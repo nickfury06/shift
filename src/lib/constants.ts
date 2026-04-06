@@ -2,25 +2,15 @@ import type { Zone, Moment, Day, ReservationSource, ReservationSeating, Reservat
 
 // ── Zone ───────────────────────────────────────────────────
 export const ZONE_LABELS: Record<Zone, string> = {
+  bar: "Bar",
   terrasse: "Terrasse",
-  terrasse_wc: "Toilettes",
   restaurant: "Restaurant",
-  bar_escaliers: "Escaliers",
-  bar_salle: "Salle",
-  bar_gaming: "Gaming",
-  bar_backbar: "Back Bar",
-  bar_reserve: "Réserve",
 };
 
 export const ZONE_COLORS: Record<Zone, string> = {
+  bar: "#8B7B6A",
   terrasse: "#C9906A",
-  terrasse_wc: "#B8845C",
-  restaurant: "#A8616A",
-  bar_escaliers: "#6B93A0",
-  bar_salle: "#6B8B5E",
-  bar_gaming: "#9B8B6E",
-  bar_backbar: "#8B7BB0",
-  bar_reserve: "#7B7060",
+  restaurant: "#A87A6A",
 };
 
 // ── Moment ─────────────────────────────────────────────────

@@ -4,15 +4,7 @@ export type StockDomain = "boissons" | "vins";
 export type StockCategory = "spiritueux" | "sirops_cocktails" | "bieres" | "vins" | "champagnes" | "softs" | "consommables";
 
 // ── Zones ──────────────────────────────────────────────────
-export type Zone =
-  | "terrasse"
-  | "terrasse_wc"
-  | "restaurant"
-  | "bar_escaliers"
-  | "bar_salle"
-  | "bar_gaming"
-  | "bar_backbar"
-  | "bar_reserve";
+export type Zone = "bar" | "terrasse" | "restaurant";
 
 // ── Moments ────────────────────────────────────────────────
 export type Moment = "ouverture" | "service" | "fermeture";
@@ -54,26 +46,30 @@ export interface Profile {
 export interface Task {
   id: string;
   title: string;
+  note: string | null;
   zone: Zone;
   moment: Moment;
-  day: Day;
-  assigned_to: string | null;
+  assigned_to: string[];
+  days: Day[];
   priority: number;
-  description: string | null;
+  is_reminder: boolean;
+  is_libre: boolean;
+  created_by: string | null;
   created_at: string;
 }
 
 export interface OneOffTask {
   id: string;
   title: string;
+  note: string | null;
   zone: Zone;
   moment: Moment;
+  assigned_to: string[];
   date: string;
-  assigned_to: string | null;
-  created_by: string;
   priority: number;
-  description: string | null;
-  completed: boolean;
+  is_reminder: boolean;
+  is_libre: boolean;
+  created_by: string | null;
   created_at: string;
 }
 

@@ -3,17 +3,31 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
-import { ZONE_LABELS, MOMENT_LABELS, DAY_LABELS, MOMENT_ORDER } from "@/lib/constants";
-import type { Task, Zone, Moment, Day } from "@/lib/types";
-import { Plus, Trash2, Edit3 } from "lucide-react";
+import { ZONE_LABELS, ZONE_COLORS, MOMENT_LABELS, MOMENT_ORDER } from "@/lib/constants";
+import type { Task, Zone, Moment, Day, Profile } from "@/lib/types";
+import { Plus, Trash2, Edit3, Bell } from "lucide-react";
+
+// ── Work days & labels ────────────────────────────────────
+const TASK_WORK_DAYS: Day[] = ["mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+
+const SHORT_DAY_LABELS: Record<Day, string> = {
+  lundi: "Lun",
+  mardi: "Mar",
+  mercredi: "Mer",
+  jeudi: "Jeu",
+  vendredi: "Ven",
+  samedi: "Sam",
+  dimanche: "Dim",
+};
 
 type FilterCategory = "all" | Zone;
 
 export default function TasksPage() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const supabase = useRef(createClient()).current;
 
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [staff, setStaff] = useState<Pick<Profile, "id" | "name">[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterCategory>("all");
 
@@ -21,11 +35,14 @@ export default function TasksPage() {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
+  const [note, setNote] = useState("");
   const [zone, setZone] = useState<Zone>("restaurant");
   const [moment, setMoment] = useState<Moment>("ouverture");
-  const [day, setDay] = useState<Day>("lundi");
-  const [priority, setPriority] = useState(0);
-  const [description, setDescription] = useState("");
+  const [selectedDays, setSelectedDays] = useState<Day[]>([...TASK_WORK_DAYS]);
+  const [priority, setPriority] = useState(1);
+  const [selectedStaff, setSelectedStaff] = useState<string[]>([]);
+  const [isLibre, setIsLibre] = useState(false);
+  const [isReminder, setIsReminder] = useState(false);
 
   const fetchTasks = useCallback(async () => {
     const { data } = await supabase
@@ -38,14 +55,23 @@ export default function TasksPage() {
     setLoading(false);
   }, [supabase]);
 
+  const fetchStaff = useCallback(async () => {
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, name")
+      .order("name");
+    setStaff(data || []);
+  }, [supabase]);
+
   useEffect(() => {
     fetchTasks();
-  }, [fetchTasks]);
+    fetchStaff();
+  }, [fetchTasks, fetchStaff]);
 
   // Guard: patron only
   if (profile && profile.role !== "patron") {
     return (
-      <div style={{ padding: "0 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+      <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
         <div className="card-medium" style={{ padding: 24, textAlign: "center" }}>
           <p style={{ color: "var(--text-secondary)" }}>Acces reserve au patron</p>
         </div>
@@ -55,40 +81,64 @@ export default function TasksPage() {
 
   function resetForm() {
     setTitle("");
+    setNote("");
     setZone("restaurant");
     setMoment("ouverture");
-    setDay("lundi");
-    setPriority(0);
-    setDescription("");
+    setSelectedDays([...TASK_WORK_DAYS]);
+    setPriority(1);
+    setSelectedStaff([]);
+    setIsLibre(false);
+    setIsReminder(false);
     setEditId(null);
     setShowForm(false);
   }
 
   function startEdit(task: Task) {
     setTitle(task.title);
+    setNote(task.note || "");
     setZone(task.zone);
     setMoment(task.moment);
-    setDay(task.day);
+    setSelectedDays(task.days || [...TASK_WORK_DAYS]);
     setPriority(task.priority);
-    setDescription(task.description || "");
+    setSelectedStaff(task.assigned_to || []);
+    setIsLibre(task.is_libre);
+    setIsReminder(task.is_reminder);
     setEditId(task.id);
     setShowForm(true);
   }
 
+  function toggleDay(d: Day) {
+    setSelectedDays((prev) =>
+      prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]
+    );
+  }
+
+  function toggleStaffMember(id: string) {
+    setSelectedStaff((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
+
   async function handleSave() {
-    if (!title.trim()) return;
+    if (!title.trim() || selectedDays.length === 0) return;
 
     const payload = {
       title: title.trim(),
+      note: note.trim() || null,
       zone,
       moment,
-      day,
+      days: selectedDays,
       priority,
-      description: description.trim() || null,
+      assigned_to: isLibre ? [] : selectedStaff,
+      is_reminder: isReminder,
+      is_libre: isLibre,
+      created_by: user?.id ?? null,
     };
 
     if (editId) {
-      await supabase.from("tasks").update(payload).eq("id", editId);
+      // Don't send created_by on update
+      const { created_by, ...updatePayload } = payload;
+      await supabase.from("tasks").update(updatePayload).eq("id", editId);
     } else {
       await supabase.from("tasks").insert(payload);
     }
@@ -105,11 +155,11 @@ export default function TasksPage() {
   const filtered =
     filter === "all" ? tasks : tasks.filter((t) => t.zone === filter);
 
-  const zones: FilterCategory[] = ["all", "restaurant", "terrasse", "bar_salle", "bar_backbar"];
+  const zones: FilterCategory[] = ["all", "bar", "terrasse", "restaurant"];
 
   if (loading) {
     return (
-      <div style={{ padding: "0 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+      <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div className="card-light" style={{ height: 40, width: "50%", borderRadius: 8, opacity: 0.5 }} />
           {[1, 2, 3].map((i) => (
@@ -121,11 +171,13 @@ export default function TasksPage() {
   }
 
   return (
-    <div style={{ padding: "0 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+    <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 16 }}>
-          <h1 style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-primary)" }}>Taches</h1>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <h1 style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-primary)" }}>
+            Taches
+          </h1>
           <button
             onClick={() => {
               resetForm();
@@ -139,21 +191,25 @@ export default function TasksPage() {
           </button>
         </div>
 
-        {/* Category filter pills */}
+        {/* Zone filter pills */}
         <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
           {zones.map((z) => (
             <button
               key={z}
               onClick={() => setFilter(z)}
-              className={`pill ${filter === z ? "" : ""}`}
-              style={filter === z ? { background: "var(--gradient-primary)", color: "#fff", flexShrink: 0 } : { flexShrink: 0 }}
+              className="pill"
+              style={
+                filter === z
+                  ? { background: "var(--gradient-primary)", color: "#fff", flexShrink: 0 }
+                  : { flexShrink: 0 }
+              }
             >
-              {z === "all" ? "Toutes" : ZONE_LABELS[z]}
+              {z === "all" ? "Tout" : ZONE_LABELS[z]}
             </button>
           ))}
         </div>
 
-        {/* Form */}
+        {/* ── Form ────────────────────────────────────────── */}
         {showForm && (
           <div className="card-medium" style={{ padding: 16 }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -161,6 +217,7 @@ export default function TasksPage() {
                 {editId ? "Modifier" : "Nouvelle tache"}
               </p>
 
+              {/* Title */}
               <input
                 type="text"
                 placeholder="Titre de la tache"
@@ -169,55 +226,196 @@ export default function TasksPage() {
                 className="w-full rounded-xl bg-input px-3 py-2 text-sm outline-none"
               />
 
+              {/* Note */}
               <textarea
-                placeholder="Description (optionnel)"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Note (optionnel)"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
                 className="w-full rounded-xl bg-input px-3 py-2 text-sm outline-none resize-none"
                 rows={2}
               />
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                <select
-                  value={zone}
-                  onChange={(e) => setZone(e.target.value as Zone)}
-                  className="rounded-xl bg-input px-3 py-2 text-sm"
-                >
+              {/* Zone */}
+              <div>
+                <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 8 }}>Zone</p>
+                <div style={{ display: "flex", gap: 8 }}>
                   {(Object.keys(ZONE_LABELS) as Zone[]).map((z) => (
-                    <option key={z} value={z}>{ZONE_LABELS[z]}</option>
+                    <button
+                      key={z}
+                      onClick={() => setZone(z)}
+                      className="rounded-xl px-3 py-2 text-sm font-medium"
+                      style={
+                        zone === z
+                          ? { background: ZONE_COLORS[z], color: "#fff" }
+                          : { background: "var(--secondary-bg)", color: "var(--text-secondary)" }
+                      }
+                    >
+                      {ZONE_LABELS[z]}
+                    </button>
                   ))}
-                </select>
-
-                <select
-                  value={moment}
-                  onChange={(e) => setMoment(e.target.value as Moment)}
-                  className="rounded-xl bg-input px-3 py-2 text-sm"
-                >
-                  {MOMENT_ORDER.map((m) => (
-                    <option key={m} value={m}>{MOMENT_LABELS[m]}</option>
-                  ))}
-                </select>
-
-                <select
-                  value={day}
-                  onChange={(e) => setDay(e.target.value as Day)}
-                  className="rounded-xl bg-input px-3 py-2 text-sm"
-                >
-                  {(Object.keys(DAY_LABELS) as Day[]).map((d) => (
-                    <option key={d} value={d}>{DAY_LABELS[d]}</option>
-                  ))}
-                </select>
-
-                <input
-                  type="number"
-                  placeholder="Priorite"
-                  value={priority}
-                  onChange={(e) => setPriority(Number(e.target.value))}
-                  className="rounded-xl bg-input px-3 py-2 text-sm"
-                  min={0}
-                />
+                </div>
               </div>
 
+              {/* Moment */}
+              <div>
+                <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 8 }}>Moment</p>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {MOMENT_ORDER.map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => setMoment(m)}
+                      className="rounded-xl px-3 py-2 text-sm font-medium"
+                      style={
+                        moment === m
+                          ? { background: "var(--gradient-primary)", color: "#fff" }
+                          : { background: "var(--secondary-bg)", color: "var(--text-secondary)" }
+                      }
+                    >
+                      {MOMENT_LABELS[m]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Days */}
+              <div>
+                <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 8 }}>Jours</p>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {TASK_WORK_DAYS.map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => toggleDay(d)}
+                      className="rounded-xl px-3 py-2 text-sm font-medium"
+                      style={
+                        selectedDays.includes(d)
+                          ? { background: "var(--gradient-primary)", color: "#fff" }
+                          : { background: "var(--secondary-bg)", color: "var(--text-secondary)" }
+                      }
+                    >
+                      {SHORT_DAY_LABELS[d]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Priority */}
+              <div>
+                <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 8 }}>Priorite</p>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {[1, 2, 3, 4, 5].map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setPriority(p)}
+                      className="rounded-xl text-sm font-medium"
+                      style={{
+                        width: 36,
+                        height: 36,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        ...(priority === p
+                          ? { background: "var(--gradient-primary)", color: "#fff" }
+                          : { background: "var(--secondary-bg)", color: "var(--text-secondary)" }),
+                      }}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Toggles row */}
+              <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+                {/* Is libre */}
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                  <div
+                    onClick={() => {
+                      setIsLibre(!isLibre);
+                      if (!isLibre) setSelectedStaff([]);
+                    }}
+                    style={{
+                      width: 40,
+                      height: 22,
+                      borderRadius: 11,
+                      background: isLibre ? "var(--color-primary)" : "var(--secondary-bg)",
+                      position: "relative",
+                      transition: "background 0.2s",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: 9,
+                        background: "#fff",
+                        position: "absolute",
+                        top: 2,
+                        left: isLibre ? 20 : 2,
+                        transition: "left 0.2s",
+                      }}
+                    />
+                  </div>
+                  <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>Libre (dispo pour tous)</span>
+                </label>
+
+                {/* Is reminder */}
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                  <div
+                    onClick={() => setIsReminder(!isReminder)}
+                    style={{
+                      width: 40,
+                      height: 22,
+                      borderRadius: 11,
+                      background: isReminder ? "var(--color-primary)" : "var(--secondary-bg)",
+                      position: "relative",
+                      transition: "background 0.2s",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: 9,
+                        background: "#fff",
+                        position: "absolute",
+                        top: 2,
+                        left: isReminder ? 20 : 2,
+                        transition: "left 0.2s",
+                      }}
+                    />
+                  </div>
+                  <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>Rappel</span>
+                </label>
+              </div>
+
+              {/* Assigned to (hidden if libre) */}
+              {!isLibre && (
+                <div>
+                  <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 8 }}>
+                    Assigne a (optionnel)
+                  </p>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {staff.map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => toggleStaffMember(s.id)}
+                        className="rounded-xl px-3 py-2 text-sm font-medium"
+                        style={
+                          selectedStaff.includes(s.id)
+                            ? { background: "var(--gradient-primary)", color: "#fff" }
+                            : { background: "var(--secondary-bg)", color: "var(--text-secondary)" }
+                        }
+                      >
+                        {s.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
               <div style={{ display: "flex", gap: 8 }}>
                 <button
                   onClick={handleSave}
@@ -238,21 +436,82 @@ export default function TasksPage() {
           </div>
         )}
 
-        {/* Task list */}
+        {/* ── Task list ───────────────────────────────────── */}
         <div className="stagger" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {filtered.map((task) => (
-            <div key={task.id} className="card-light" style={{ padding: 16, display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+            <div
+              key={task.id}
+              className="card-light"
+              style={{ padding: 16, display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}
+            >
               <div style={{ minWidth: 0, flex: 1 }}>
-                <p style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>{task.title}</p>
-                {task.description && (
-                  <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4 }}>{task.description}</p>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {task.is_reminder && (
+                    <Bell size={14} style={{ color: "var(--color-primary)", flexShrink: 0 }} />
+                  )}
+                  <p style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>
+                    {task.title}
+                  </p>
+                </div>
+
+                {task.note && (
+                  <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4 }}>
+                    {task.note}
+                  </p>
                 )}
-                <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                  <span className="pill">{ZONE_LABELS[task.zone]}</span>
-                  <span className="pill">{MOMENT_LABELS[task.moment]}</span>
-                  <span className="pill">{DAY_LABELS[task.day]}</span>
+
+                <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  {/* Zone badge */}
+                  <span
+                    className="pill"
+                    style={{ background: ZONE_COLORS[task.zone], color: "#fff", fontSize: 11 }}
+                  >
+                    {ZONE_LABELS[task.zone]}
+                  </span>
+
+                  {/* Moment */}
+                  <span className="pill" style={{ fontSize: 11 }}>
+                    {MOMENT_LABELS[task.moment]}
+                  </span>
+
+                  {/* Days pills */}
+                  {task.days && task.days.length > 0 && (
+                    <div style={{ display: "flex", gap: 4 }}>
+                      {TASK_WORK_DAYS.filter((d) => task.days.includes(d)).map((d) => (
+                        <span
+                          key={d}
+                          style={{
+                            fontSize: 10,
+                            padding: "2px 6px",
+                            borderRadius: 6,
+                            background: "var(--secondary-bg)",
+                            color: "var(--text-secondary)",
+                            fontWeight: 500,
+                          }}
+                        >
+                          {SHORT_DAY_LABELS[d]}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Priority */}
+                  <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                    P{task.priority}
+                  </span>
+
+                  {/* Libre badge */}
+                  {task.is_libre && (
+                    <span
+                      className="pill"
+                      style={{ fontSize: 10, background: "var(--color-primary)", color: "#fff" }}
+                    >
+                      Libre
+                    </span>
+                  )}
                 </div>
               </div>
+
               <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: 8 }}>
                 <button
                   onClick={() => startEdit(task)}

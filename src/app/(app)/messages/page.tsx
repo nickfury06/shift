@@ -5,32 +5,30 @@ import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
 import { getShiftDate, formatDateFr } from "@/lib/shift-utils";
 import type { ManagerMessage } from "@/lib/types";
-import MessageBanner from "@/components/MessageBanner";
 import { Send, Trash2 } from "lucide-react";
 
 export default function MessagesPage() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const supabase = useRef(createClient()).current;
 
   const [messages, setMessages] = useState<ManagerMessage[]>([]);
+  const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
-  // Compose state
-  const [title, setTitle] = useState("");
+  // Compose state — just content + date
   const [content, setContent] = useState("");
-  const [priority, setPriority] = useState<"normal" | "urgent">("normal");
+  const [date, setDate] = useState(getShiftDate());
   const [sending, setSending] = useState(false);
 
-  const shiftDate = getShiftDate();
-
   const fetchMessages = useCallback(async () => {
-    const { data } = await supabase
-      .from("manager_messages")
-      .select("*")
-      .order("date", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(30);
-    setMessages((data as ManagerMessage[]) || []);
+    const [{ data: msgs }, { data: profs }] = await Promise.all([
+      supabase.from("messages").select("*").order("date", { ascending: false }).order("created_at", { ascending: false }).limit(30),
+      supabase.from("profiles").select("id, name"),
+    ]);
+    setMessages(msgs || []);
+    const map: Record<string, string> = {};
+    profs?.forEach((p: { id: string; name: string }) => { map[p.id] = p.name; });
+    setProfiles(map);
     setLoading(false);
   }, [supabase]);
 
@@ -41,103 +39,117 @@ export default function MessagesPage() {
   // Guard: patron only
   if (profile && profile.role !== "patron") {
     return (
-      <div style={{ padding: "0 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+      <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
         <div className="card-medium" style={{ padding: 24, textAlign: "center" }}>
-          <p style={{ color: "var(--text-secondary)" }}>Acces reserve au patron</p>
+          <p style={{ color: "var(--text-secondary)" }}>Accès réservé au patron</p>
         </div>
       </div>
     );
   }
 
   async function handleSend() {
-    if (!title.trim() || !content.trim() || !profile) return;
+    if (!content.trim() || !user) return;
     setSending(true);
 
-    await supabase.from("manager_messages").insert({
-      title: title.trim(),
+    const { error } = await supabase.from("messages").insert({
       content: content.trim(),
-      date: shiftDate,
-      priority,
-      created_by: profile.id,
+      date,
+      created_by: user.id,
     });
 
-    setTitle("");
-    setContent("");
-    setPriority("normal");
+    if (!error) {
+      setContent("");
+      fetchMessages();
+    }
     setSending(false);
-    fetchMessages();
   }
 
   async function handleDelete(id: string) {
-    await supabase.from("manager_messages").delete().eq("id", id);
+    await supabase.from("messages").delete().eq("id", id);
     fetchMessages();
   }
 
   if (loading) {
     return (
-      <div style={{ padding: "0 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+      <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div className="card-light" style={{ height: 40, width: "50%", borderRadius: 8, opacity: 0.5 }} />
           <div className="card-light" style={{ height: 128, borderRadius: 8, opacity: 0.5 }} />
-          {[1, 2].map((i) => (
-            <div key={i} className="card-light" style={{ height: 80, borderRadius: 8, opacity: 0.5 }} />
-          ))}
         </div>
       </div>
     );
   }
 
+  const today = getShiftDate();
+
   return (
-    <div style={{ padding: "0 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+    <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
       <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-        <h1 style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-primary)", paddingTop: 16 }}>Messages</h1>
+        <h1 style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-primary)" }}>Messages</h1>
 
-        {/* Compose */}
+        {/* Compose — just content + date, author auto-detected */}
         <div className="card-medium" style={{ padding: 16 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <p className="section-label">Nouveau message</p>
-
-            <input
-              type="text"
-              placeholder="Titre / auteur"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded-xl bg-input px-3 py-2 text-sm outline-none"
-            />
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <p className="section-label">Nouveau message pour l&apos;équipe</p>
 
             <textarea
-              placeholder="Contenu du message..."
+              placeholder="Ex: Plus que 3 portions de tartare — proposer le carpaccio..."
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              className="w-full rounded-xl bg-input px-3 py-2 text-sm outline-none resize-none"
+              style={{
+                width: "100%",
+                borderRadius: 12,
+                background: "var(--input-bg)",
+                border: "1px solid var(--border-color)",
+                padding: "12px 16px",
+                fontSize: 14,
+                color: "var(--text-primary)",
+                outline: "none",
+                resize: "none",
+                minHeight: 80,
+              }}
               rows={3}
             />
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  onClick={() => setPriority("normal")}
-                  className={`pill ${priority === "normal" ? "text-white" : ""}`}
-                  style={priority === "normal" ? { background: "var(--gradient-primary)", color: "#fff" } : undefined}
-                >
-                  Normal
-                </button>
-                <button
-                  onClick={() => setPriority("urgent")}
-                  className={`pill ${priority === "urgent" ? "bg-destructive text-white" : ""}`}
-                >
-                  Urgent
-                </button>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Pour le :</span>
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  style={{
+                    borderRadius: 8,
+                    background: "var(--input-bg)",
+                    border: "1px solid var(--border-color)",
+                    padding: "4px 8px",
+                    fontSize: 12,
+                    color: "var(--text-primary)",
+                    outline: "none",
+                  }}
+                />
               </div>
 
               <button
                 onClick={handleSend}
-                disabled={sending || !title.trim() || !content.trim()}
-                className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                style={{ background: "var(--gradient-primary)" }}
+                disabled={sending || !content.trim()}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  borderRadius: 12,
+                  padding: "8px 16px",
+                  fontSize: 14,
+                  fontWeight: 500,
+                  color: "#fff",
+                  background: "var(--gradient-primary)",
+                  border: "none",
+                  cursor: "pointer",
+                  opacity: sending || !content.trim() ? 0.5 : 1,
+                }}
               >
                 <Send size={14} />
-                Envoyer
+                Publier
               </button>
             </div>
           </div>
@@ -147,34 +159,55 @@ export default function MessagesPage() {
         <div>
           <p className="section-label" style={{ marginBottom: 8 }}>Historique</p>
           <div className="stagger" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className="card-heavy"
-                style={{
-                  position: "relative",
-                  borderLeft: `3px solid ${msg.priority === "urgent" ? "var(--destructive)" : "var(--terra-deep)"}`,
-                  padding: 16,
-                }}
-              >
-                <div style={{ paddingRight: 32 }}>
-                  <p style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>{msg.content}</p>
-                  <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 4 }}>{msg.title} · {formatDateFr(msg.date)}</p>
-                </div>
-                <button
-                  onClick={() => handleDelete(msg.id)}
-                  className="flex items-center justify-center rounded-lg hover:bg-secondary"
-                  style={{ position: "absolute", top: 8, right: 8, width: 28, height: 28 }}
-                  aria-label="Supprimer"
+            {messages.map((msg) => {
+              const isPast = msg.date < today;
+              return (
+                <div
+                  key={msg.id}
+                  style={{
+                    position: "relative",
+                    background: "var(--card-bg)",
+                    border: "1px solid var(--card-border)",
+                    borderLeft: "3px solid var(--terra-medium)",
+                    borderRadius: 16,
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 6px 20px rgba(0,0,0,0.06)",
+                    padding: 16,
+                    opacity: isPast ? 0.5 : 1,
+                  }}
                 >
-                  <Trash2 size={13} className="text-destructive" />
-                </button>
-              </div>
-            ))}
+                  <div style={{ paddingRight: 32 }}>
+                    <p style={{ fontSize: 14, color: "var(--text-primary)", lineHeight: 1.5 }}>{msg.content}</p>
+                    <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 8 }}>
+                      — {profiles[msg.created_by] || "?"} · {formatDateFr(msg.date)}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleDelete(msg.id)}
+                    style={{
+                      position: "absolute",
+                      top: 12,
+                      right: 12,
+                      width: 28,
+                      height: 28,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: 8,
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                    }}
+                    aria-label="Supprimer"
+                  >
+                    <Trash2 size={13} style={{ color: "var(--danger)" }} />
+                  </button>
+                </div>
+              );
+            })}
 
             {messages.length === 0 && (
               <div className="card-light" style={{ padding: 24, textAlign: "center" }}>
-                <p style={{ fontSize: 14, color: "var(--text-secondary)" }}>Aucun message</p>
+                <p style={{ fontSize: 14, color: "var(--text-secondary)" }}>Aucun message — publie ton premier message pour l&apos;équipe</p>
               </div>
             )}
           </div>

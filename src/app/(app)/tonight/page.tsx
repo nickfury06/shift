@@ -98,7 +98,7 @@ export default function TonightPage() {
       title: t.title,
       zone: ZONE_LABELS[t.zone] || t.zone,
       zoneKey: t.zone,
-      description: t.description,
+      description: t.note,
       completed: completedIds.has(t.id),
       moment: t.moment,
       isOneOff: false,
@@ -109,8 +109,8 @@ export default function TonightPage() {
       title: t.title,
       zone: ZONE_LABELS[t.zone] || t.zone,
       zoneKey: t.zone,
-      description: t.description,
-      completed: t.completed,
+      description: t.note,
+      completed: completedIds.has(t.id),
       moment: t.moment,
       isOneOff: true,
     }));
@@ -230,7 +230,7 @@ export default function TonightPage() {
   const totalCovers = reservations.reduce((sum, r) => sum + r.covers, 0);
 
   return (
-    <div style={{ padding: "0 20px", paddingBottom: 96, maxWidth: 512, margin: "0 auto" }}>
+    <div style={{ padding: "0 20px", paddingTop: "env(safe-area-inset-top, 16px)", paddingBottom: 96, maxWidth: 512, margin: "0 auto" }}>
 
       {/* ── Compact Header ──────────────────────────────────── */}
       <div
@@ -238,7 +238,7 @@ export default function TonightPage() {
           display: "flex",
           alignItems: "center",
           gap: 6,
-          padding: "4px 0 20px",
+          padding: "16px 0 20px",
           fontSize: 14,
           color: "var(--text-secondary)",
         }}
