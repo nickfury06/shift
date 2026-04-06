@@ -1,31 +1,48 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+"use client";
 
-export default async function Home() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+import { useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
 
-  if (!user) {
-    redirect("/login");
-  }
+export default function Home() {
+  const router = useRouter();
 
-  // Get user profile to determine role and onboarding status
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, onboarding_completed")
-    .eq("id", user.id)
-    .single();
+  useEffect(() => {
+    async function checkAuth() {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
 
-  if (profile?.role === "patron") {
-    redirect("/dashboard");
-  }
+      if (!session) {
+        router.replace("/login");
+        return;
+      }
 
-  // Staff/responsable who haven't completed onboarding
-  if (profile && !profile.onboarding_completed) {
-    redirect("/onboarding");
-  }
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role, onboarding_completed")
+        .eq("id", session.user.id)
+        .single();
 
-  redirect("/tonight");
+      if (!profile) {
+        router.replace("/login");
+        return;
+      }
+
+      if (profile.role === "patron") {
+        router.replace("/dashboard");
+      } else if (!profile.onboarding_completed) {
+        router.replace("/onboarding");
+      } else {
+        router.replace("/tonight");
+      }
+    }
+
+    checkAuth();
+  }, [router]);
+
+  return (
+    <div className="min-h-dvh flex items-center justify-center">
+      <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--terra-medium)", borderTopColor: "transparent" }} />
+    </div>
+  );
 }

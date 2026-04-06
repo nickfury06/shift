@@ -17,49 +17,26 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
 
-    const supabase = createClient();
+    try {
+      const supabase = createClient();
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (authError) {
-      setError("Email ou mot de passe incorrect");
+      if (authError) {
+        setError(authError.message);
+        setLoading(false);
+        return;
+      }
+
+      // Small delay to let session cookie settle, then hard redirect
+      await new Promise((r) => setTimeout(r, 300));
+      window.location.href = "/";
+    } catch (err: unknown) {
+      setError(String(err));
       setLoading(false);
-      return;
-    }
-
-    // Fetch profile to determine redirect
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      setError("Erreur lors de la connexion");
-      setLoading(false);
-      return;
-    }
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role, onboarding_completed")
-      .eq("id", user.id)
-      .single<Pick<Profile, "role" | "onboarding_completed">>();
-
-    if (!profile) {
-      setError("Profil introuvable");
-      setLoading(false);
-      return;
-    }
-
-    // Redirect based on onboarding status and role
-    if (!profile.onboarding_completed) {
-      router.push("/onboarding");
-    } else if (profile.role === "patron") {
-      router.push("/dashboard");
-    } else {
-      router.push("/tonight");
     }
   }
 
@@ -93,7 +70,7 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoComplete="email"
-                className="w-full rounded-xl border border-border bg-background/50 px-4 py-3 text-sm outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
+                style={{ width: "100%", borderRadius: 12, border: "1px solid var(--border-color)", background: "var(--input-bg)", padding: "12px 16px", fontSize: 14, color: "var(--text-primary)", outline: "none" }}
                 placeholder="prenom@lehive.fr"
               />
             </div>
@@ -112,7 +89,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="current-password"
-                className="w-full rounded-xl border border-border bg-background/50 px-4 py-3 text-sm outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
+                style={{ width: "100%", borderRadius: 12, border: "1px solid var(--border-color)", background: "var(--input-bg)", padding: "12px 16px", fontSize: 14, color: "var(--text-primary)", outline: "none" }}
                 placeholder="••••••••"
               />
             </div>
