@@ -38,9 +38,9 @@ export default function StaffPage() {
   // Guard: patron only
   if (profile && profile.role !== "patron") {
     return (
-      <div className="p-4 pb-28 max-w-lg mx-auto">
-        <div className="glass-card p-6 text-center">
-          <p className="text-muted-foreground">Acces reserve au patron</p>
+      <div style={{ padding: "0 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+        <div className="card-medium" style={{ padding: 24, textAlign: "center" }}>
+          <p style={{ color: "var(--text-secondary)" }}>Acces reserve au patron</p>
         </div>
       </div>
     );
@@ -65,15 +65,13 @@ export default function StaffPage() {
     const password = `shift-${firstName.toLowerCase()}-${Math.random().toString(36).slice(2, 8)}`;
 
     try {
-      // Create auth user via Supabase admin (edge function or service role)
-      // For now we use the signUp endpoint
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             name: `${firstName.trim()} ${lastName.trim()}`,
-            
+
             role,
           },
         },
@@ -86,12 +84,11 @@ export default function StaffPage() {
       }
 
       if (authData.user) {
-        // Upsert profile
         await supabase.from("profiles").upsert({
           id: authData.user.id,
           email,
           name: `${firstName.trim()} ${lastName.trim()}`,
-          
+
           role,
           onboarding_completed: false,
         });
@@ -120,7 +117,6 @@ export default function StaffPage() {
 
   async function handleResetPassword(userEmail: string) {
     const newPassword = `shift-reset-${Math.random().toString(36).slice(2, 8)}`;
-    // This would typically go through an edge function with service role
     alert(`Nouveau mot de passe pour ${userEmail}:\n${newPassword}\n\n(Implementation via edge function requise)`);
   }
 
@@ -132,128 +128,137 @@ export default function StaffPage() {
 
   if (loading) {
     return (
-      <div className="p-4 pb-28 max-w-lg mx-auto space-y-4">
-        <div className="bg-card rounded-lg animate-pulse h-10 w-1/2" />
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="bg-card rounded-lg animate-pulse h-16" />
-        ))}
+      <div style={{ padding: "0 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div className="card-light" style={{ height: 40, width: "50%", borderRadius: 8, opacity: 0.5 }} />
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="card-light" style={{ height: 64, borderRadius: 8, opacity: 0.5 }} />
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-4 pb-28 max-w-lg mx-auto space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold tracking-tight">Equipe</h1>
-        <button
-          onClick={() => setShowForm((v) => !v)}
-          className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-white"
-          style={{ background: "var(--gradient-primary)" }}
-        >
-          <UserPlus size={16} />
-          Ajouter
-        </button>
-      </div>
-
-      {/* Create form */}
-      {showForm && (
-        <div className="glass-card p-4 space-y-3">
-          <h3 className="text-base font-semibold tracking-tight">Nouveau membre</h3>
-
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
-
-          <input
-            type="text"
-            placeholder="Prenom"
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-            className="w-full rounded-xl bg-input px-3 py-2 text-sm outline-none"
-          />
-
-          <input
-            type="text"
-            placeholder="Nom"
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
-            className="w-full rounded-xl bg-input px-3 py-2 text-sm outline-none"
-          />
-
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value as Role)}
-            className="w-full rounded-xl bg-input px-3 py-2 text-sm"
+    <div style={{ padding: "0 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 16 }}>
+          <h1 style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-primary)" }}>Equipe</h1>
+          <button
+            onClick={() => setShowForm((v) => !v)}
+            className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-white"
+            style={{ background: "var(--gradient-primary)" }}
           >
-            <option value="staff">Staff</option>
-            <option value="responsable">Responsable</option>
-          </select>
-
-          {firstName && lastName && (
-            <p className="text-xs text-muted-foreground">
-              Email auto: {generateEmail(firstName, lastName)}
-            </p>
-          )}
-
-          <div className="flex gap-2">
-            <button
-              onClick={handleCreate}
-              disabled={creating || !firstName.trim() || !lastName.trim()}
-              className="flex-1 rounded-xl px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-              style={{ background: "var(--gradient-primary)" }}
-            >
-              {creating ? "Creation..." : "Creer le compte"}
-            </button>
-            <button
-              onClick={() => setShowForm(false)}
-              className="rounded-xl px-3 py-2 text-sm font-medium bg-secondary text-muted-foreground"
-            >
-              Annuler
-            </button>
-          </div>
+            <UserPlus size={16} />
+            Ajouter
+          </button>
         </div>
-      )}
 
-      {/* Staff list */}
-      <div className="space-y-2 stagger-children">
-        {staff.map((member) => (
-          <div key={member.id} className="glass-card p-3 flex items-center justify-between">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">
-                {member.name}
-              </p>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="pill text-[10px]">{roleLabel[member.role]}</span>
-                <span className="text-[10px] text-muted-foreground">{member.email}</span>
+        {/* Create form */}
+        {showForm && (
+          <div className="card-medium" style={{ padding: 16 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <p className="section-label">Nouveau membre</p>
+
+              {error && (
+                <p className="text-sm text-destructive">{error}</p>
+              )}
+
+              <input
+                type="text"
+                placeholder="Prenom"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                className="w-full rounded-xl bg-input px-3 py-2 text-sm outline-none"
+              />
+
+              <input
+                type="text"
+                placeholder="Nom"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                className="w-full rounded-xl bg-input px-3 py-2 text-sm outline-none"
+              />
+
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value as Role)}
+                className="w-full rounded-xl bg-input px-3 py-2 text-sm"
+              >
+                <option value="staff">Staff</option>
+                <option value="responsable">Responsable</option>
+              </select>
+
+              {firstName && lastName && (
+                <p style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                  Email auto: {generateEmail(firstName, lastName)}
+                </p>
+              )}
+
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={handleCreate}
+                  disabled={creating || !firstName.trim() || !lastName.trim()}
+                  className="flex-1 rounded-xl px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  style={{ background: "var(--gradient-primary)" }}
+                >
+                  {creating ? "Creation..." : "Creer le compte"}
+                </button>
+                <button
+                  onClick={() => setShowForm(false)}
+                  className="rounded-xl px-3 py-2 text-sm font-medium"
+                  style={{ background: "var(--secondary-bg)", color: "var(--text-secondary)" }}
+                >
+                  Annuler
+                </button>
               </div>
             </div>
-            {member.role !== "patron" && (
-              <div className="flex items-center gap-1 ml-2">
-                <button
-                  onClick={() => handleResetPassword(member.email)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-secondary"
-                  aria-label="Reset mot de passe"
-                >
-                  <KeyRound size={14} className="text-muted-foreground" />
-                </button>
-                <button
-                  onClick={() => handleDelete(member.id)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-secondary"
-                  aria-label="Supprimer"
-                >
-                  <Trash2 size={14} className="text-destructive" />
-                </button>
-              </div>
-            )}
-          </div>
-        ))}
-
-        {staff.length === 0 && (
-          <div className="glass-card p-6 text-center">
-            <p className="text-sm text-muted-foreground">Aucun membre</p>
           </div>
         )}
+
+        {/* Staff list */}
+        <div className="stagger" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {staff.map((member) => (
+            <div key={member.id} className="card-light" style={{ padding: 16, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <p style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>
+                  {member.name}
+                </p>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+                  <span className="pill">{roleLabel[member.role]}</span>
+                  <span style={{ fontSize: 10, color: "var(--text-tertiary)" }}>{member.email}</span>
+                </div>
+              </div>
+              {member.role !== "patron" && (
+                <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: 8 }}>
+                  <button
+                    onClick={() => handleResetPassword(member.email)}
+                    className="flex items-center justify-center rounded-lg hover:bg-secondary"
+                    style={{ width: 32, height: 32 }}
+                    aria-label="Reset mot de passe"
+                  >
+                    <KeyRound size={14} style={{ color: "var(--text-tertiary)" }} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(member.id)}
+                    className="flex items-center justify-center rounded-lg hover:bg-secondary"
+                    style={{ width: 32, height: 32 }}
+                    aria-label="Supprimer"
+                  >
+                    <Trash2 size={14} className="text-destructive" />
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+
+          {staff.length === 0 && (
+            <div className="card-light" style={{ padding: 24, textAlign: "center" }}>
+              <p style={{ fontSize: 14, color: "var(--text-secondary)" }}>Aucun membre</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

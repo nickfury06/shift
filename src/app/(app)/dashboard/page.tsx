@@ -53,9 +53,9 @@ export default function DashboardPage() {
   // Guard: patron only
   if (profile && profile.role !== "patron") {
     return (
-      <div className="p-4 pb-28 max-w-lg mx-auto">
-        <div className="glass-card p-6 text-center">
-          <p className="text-muted-foreground">Acces reserve au patron</p>
+      <div style={{ padding: "0 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+        <div className="card-medium" style={{ padding: 24, textAlign: "center" }}>
+          <p style={{ color: "var(--text-secondary)" }}>Acces reserve au patron</p>
         </div>
       </div>
     );
@@ -63,14 +63,16 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="p-4 pb-28 max-w-lg mx-auto space-y-4">
-        <div className="bg-card rounded-lg animate-pulse h-10 w-3/4" />
-        <div className="grid grid-cols-3 gap-2">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-card rounded-lg animate-pulse h-24" />
-          ))}
+      <div style={{ padding: "0 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div className="card-light" style={{ height: 40, width: "75%", borderRadius: 8, opacity: 0.5 }} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="card-light" style={{ height: 96, borderRadius: 8, opacity: 0.5 }} />
+            ))}
+          </div>
+          <div className="card-light" style={{ height: 160, borderRadius: 8, opacity: 0.5 }} />
         </div>
-        <div className="bg-card rounded-lg animate-pulse h-40" />
       </div>
     );
   }
@@ -100,113 +102,119 @@ export default function DashboardPage() {
   });
 
   return (
-    <div className="p-4 pb-28 max-w-lg mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div style={{ padding: "0 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+      <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 16 }}>
+          <div>
+            <h1 style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-primary)" }}>Dashboard</h1>
+            <p style={{ fontSize: 14, color: "var(--text-secondary)" }}>{formatDateFr(shiftDate)}</p>
+          </div>
+          <ThemeToggle />
+        </div>
+
+        {/* 3 stat cards */}
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">{formatDateFr(shiftDate)}</p>
-        </div>
-        <ThemeToggle />
-      </div>
-
-      {/* 3 stat cards */}
-      <div className="grid grid-cols-3 gap-2 stagger-children">
-        <div className="glass-card p-3 text-center">
-          <CheckCircle2 size={20} className="mx-auto text-success mb-1" />
-          <p className="text-2xl font-semibold">{completionRate}%</p>
-          <p className="text-[10px] text-muted-foreground">Completion</p>
-        </div>
-        <div className="glass-card p-3 text-center">
-          <TrendingUp size={20} className="mx-auto text-primary mb-1" />
-          <p className="text-2xl font-semibold">{doneTasks}/{totalTasks}</p>
-          <p className="text-[10px] text-muted-foreground">Taches</p>
-        </div>
-        <div className="glass-card p-3 text-center">
-          <Star size={20} className="mx-auto text-warning mb-1" />
-          <p className="text-2xl font-semibold" style={{ color: typeof avgScore === "string" && avgScore !== "--" ? scoreColor(parseFloat(avgScore)) : undefined }}>
-            {avgScore}
-          </p>
-          <p className="text-[10px] text-muted-foreground">Score moyen</p>
-        </div>
-      </div>
-
-      {/* Moment progress */}
-      <div className="space-y-3">
-        <h2 className="text-base font-semibold tracking-tight">Progression par moment</h2>
-        <div className="space-y-2 stagger-children">
-          {momentProgress.map((mp) => (
-            <div key={mp.moment} className="glass-card p-3">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-sm font-medium">{MOMENT_LABELS[mp.moment]}</span>
-                <span className="text-xs text-muted-foreground">{mp.done}/{mp.total}</span>
-              </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
-                <div
-                  className="h-full rounded-full transition-all duration-500"
-                  style={{
-                    width: `${mp.pct}%`,
-                    background: "var(--gradient-primary)",
-                  }}
-                />
-              </div>
+          <p className="section-label" style={{ marginBottom: 8 }}>Statistiques</p>
+          <div className="stagger" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+            <div className="card-medium" style={{ padding: 16, textAlign: "center" }}>
+              <CheckCircle2 size={20} style={{ margin: "0 auto 8px", color: "var(--terra-deep)" }} />
+              <p style={{ fontSize: 24, fontWeight: 600, color: "var(--text-primary)" }}>{completionRate}%</p>
+              <p style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Completion</p>
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Staff progress */}
-      {staffProgress.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-base font-semibold tracking-tight">Equipe ce soir</h2>
-          <div className="space-y-2 stagger-children">
-            {staffProgress.map((sp) => (
-              <div key={sp.name} className="glass-card p-3 flex items-center justify-between">
-                <span className="text-sm font-medium">{sp.name}</span>
-                <span className="pill">{sp.count} tache{sp.count !== 1 ? "s" : ""}</span>
-              </div>
-            ))}
+            <div className="card-medium" style={{ padding: 16, textAlign: "center" }}>
+              <TrendingUp size={20} style={{ margin: "0 auto 8px", color: "var(--terra-deep)" }} />
+              <p style={{ fontSize: 24, fontWeight: 600, color: "var(--text-primary)" }}>{doneTasks}/{totalTasks}</p>
+              <p style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Taches</p>
+            </div>
+            <div className="card-medium" style={{ padding: 16, textAlign: "center" }}>
+              <Star size={20} style={{ margin: "0 auto 8px", color: "var(--terra-deep)" }} />
+              <p style={{ fontSize: 24, fontWeight: 600, color: typeof avgScore === "string" && avgScore !== "--" ? scoreColor(parseFloat(avgScore)) : "var(--text-primary)" }}>
+                {avgScore}
+              </p>
+              <p style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Score moyen</p>
+            </div>
           </div>
         </div>
-      )}
 
-      {/* Recent debriefs */}
-      {debriefs.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-base font-semibold tracking-tight">Derniers debriefs</h2>
-          <div className="space-y-2 stagger-children">
-            {debriefs.slice(0, 5).map((d) => (
-              <div key={d.id} className="glass-card p-3 flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <span className="text-sm font-medium capitalize">{d.category}</span>
-                  {d.comment && (
-                    <p className="text-xs text-muted-foreground truncate mt-0.5">{d.comment}</p>
-                  )}
+        {/* Moment progress */}
+        <div>
+          <p className="section-label" style={{ marginBottom: 8 }}>Progression par moment</p>
+          <div className="stagger" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {momentProgress.map((mp) => (
+              <div key={mp.moment} className="card-light" style={{ padding: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>{MOMENT_LABELS[mp.moment]}</span>
+                  <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{mp.done}/{mp.total}</span>
                 </div>
-                <span
-                  className="text-lg font-semibold ml-3"
-                  style={{ color: scoreColor(d.score) }}
-                >
-                  {d.score}
-                </span>
+                <div style={{ height: 6, width: "100%", overflow: "hidden", borderRadius: 999, background: "var(--secondary-bg)" }}>
+                  <div
+                    style={{
+                      height: "100%",
+                      borderRadius: 999,
+                      transition: "all 500ms",
+                      width: `${mp.pct}%`,
+                      background: "var(--gradient-primary)",
+                    }}
+                  />
+                </div>
               </div>
             ))}
           </div>
         </div>
-      )}
 
-      {/* Quick links */}
-      <div className="grid grid-cols-2 gap-2 stagger-children">
-        <Link href="/tasks" className="glass-card glass-card-hover p-4 flex items-center gap-2">
-          <ListChecks size={18} className="text-primary" />
-          <span className="text-sm font-medium">Gerer les taches</span>
-          <ArrowRight size={14} className="ml-auto text-muted-foreground" />
-        </Link>
-        <Link href="/staff" className="glass-card glass-card-hover p-4 flex items-center gap-2">
-          <Users size={18} className="text-primary" />
-          <span className="text-sm font-medium">Equipe</span>
-          <ArrowRight size={14} className="ml-auto text-muted-foreground" />
-        </Link>
+        {/* Staff progress */}
+        {staffProgress.length > 0 && (
+          <div>
+            <p className="section-label" style={{ marginBottom: 8 }}>Equipe ce soir</p>
+            <div className="stagger" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {staffProgress.map((sp) => (
+                <div key={sp.name} className="card-light" style={{ padding: 16, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>{sp.name}</span>
+                  <span className="pill-count">{sp.count} tache{sp.count !== 1 ? "s" : ""}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Recent debriefs */}
+        {debriefs.length > 0 && (
+          <div>
+            <p className="section-label" style={{ marginBottom: 8 }}>Derniers debriefs</p>
+            <div className="stagger" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {debriefs.slice(0, 5).map((d) => (
+                <div key={d.id} className="card-light" style={{ padding: 16, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <span style={{ fontSize: 14, fontWeight: 500, textTransform: "capitalize", color: "var(--text-primary)" }}>{d.category}</span>
+                    {d.comment && (
+                      <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.comment}</p>
+                    )}
+                  </div>
+                  <span
+                    style={{ fontSize: 18, fontWeight: 600, marginLeft: 16, color: scoreColor(d.score) }}
+                  >
+                    {d.score}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Quick links */}
+        <div className="stagger" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <Link href="/tasks" className="card-medium" style={{ padding: 16, display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
+            <ListChecks size={18} style={{ color: "var(--terra-deep)" }} />
+            <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>Gerer les taches</span>
+            <ArrowRight size={14} style={{ marginLeft: "auto", color: "var(--text-tertiary)" }} />
+          </Link>
+          <Link href="/staff" className="card-medium" style={{ padding: 16, display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
+            <Users size={18} style={{ color: "var(--terra-deep)" }} />
+            <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>Equipe</span>
+            <ArrowRight size={14} style={{ marginLeft: "auto", color: "var(--text-tertiary)" }} />
+          </Link>
+        </div>
       </div>
     </div>
   );

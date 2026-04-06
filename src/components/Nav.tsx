@@ -44,7 +44,7 @@ export default function Nav() {
       return [
         { href: "/tonight", label: "Ce soir", icon: <Sun size={iconSize} strokeWidth={strokeWidth} /> },
         { href: "/planning", label: "Planning", icon: <Calendar size={iconSize} strokeWidth={strokeWidth} /> },
-        { href: "/reservations", label: "Resas", icon: <BookOpen size={iconSize} strokeWidth={strokeWidth} /> },
+        { href: "/reservations", label: "Résas", icon: <BookOpen size={iconSize} strokeWidth={strokeWidth} /> },
         { href: "/debrief", label: "Debrief", icon: <PenLine size={iconSize} strokeWidth={strokeWidth} /> },
       ];
     }
@@ -53,7 +53,7 @@ export default function Nav() {
         { href: "/tonight", label: "Ce soir", icon: <Sun size={iconSize} strokeWidth={strokeWidth} /> },
         { href: "/planning", label: "Planning", icon: <Calendar size={iconSize} strokeWidth={strokeWidth} /> },
         { href: "/stocks", label: "Stocks", icon: <Package size={iconSize} strokeWidth={strokeWidth} /> },
-        { href: "/reservations", label: "Resas", icon: <BookOpen size={iconSize} strokeWidth={strokeWidth} /> },
+        { href: "/reservations", label: "Résas", icon: <BookOpen size={iconSize} strokeWidth={strokeWidth} /> },
         { href: "/debrief", label: "Debrief", icon: <PenLine size={iconSize} strokeWidth={strokeWidth} /> },
       ];
     }
@@ -61,7 +61,7 @@ export default function Nav() {
     return [
       { href: "/dashboard", label: "Board", icon: <LayoutDashboard size={iconSize} strokeWidth={strokeWidth} /> },
       { href: "/tonight", label: "Ce soir", icon: <Sun size={iconSize} strokeWidth={strokeWidth} /> },
-      { href: "/reservations", label: "Resas", icon: <BookOpen size={iconSize} strokeWidth={strokeWidth} /> },
+      { href: "/reservations", label: "Résas", icon: <BookOpen size={iconSize} strokeWidth={strokeWidth} /> },
       { href: "/stocks", label: "Stocks", icon: <Package size={iconSize} strokeWidth={strokeWidth} /> },
     ];
   }
@@ -71,9 +71,9 @@ export default function Nav() {
     { href: "/messages", label: "Messages", icon: <MessageCircle size={iconSize} strokeWidth={strokeWidth} /> },
     { href: "/debrief", label: "Debriefs", icon: <PenLine size={iconSize} strokeWidth={strokeWidth} /> },
     { href: "/planning", label: "Planning", icon: <Calendar size={iconSize} strokeWidth={strokeWidth} /> },
-    { href: "/tasks", label: "Taches", icon: <ListChecks size={iconSize} strokeWidth={strokeWidth} /> },
-    { href: "/staff", label: "Equipe", icon: <Users size={iconSize} strokeWidth={strokeWidth} /> },
-    { href: "/settings", label: "Reglages", icon: <ClipboardList size={iconSize} strokeWidth={strokeWidth} /> },
+    { href: "/tasks", label: "Tâches", icon: <ListChecks size={iconSize} strokeWidth={strokeWidth} /> },
+    { href: "/staff", label: "Équipe", icon: <Users size={iconSize} strokeWidth={strokeWidth} /> },
+    { href: "/settings", label: "Réglages", icon: <ClipboardList size={iconSize} strokeWidth={strokeWidth} /> },
   ];
 
   const mainItems = getMainItems();
@@ -84,27 +84,62 @@ export default function Nav() {
       {/* Overlay */}
       {moreOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 40,
+            background: "rgba(0,0,0,0.2)",
+            backdropFilter: "blur(4px)",
+            WebkitBackdropFilter: "blur(4px)",
+          }}
           onClick={() => setMoreOpen(false)}
         />
       )}
 
       {/* More menu panel */}
       {moreOpen && (
-        <div className="fixed bottom-20 left-0 right-0 z-50 px-4 pb-2">
-          <div className="mx-auto max-w-lg">
-            <div className="glass-card p-4">
-              <div className="space-y-1 stagger-children">
+        <div
+          style={{
+            position: "fixed",
+            bottom: 80,
+            left: 0,
+            right: 0,
+            zIndex: 50,
+            padding: "0 16px 8px",
+          }}
+        >
+          <div style={{ maxWidth: 512, margin: "0 auto" }}>
+            <div
+              style={{
+                background: "var(--nav-bg)",
+                backdropFilter: "blur(24px)",
+                WebkitBackdropFilter: "blur(24px)",
+                border: "1px solid var(--card-border)",
+                borderRadius: 20,
+                boxShadow: "0 -2px 20px rgba(0,0,0,0.04)",
+                padding: 16,
+              }}
+            >
+              <div className="stagger">
                 {moreItems.map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
                     onClick={() => setMoreOpen(false)}
-                    className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
-                      isActive(item.href)
-                        ? "text-primary"
-                        : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-                    }`}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      borderRadius: 12,
+                      padding: "10px 12px",
+                      fontSize: 14,
+                      fontWeight: 500,
+                      color: isActive(item.href)
+                        ? "var(--terra-medium)"
+                        : "var(--text-secondary)",
+                      textDecoration: "none",
+                      transition: "color 0.2s ease",
+                    }}
                   >
                     {item.icon}
                     {item.label}
@@ -117,16 +152,44 @@ export default function Nav() {
                     setMoreOpen(false);
                     signOut();
                   }}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-destructive transition-colors hover:bg-secondary"
+                  style={{
+                    display: "flex",
+                    width: "100%",
+                    alignItems: "center",
+                    gap: 12,
+                    borderRadius: 12,
+                    padding: "10px 12px",
+                    fontSize: 14,
+                    fontWeight: 500,
+                    color: "var(--danger)",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                  }}
                 >
                   <LogOut size={iconSize} strokeWidth={strokeWidth} />
-                  Deconnexion
+                  Déconnexion
                 </button>
 
                 {/* Theme toggle */}
-                <div className="flex items-center gap-3 rounded-xl px-3 py-2.5">
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    borderRadius: 12,
+                    padding: "10px 12px",
+                  }}
+                >
                   <ThemeToggle />
-                  <span className="text-sm text-muted-foreground">Theme</span>
+                  <span
+                    style={{
+                      fontSize: 14,
+                      color: "var(--text-secondary)",
+                    }}
+                  >
+                    Thème
+                  </span>
                 </div>
               </div>
             </div>
@@ -135,54 +198,102 @@ export default function Nav() {
       )}
 
       {/* Bottom nav bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40">
-        <div className="mx-auto max-w-lg px-4 pb-3">
-          <div className="flex items-center justify-around py-1.5 shadow-2xl glass-card">
-            {mainItems.map((item) => {
-              const active = isActive(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex flex-col items-center gap-0.5 px-3 py-1.5 transition-colors ${
-                    active
-                      ? "text-primary"
-                      : "text-muted-foreground"
-                  }`}
-                  style={
-                    active
-                      ? { filter: "drop-shadow(0 0 6px var(--color-primary))" }
-                      : undefined
-                  }
-                >
-                  {item.icon}
-                  <span className="text-[10px] font-medium">{item.label}</span>
-                </Link>
-              );
-            })}
-
-            {/* "More" button for patron */}
-            {role === "patron" && (
-              <button
-                onClick={() => setMoreOpen((v) => !v)}
-                className={`flex flex-col items-center gap-0.5 px-3 py-1.5 transition-colors ${
-                  moreOpen ? "text-primary" : "text-muted-foreground"
-                }`}
-                style={
-                  moreOpen
-                    ? { filter: "drop-shadow(0 0 6px var(--color-primary))" }
-                    : undefined
-                }
+      <nav
+        style={{
+          position: "fixed",
+          bottom: 12,
+          left: 20,
+          right: 20,
+          zIndex: 40,
+          maxWidth: 512,
+          margin: "0 auto",
+        }}
+      >
+        <div
+          style={{
+            height: 56,
+            borderRadius: 20,
+            background: "var(--nav-bg)",
+            backdropFilter: "blur(24px)",
+            WebkitBackdropFilter: "blur(24px)",
+            border: "1px solid var(--card-border)",
+            boxShadow: "0 -2px 20px rgba(0,0,0,0.04)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-around",
+            padding: "0 8px",
+          }}
+        >
+          {mainItems.map((item) => {
+            const active = isActive(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 3,
+                  padding: "6px 12px",
+                  color: active
+                    ? "var(--terra-medium)"
+                    : "var(--text-tertiary)",
+                  textDecoration: "none",
+                  WebkitTapHighlightColor: "transparent",
+                  filter: active
+                    ? "drop-shadow(0 0 8px rgba(196,120,90,0.3))"
+                    : "none",
+                  transition: "all 0.2s ease",
+                }}
               >
-                {moreOpen ? (
-                  <X size={iconSize} strokeWidth={strokeWidth} />
-                ) : (
-                  <MoreHorizontal size={iconSize} strokeWidth={strokeWidth} />
-                )}
-                <span className="text-[10px] font-medium">Plus</span>
-              </button>
-            )}
-          </div>
+                {item.icon}
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 500,
+                    color: active
+                      ? "var(--terra-medium)"
+                      : "var(--text-tertiary)",
+                  }}
+                >
+                  {item.label}
+                </span>
+              </Link>
+            );
+          })}
+
+          {/* "More" button for patron */}
+          {role === "patron" && (
+            <button
+              onClick={() => setMoreOpen((v) => !v)}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 3,
+                padding: "6px 12px",
+                color: moreOpen
+                  ? "var(--terra-medium)"
+                  : "var(--text-tertiary)",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                WebkitTapHighlightColor: "transparent",
+                filter: moreOpen
+                  ? "drop-shadow(0 0 8px rgba(196,120,90,0.3))"
+                  : "none",
+                transition: "all 0.2s ease",
+              }}
+            >
+              {moreOpen ? (
+                <X size={iconSize} strokeWidth={strokeWidth} />
+              ) : (
+                <MoreHorizontal size={iconSize} strokeWidth={strokeWidth} />
+              )}
+              <span style={{ fontSize: 10, fontWeight: 500 }}>Plus</span>
+            </button>
+          )}
         </div>
       </nav>
     </>

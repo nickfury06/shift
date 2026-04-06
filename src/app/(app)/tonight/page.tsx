@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
 import { getShiftDate, getShiftDay, formatDateFr, formatTime } from "@/lib/shift-utils";
-import { MOMENT_LABELS, MOMENT_ORDER, ZONE_LABELS } from "@/lib/constants";
+import { MOMENT_LABELS, MOMENT_ORDER, ZONE_LABELS, ZONE_COLORS, SEATING_LABELS, SEATING_ICONS } from "@/lib/constants";
 import type {
   Task,
   OneOffTask,
@@ -13,16 +13,18 @@ import type {
   Event,
   Reservation,
   Moment,
+  Zone,
 } from "@/lib/types";
 import MessageBanner from "@/components/MessageBanner";
 import MomentSection from "@/components/MomentSection";
 import TaskCard from "@/components/TaskCard";
-import { CalendarDays, Users, Check, Trash2 } from "lucide-react";
+import { Check } from "lucide-react";
 
 interface MergedTask {
   id: string;
   title: string;
   zone?: string;
+  zoneKey?: Zone;
   description?: string | null;
   completed: boolean;
   moment: Moment;
@@ -44,10 +46,12 @@ export default function TonightPage() {
   const shiftDay = getShiftDay();
   const dateLabel = formatDateFr(shiftDate);
 
+  // Capitalize first letter for display (e.g. "Mar 1 avril")
+  const dateLabelShort = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1, 3) + " " + dateLabel.split(" ").slice(1).join(" ");
+
   const fetchData = useCallback(async () => {
     if (!profile) return;
 
-    // Fetch all data in parallel
     const [msgRes, eventRes, resaRes, taskRes, oneOffRes, compRes] =
       await Promise.all([
         supabase
@@ -86,7 +90,6 @@ export default function TonightPage() {
     setEvent((eventRes.data as Event) || null);
     setReservations((resaRes.data as Reservation[]) || []);
 
-    // Merge recurring + one-off tasks
     const completions = (compRes.data as TaskCompletion[]) || [];
     const completedIds = new Set(completions.map((c) => c.task_id));
 
@@ -94,6 +97,7 @@ export default function TonightPage() {
       id: t.id,
       title: t.title,
       zone: ZONE_LABELS[t.zone] || t.zone,
+      zoneKey: t.zone,
       description: t.description,
       completed: completedIds.has(t.id),
       moment: t.moment,
@@ -104,6 +108,7 @@ export default function TonightPage() {
       id: t.id,
       title: t.title,
       zone: ZONE_LABELS[t.zone] || t.zone,
+      zoneKey: t.zone,
       description: t.description,
       completed: t.completed,
       moment: t.moment,
@@ -199,10 +204,10 @@ export default function TonightPage() {
     fetchData();
   }
 
-  async function cancelReservation(id: string) {
+  async function unmarkArrived(id: string) {
     await supabase
       .from("reservations")
-      .update({ status: "attendu" })
+      .update({ status: "attendu", arrived_by: null })
       .eq("id", id);
     fetchData();
   }
@@ -210,35 +215,47 @@ export default function TonightPage() {
   // ── Loading skeleton ──────────────────────────────────────
   if (loading) {
     return (
-      <div className="p-4 pb-28 max-w-lg mx-auto space-y-4">
-        <div className="bg-card rounded-lg animate-pulse h-10 w-3/4" />
-        <div className="bg-card rounded-lg animate-pulse h-24" />
-        <div className="bg-card rounded-lg animate-pulse h-32" />
-        <div className="bg-card rounded-lg animate-pulse h-48" />
+      <div style={{ padding: "0 20px", paddingBottom: 96, maxWidth: 512, margin: "0 auto" }}>
+        <div style={{ height: 40, background: "var(--card-bg)", borderRadius: 16, marginBottom: 16, opacity: 0.5 }} />
+        <div style={{ height: 80, background: "var(--card-bg)", borderRadius: 16, marginBottom: 16, opacity: 0.5 }} />
+        <div style={{ height: 120, background: "var(--card-bg)", borderRadius: 16, marginBottom: 16, opacity: 0.5 }} />
+        <div style={{ height: 160, background: "var(--card-bg)", borderRadius: 16, opacity: 0.5 }} />
       </div>
     );
   }
 
-  const confirmedResas = reservations.filter(
-    (r) => r.status === "attendu"
-  );
-  const totalCovers = confirmedResas.reduce((sum, r) => sum + r.covers, 0);
+  const confirmedResas = reservations.filter((r) => r.status === "attendu");
+  const arrivedResas = reservations.filter((r) => r.status === "arrive");
+  const allDisplayResas = [...confirmedResas, ...arrivedResas];
+  const totalCovers = reservations.reduce((sum, r) => sum + r.covers, 0);
 
   return (
-    <div className="p-4 pb-28 max-w-lg mx-auto space-y-6">
-      {/* ── Header ─────────────────────────────────────────── */}
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">
-          {profile?.name} <span className="text-muted-foreground font-normal">· {dateLabel}</span>
-        </h1>
-        <div className="mt-1">
-          <span className="pill">{shiftDay}</span>
-        </div>
+    <div style={{ padding: "0 20px", paddingBottom: 96, maxWidth: 512, margin: "0 auto" }}>
+
+      {/* ── Compact Header ──────────────────────────────────── */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "4px 0 20px",
+          fontSize: 14,
+          color: "var(--text-secondary)",
+        }}
+      >
+        <span style={{ fontWeight: 500, color: "var(--text-primary)" }}>
+          {profile?.name}
+        </span>
+        <span style={{ color: "var(--text-tertiary)" }}>&middot;</span>
+        <span>{dateLabelShort}</span>
+        <span className="pill" style={{ marginLeft: 2 }}>
+          16h&rarr;1h
+        </span>
       </div>
 
-      {/* ── Manager messages ───────────────────────────────── */}
+      {/* ── Manager Messages ────────────────────────────────── */}
       {messages.length > 0 && (
-        <div className="space-y-2 stagger-children">
+        <div className="stagger" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {messages.map((msg) => (
             <MessageBanner
               key={msg.id}
@@ -250,111 +267,311 @@ export default function TonightPage() {
         </div>
       )}
 
-      {/* ── Event card ─────────────────────────────────────── */}
+      {/* Gap between sections */}
+      {messages.length > 0 && <div style={{ height: 28 }} />}
+
+      {/* ── Event Card ──────────────────────────────────────── */}
       {event && (
-        <div
-          className="glass-card p-4"
-          style={{ background: "var(--gradient-warm)" }}
-        >
-          <div className="flex items-center gap-2 mb-1">
-            <CalendarDays size={16} className="text-primary" />
-            <h3 className="text-base font-semibold tracking-tight text-gradient">
+        <>
+          <div
+            className="card-medium"
+            style={{
+              background:
+                "linear-gradient(135deg, rgba(196,120,90,0.04) 0%, rgba(196,120,90,0.01) 100%)",
+              border: "1px solid rgba(196,120,90,0.1)",
+              padding: "14px 16px",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 15,
+                fontWeight: 500,
+                color: "var(--text-primary)",
+              }}
+            >
               {event.title}
-            </h3>
+            </div>
+            {event.description && (
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 400,
+                  color: "var(--text-secondary)",
+                  marginTop: 4,
+                }}
+              >
+                {event.description}
+              </div>
+            )}
+            {(event.start_time || event.end_time) && (
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 400,
+                  color: "var(--text-secondary)",
+                  marginTop: 4,
+                }}
+              >
+                {formatTime(event.start_time)}
+                {event.end_time ? ` - ${formatTime(event.end_time)}` : ""}
+              </div>
+            )}
           </div>
-          {event.description && (
-            <p className="text-sm text-muted-foreground">{event.description}</p>
-          )}
-          <p className="mt-1 text-xs text-muted-foreground">
-            {formatTime(event.start_time)}
-            {event.end_time ? ` - ${formatTime(event.end_time)}` : ""}
-          </p>
+          <div style={{ height: 28 }} />
+        </>
+      )}
+
+      {/* ── Reservations ────────────────────────────────────── */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 12,
+        }}
+      >
+        <span
+          style={{
+            fontSize: 13,
+            fontWeight: 500,
+            textTransform: "uppercase",
+            letterSpacing: "0.08em",
+            color: "var(--text-tertiary)",
+          }}
+        >
+          Réservations
+        </span>
+        <span
+          style={{
+            fontSize: 12,
+            fontWeight: 500,
+            color: "#8B5A40",
+            background: "rgba(139,90,64,0.1)",
+            padding: "4px 10px",
+            borderRadius: 8,
+            letterSpacing: 0,
+          }}
+        >
+          {reservations.length} résas &middot; {totalCovers} couverts
+        </span>
+      </div>
+
+      {allDisplayResas.length > 0 ? (
+        <div className="stagger" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {allDisplayResas.map((resa) => {
+            const isArrived = resa.status === "arrive";
+            const seatingIcon = SEATING_ICONS[resa.seating] || "";
+            const seatingLabel = SEATING_LABELS[resa.seating] || "";
+            return (
+              <div
+                key={resa.id}
+                className="card-medium"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "12px 14px",
+                  opacity: isArrived ? 0.5 : 1,
+                  transition: "opacity 0.4s ease",
+                }}
+              >
+                {/* Time */}
+                <div
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: "#8B5A40",
+                    minWidth: 42,
+                    flexShrink: 0,
+                  }}
+                >
+                  {formatTime(resa.time)}
+                </div>
+
+                {/* Details */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: 15,
+                      fontWeight: 500,
+                      color: "var(--text-primary)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    {resa.name}
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: "#A85D3F",
+                        background: "rgba(196,120,90,0.08)",
+                        padding: "2px 7px",
+                        borderRadius: 6,
+                      }}
+                    >
+                      {resa.covers} pers.
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "var(--text-secondary)",
+                      marginTop: 3,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <span>
+                      {seatingIcon} {seatingLabel}
+                    </span>
+                    {resa.notes && (
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: "var(--warning)",
+                          fontWeight: 500,
+                        }}
+                      >
+                        ⚠️ {resa.notes}
+                      </span>
+                    )}
+                    {isArrived && (
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: "#8B5A40",
+                          background: "rgba(139,90,64,0.1)",
+                          padding: "2px 8px",
+                          borderRadius: 6,
+                        }}
+                      >
+                        ✓ Arrivé
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Check button */}
+                <button
+                  onClick={() =>
+                    isArrived ? unmarkArrived(resa.id) : markArrived(resa.id)
+                  }
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: "50%",
+                    border: `2px solid #8B5A40`,
+                    background: isArrived ? "#8B5A40" : "transparent",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    flexShrink: 0,
+                    padding: 0,
+                    transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
+                  }}
+                  aria-label={isArrived ? "Annuler arrivée" : "Marquer arrivé"}
+                >
+                  <Check
+                    size={18}
+                    strokeWidth={2.5}
+                    style={{
+                      color: isArrived ? "#fff" : "rgba(139,90,64,0.5)",
+                      transition: "all 0.3s ease",
+                    }}
+                  />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div
+          className="card-medium"
+          style={{
+            padding: "16px",
+            textAlign: "center",
+            fontSize: 13,
+            color: "var(--text-secondary)",
+          }}
+        >
+          Aucune réservation ce soir
         </div>
       )}
 
-      {/* ── Reservations summary ───────────────────────────── */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold tracking-tight">Reservations</h2>
-          <span className="pill">
-            <Users size={12} className="inline mr-1" />
-            {totalCovers} couverts · {confirmedResas.length} tables
-          </span>
-        </div>
+      {/* Gap */}
+      <div style={{ height: 28 }} />
 
-        {confirmedResas.length > 0 ? (
-          <div className="space-y-2 stagger-children">
-            {confirmedResas.slice(0, 4).map((resa) => (
-              <div key={resa.id} className="glass-card p-3 flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium truncate">{resa.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatTime(resa.time)} · {resa.covers} pers.
-                    {resa.notes && ` · ${resa.notes}`}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1.5 ml-2">
-                  {resa.status !== "arrive" && (
-                    <button
-                      onClick={() => markArrived(resa.id)}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-secondary"
-                      aria-label="Marquer arrive"
-                    >
-                      <Check size={16} className="text-success" />
-                    </button>
-                  )}
-                  <button
-                    onClick={() => cancelReservation(resa.id)}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-secondary"
-                    aria-label="Annuler"
-                  >
-                    <Trash2 size={16} className="text-destructive" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="glass-card p-4">
-            <p className="text-sm text-muted-foreground text-center">
-              Aucune reservation ce soir
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* ── Moment sections ────────────────────────────────── */}
-      {MOMENT_ORDER.map((moment) => {
+      {/* ── Moment Sections (Tasks) ─────────────────────────── */}
+      {MOMENT_ORDER.map((moment, idx) => {
         const momentTasks = tasks.filter((t) => t.moment === moment);
+        // If no tasks for this moment, skip
+        if (momentTasks.length === 0 && moment !== "fermeture") return null;
+
         return (
-          <MomentSection
-            key={moment}
-            name={MOMENT_LABELS[moment]}
-            tasks={momentTasks}
-            onToggleTask={handleToggleTask}
-          />
+          <div key={moment}>
+            <MomentSection
+              name={MOMENT_LABELS[moment]}
+              tasks={momentTasks}
+              onToggleTask={handleToggleTask}
+            />
+            {idx < MOMENT_ORDER.length - 1 && <div style={{ height: 28 }} />}
+          </div>
         );
       })}
 
-      {/* ── Free tasks ─────────────────────────────────────── */}
+      {/* ── Free Tasks ──────────────────────────────────────── */}
       {freeTasks.length > 0 && (
-        <div className="space-y-2">
-          <h2 className="text-base font-semibold tracking-tight">Taches libres</h2>
-          <div className="space-y-2 stagger-children">
+        <>
+          <div style={{ height: 28 }} />
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 8,
+            }}
+          >
+            <span
+              style={{
+                fontSize: 13,
+                fontWeight: 500,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                color: "var(--text-tertiary)",
+                opacity: 0.8,
+              }}
+            >
+              Tâches libres
+            </span>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {freeTasks.map((task) => (
               <TaskCard
                 key={task.id}
                 id={task.id}
                 title={task.title}
                 zone={task.zone}
+                zoneKey={task.zoneKey}
                 description={task.description}
                 completed={task.completed}
+                isLibre
                 onToggle={handleToggleTask}
               />
             ))}
           </div>
-        </div>
+        </>
       )}
+
+      {/* Extra bottom padding for nav clearance */}
+      <div style={{ height: 20 }} />
     </div>
   );
 }

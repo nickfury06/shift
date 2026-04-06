@@ -14,10 +14,11 @@ export default function ScoreSelector({
   size = "large",
 }: ScoreSelectorProps) {
   const dimension = size === "large" ? 48 : 36;
-  const textClass = size === "large" ? "text-base font-semibold" : "text-sm font-medium";
+  const fontSize = size === "large" ? 16 : 14;
+  const fontWeight = size === "large" ? 600 : 500;
 
   return (
-    <div className="flex items-center gap-2">
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       {[1, 2, 3, 4, 5].map((score) => {
         const selected = value === score;
         return (
@@ -25,12 +26,20 @@ export default function ScoreSelector({
             key={score}
             whileTap={{ scale: 0.9 }}
             onClick={() => onChange(score)}
-            className={`flex items-center justify-center rounded-full transition-colors ${textClass}`}
             style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: "50%",
+              border: "none",
+              cursor: "pointer",
+              transition: "background 150ms, color 150ms",
               width: dimension,
               height: dimension,
-              background: selected ? "var(--gradient-primary)" : "var(--secondary-bg)",
-              color: selected ? "#FFFFFF" : "var(--fg-secondary)",
+              fontSize,
+              fontWeight,
+              background: selected ? "#8B5A40" : "var(--secondary-bg)",
+              color: selected ? "#FFFFFF" : "var(--text-secondary)",
             }}
             aria-label={`Score ${score}`}
           >

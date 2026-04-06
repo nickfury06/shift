@@ -45,9 +45,9 @@ export default function TasksPage() {
   // Guard: patron only
   if (profile && profile.role !== "patron") {
     return (
-      <div className="p-4 pb-28 max-w-lg mx-auto">
-        <div className="glass-card p-6 text-center">
-          <p className="text-muted-foreground">Acces reserve au patron</p>
+      <div style={{ padding: "0 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+        <div className="card-medium" style={{ padding: 24, textAlign: "center" }}>
+          <p style={{ color: "var(--text-secondary)" }}>Acces reserve au patron</p>
         </div>
       </div>
     );
@@ -109,172 +109,177 @@ export default function TasksPage() {
 
   if (loading) {
     return (
-      <div className="p-4 pb-28 max-w-lg mx-auto space-y-4">
-        <div className="bg-card rounded-lg animate-pulse h-10 w-1/2" />
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="bg-card rounded-lg animate-pulse h-20" />
-        ))}
+      <div style={{ padding: "0 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div className="card-light" style={{ height: 40, width: "50%", borderRadius: 8, opacity: 0.5 }} />
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="card-light" style={{ height: 80, borderRadius: 8, opacity: 0.5 }} />
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-4 pb-28 max-w-lg mx-auto space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold tracking-tight">Taches</h1>
-        <button
-          onClick={() => {
-            resetForm();
-            setShowForm(true);
-          }}
-          className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-white"
-          style={{ background: "var(--gradient-primary)" }}
-        >
-          <Plus size={16} />
-          Ajouter
-        </button>
-      </div>
-
-      {/* Category filter pills */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {zones.map((z) => (
+    <div style={{ padding: "0 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 16 }}>
+          <h1 style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-primary)" }}>Taches</h1>
           <button
-            key={z}
-            onClick={() => setFilter(z)}
-            className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              filter === z
-                ? "text-white"
-                : "pill"
-            }`}
-            style={filter === z ? { background: "var(--gradient-primary)" } : undefined}
+            onClick={() => {
+              resetForm();
+              setShowForm(true);
+            }}
+            className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-white"
+            style={{ background: "var(--gradient-primary)" }}
           >
-            {z === "all" ? "Toutes" : ZONE_LABELS[z]}
+            <Plus size={16} />
+            Ajouter
           </button>
-        ))}
-      </div>
-
-      {/* Form */}
-      {showForm && (
-        <div className="glass-card p-4 space-y-3">
-          <h3 className="text-base font-semibold tracking-tight">
-            {editId ? "Modifier" : "Nouvelle tache"}
-          </h3>
-
-          <input
-            type="text"
-            placeholder="Titre de la tache"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="w-full rounded-xl bg-input px-3 py-2 text-sm outline-none"
-          />
-
-          <textarea
-            placeholder="Description (optionnel)"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full rounded-xl bg-input px-3 py-2 text-sm outline-none resize-none"
-            rows={2}
-          />
-
-          <div className="grid grid-cols-2 gap-2">
-            <select
-              value={zone}
-              onChange={(e) => setZone(e.target.value as Zone)}
-              className="rounded-xl bg-input px-3 py-2 text-sm"
-            >
-              {(Object.keys(ZONE_LABELS) as Zone[]).map((z) => (
-                <option key={z} value={z}>{ZONE_LABELS[z]}</option>
-              ))}
-            </select>
-
-            <select
-              value={moment}
-              onChange={(e) => setMoment(e.target.value as Moment)}
-              className="rounded-xl bg-input px-3 py-2 text-sm"
-            >
-              {MOMENT_ORDER.map((m) => (
-                <option key={m} value={m}>{MOMENT_LABELS[m]}</option>
-              ))}
-            </select>
-
-            <select
-              value={day}
-              onChange={(e) => setDay(e.target.value as Day)}
-              className="rounded-xl bg-input px-3 py-2 text-sm"
-            >
-              {(Object.keys(DAY_LABELS) as Day[]).map((d) => (
-                <option key={d} value={d}>{DAY_LABELS[d]}</option>
-              ))}
-            </select>
-
-            <input
-              type="number"
-              placeholder="Priorite"
-              value={priority}
-              onChange={(e) => setPriority(Number(e.target.value))}
-              className="rounded-xl bg-input px-3 py-2 text-sm"
-              min={0}
-            />
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={handleSave}
-              className="flex-1 rounded-xl px-3 py-2 text-sm font-medium text-white"
-              style={{ background: "var(--gradient-primary)" }}
-            >
-              {editId ? "Enregistrer" : "Creer"}
-            </button>
-            <button
-              onClick={resetForm}
-              className="rounded-xl px-3 py-2 text-sm font-medium bg-secondary text-muted-foreground"
-            >
-              Annuler
-            </button>
-          </div>
         </div>
-      )}
 
-      {/* Task list */}
-      <div className="space-y-2 stagger-children">
-        {filtered.map((task) => (
-          <div key={task.id} className="glass-card p-3 flex items-start justify-between">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">{task.title}</p>
-              {task.description && (
-                <p className="text-xs text-muted-foreground mt-0.5">{task.description}</p>
-              )}
-              <div className="flex gap-1.5 mt-1.5 flex-wrap">
-                <span className="pill text-[10px]">{ZONE_LABELS[task.zone]}</span>
-                <span className="pill text-[10px]">{MOMENT_LABELS[task.moment]}</span>
-                <span className="pill text-[10px]">{DAY_LABELS[task.day]}</span>
+        {/* Category filter pills */}
+        <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+          {zones.map((z) => (
+            <button
+              key={z}
+              onClick={() => setFilter(z)}
+              className={`pill ${filter === z ? "" : ""}`}
+              style={filter === z ? { background: "var(--gradient-primary)", color: "#fff", flexShrink: 0 } : { flexShrink: 0 }}
+            >
+              {z === "all" ? "Toutes" : ZONE_LABELS[z]}
+            </button>
+          ))}
+        </div>
+
+        {/* Form */}
+        {showForm && (
+          <div className="card-medium" style={{ padding: 16 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <p className="section-label">
+                {editId ? "Modifier" : "Nouvelle tache"}
+              </p>
+
+              <input
+                type="text"
+                placeholder="Titre de la tache"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full rounded-xl bg-input px-3 py-2 text-sm outline-none"
+              />
+
+              <textarea
+                placeholder="Description (optionnel)"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="w-full rounded-xl bg-input px-3 py-2 text-sm outline-none resize-none"
+                rows={2}
+              />
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <select
+                  value={zone}
+                  onChange={(e) => setZone(e.target.value as Zone)}
+                  className="rounded-xl bg-input px-3 py-2 text-sm"
+                >
+                  {(Object.keys(ZONE_LABELS) as Zone[]).map((z) => (
+                    <option key={z} value={z}>{ZONE_LABELS[z]}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={moment}
+                  onChange={(e) => setMoment(e.target.value as Moment)}
+                  className="rounded-xl bg-input px-3 py-2 text-sm"
+                >
+                  {MOMENT_ORDER.map((m) => (
+                    <option key={m} value={m}>{MOMENT_LABELS[m]}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={day}
+                  onChange={(e) => setDay(e.target.value as Day)}
+                  className="rounded-xl bg-input px-3 py-2 text-sm"
+                >
+                  {(Object.keys(DAY_LABELS) as Day[]).map((d) => (
+                    <option key={d} value={d}>{DAY_LABELS[d]}</option>
+                  ))}
+                </select>
+
+                <input
+                  type="number"
+                  placeholder="Priorite"
+                  value={priority}
+                  onChange={(e) => setPriority(Number(e.target.value))}
+                  className="rounded-xl bg-input px-3 py-2 text-sm"
+                  min={0}
+                />
+              </div>
+
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={handleSave}
+                  className="flex-1 rounded-xl px-3 py-2 text-sm font-medium text-white"
+                  style={{ background: "var(--gradient-primary)" }}
+                >
+                  {editId ? "Enregistrer" : "Creer"}
+                </button>
+                <button
+                  onClick={resetForm}
+                  className="rounded-xl px-3 py-2 text-sm font-medium"
+                  style={{ background: "var(--secondary-bg)", color: "var(--text-secondary)" }}
+                >
+                  Annuler
+                </button>
               </div>
             </div>
-            <div className="flex items-center gap-1 ml-2">
-              <button
-                onClick={() => startEdit(task)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-secondary"
-                aria-label="Modifier"
-              >
-                <Edit3 size={14} className="text-muted-foreground" />
-              </button>
-              <button
-                onClick={() => handleDelete(task.id)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-secondary"
-                aria-label="Supprimer"
-              >
-                <Trash2 size={14} className="text-destructive" />
-              </button>
-            </div>
-          </div>
-        ))}
-
-        {filtered.length === 0 && (
-          <div className="glass-card p-6 text-center">
-            <p className="text-sm text-muted-foreground">Aucune tache</p>
           </div>
         )}
+
+        {/* Task list */}
+        <div className="stagger" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {filtered.map((task) => (
+            <div key={task.id} className="card-light" style={{ padding: 16, display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <p style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>{task.title}</p>
+                {task.description && (
+                  <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4 }}>{task.description}</p>
+                )}
+                <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                  <span className="pill">{ZONE_LABELS[task.zone]}</span>
+                  <span className="pill">{MOMENT_LABELS[task.moment]}</span>
+                  <span className="pill">{DAY_LABELS[task.day]}</span>
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: 8 }}>
+                <button
+                  onClick={() => startEdit(task)}
+                  className="flex items-center justify-center rounded-lg hover:bg-secondary"
+                  style={{ width: 32, height: 32 }}
+                  aria-label="Modifier"
+                >
+                  <Edit3 size={14} style={{ color: "var(--text-tertiary)" }} />
+                </button>
+                <button
+                  onClick={() => handleDelete(task.id)}
+                  className="flex items-center justify-center rounded-lg hover:bg-secondary"
+                  style={{ width: 32, height: 32 }}
+                  aria-label="Supprimer"
+                >
+                  <Trash2 size={14} className="text-destructive" />
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {filtered.length === 0 && (
+            <div className="card-light" style={{ padding: 24, textAlign: "center" }}>
+              <p style={{ fontSize: 14, color: "var(--text-secondary)" }}>Aucune tache</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -42,25 +42,25 @@ export default function ChangePasswordPage() {
   }
 
   return (
-    <div className="min-h-dvh flex items-center justify-center px-6">
-      <div className="w-full max-w-sm space-y-8">
+    <div className="min-h-dvh flex items-center justify-center" style={{ padding: "0 24px" }}>
+      <div style={{ width: "100%", maxWidth: 384, display: "flex", flexDirection: "column", gap: 32 }}>
         {/* Logo */}
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold tracking-tight">
+        <div style={{ textAlign: "center" }}>
+          <h1 style={{ fontSize: 36, fontWeight: 700, letterSpacing: "-0.02em" }}>
             <span className="text-gradient">Shift</span>
           </h1>
-          <p className="text-muted-foreground text-sm tracking-widest uppercase">
+          <p style={{ color: "var(--text-secondary)", fontSize: 14, letterSpacing: "0.1em", textTransform: "uppercase", marginTop: 8 }}>
             Nouveau mot de passe
           </p>
         </div>
 
         {/* Form */}
-        <div className="glass-card p-6 space-y-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
+        <div className="card-medium" style={{ padding: 24 }}>
+          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <label
                 htmlFor="password"
-                className="text-sm font-medium text-muted-foreground"
+                style={{ fontSize: 14, fontWeight: 500, color: "var(--text-secondary)" }}
               >
                 Nouveau mot de passe
               </label>
@@ -76,10 +76,10 @@ export default function ChangePasswordPage() {
               />
             </div>
 
-            <div className="space-y-2">
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <label
                 htmlFor="confirm-password"
-                className="text-sm font-medium text-muted-foreground"
+                style={{ fontSize: 14, fontWeight: 500, color: "var(--text-secondary)" }}
               >
                 Confirmer le mot de passe
               </label>
@@ -102,7 +102,8 @@ export default function ChangePasswordPage() {
             <button
               type="submit"
               disabled={loading}
-              className="pill-button w-full"
+              className="w-full rounded-xl py-3 text-sm font-medium text-white disabled:opacity-50"
+              style={{ background: "var(--gradient-primary)" }}
             >
               {loading ? "Mise a jour..." : "Changer le mot de passe"}
             </button>
