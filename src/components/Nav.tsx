@@ -114,7 +114,7 @@ export default function Nav() {
                 background: "var(--nav-bg)",
                 backdropFilter: "blur(24px)",
                 WebkitBackdropFilter: "blur(24px)",
-                border: "1px solid var(--card-border)",
+                border: "1px solid rgba(0,0,0,0.06)",
                 borderRadius: 20,
                 boxShadow: "0 -2px 20px rgba(0,0,0,0.04)",
                 padding: 16,

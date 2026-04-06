@@ -13,9 +13,12 @@ export default function MessageBanner({
 }: MessageBannerProps) {
   return (
     <div
-      className="card-heavy"
       style={{
+        background: "var(--card-bg)",
+        border: "1px solid var(--card-border)",
         borderLeft: "3px solid var(--terra-medium, #C4785A)",
+        borderRadius: 16,
+        boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 6px 20px rgba(0,0,0,0.06)",
         padding: "14px 16px",
       }}
     >

@@ -178,7 +178,7 @@ export default function MomentSection({
             justifyContent: "space-between",
             width: "100%",
             padding: "10px 14px",
-            marginTop: 10,
+            marginTop: 2,
             background: "transparent",
             border: "1px solid rgba(0,0,0,0.04)",
             borderRadius: 12,
