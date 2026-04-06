@@ -1,22 +1,21 @@
 "use client";
 
-import type { ManagerMessage } from "@/lib/types";
-
 interface MessageBannerProps {
-  message: ManagerMessage;
-  authorName?: string;
+  content: string;
+  author: string;
+  priority?: "normal" | "urgent";
 }
 
-export default function MessageBanner({ message, authorName }: MessageBannerProps) {
+export default function MessageBanner({ content, author, priority = "normal" }: MessageBannerProps) {
   return (
     <div
-      className="glass-card p-4 border-l-[3px] transition-all"
-      style={{ borderLeftColor: "var(--color-primary)" }}
+      className="glass-card p-4"
+      style={{ borderLeft: "3px solid var(--color-primary)" }}
     >
-      <p className="text-sm leading-relaxed">{message.content}</p>
-      {authorName && (
-        <p className="text-xs text-muted-foreground mt-2">— {authorName}</p>
-      )}
+      <p className={`text-sm ${priority === "urgent" ? "font-semibold" : ""}`}>
+        {content}
+      </p>
+      <p className="mt-1.5 text-xs text-muted-foreground">{author}</p>
     </div>
   );
 }

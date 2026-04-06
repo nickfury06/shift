@@ -1,8 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+const PUBLIC_ROUTES = ["/login"];
+
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request });
+  let supabaseResponse = NextResponse.next({
+    request,
+  });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,10 +17,12 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
+          cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
-          supabaseResponse = NextResponse.next({ request });
+          supabaseResponse = NextResponse.next({
+            request,
+          });
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           );
@@ -25,27 +31,28 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
+  // IMPORTANT: Do not add logic between createServerClient and getUser().
+  // A simple mistake here can make debugging very hard.
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const path = request.nextUrl.pathname;
+  const { pathname } = request.nextUrl;
+  const isPublicRoute = PUBLIC_ROUTES.some((route) =>
+    pathname.startsWith(route)
+  );
 
-  // Public routes that don't require auth
-  const publicRoutes = ["/login"];
-  const isPublicRoute = publicRoutes.some((route) => path.startsWith(route));
-
-  // Not authenticated and trying to access protected route
+  // Not authenticated and not on a public route → redirect to login
   if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  // Authenticated and trying to access login
-  if (user && isPublicRoute) {
+  // Authenticated and on login page → redirect to tonight
+  if (user && pathname === "/login") {
     const url = request.nextUrl.clone();
-    url.pathname = "/ce-soir";
+    url.pathname = "/tonight";
     return NextResponse.redirect(url);
   }
 

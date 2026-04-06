@@ -1,88 +1,98 @@
 "use client";
 
+import { useState } from "react";
+import { Check } from "lucide-react";
 import { motion } from "motion/react";
-import { Bell, Check } from "lucide-react";
-import type { Task, OneOffTask, Zone } from "@/lib/types";
-import { ZONE_LABELS, ZONE_COLORS } from "@/lib/constants";
 
 interface TaskCardProps {
-  task: Task | OneOffTask;
+  id: string;
+  title: string;
+  zone?: string;
+  description?: string | null;
   completed: boolean;
-  onToggle: () => void;
-  disabled?: boolean;
   compact?: boolean;
+  onToggle: (id: string, completed: boolean) => void;
 }
 
-export default function TaskCard({ task, completed, onToggle, disabled, compact }: TaskCardProps) {
-  const zoneColor = ZONE_COLORS[task.zone as Zone];
+export default function TaskCard({
+  id,
+  title,
+  zone,
+  description,
+  completed,
+  compact = false,
+  onToggle,
+}: TaskCardProps) {
+  const [checked, setChecked] = useState(completed);
 
-  if (compact && completed) {
+  function handleToggle() {
+    const next = !checked;
+    setChecked(next);
+    onToggle(id, next);
+  }
+
+  if (compact && checked) {
     return (
-      <div className="flex items-center gap-2 px-3 py-1.5 opacity-40">
-        <Check size={12} className="text-primary flex-shrink-0" />
-        <span className="text-xs line-through truncate">{task.title}</span>
+      <div className="flex items-center gap-2 px-3 py-1.5 opacity-50">
+        <div
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg"
+          style={{ background: "var(--gradient-primary)" }}
+        >
+          <Check size={14} color="var(--color-success)" strokeWidth={2.5} />
+        </div>
+        <span className="text-sm text-muted-foreground line-through">{title}</span>
       </div>
     );
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="glass-card card-hover flex items-center gap-4 p-4 transition-all"
-      style={{ opacity: completed ? 0.45 : disabled ? 0.35 : 1 }}
-    >
-      {task.is_reminder ? (
-        <span className="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: "rgba(123, 163, 122, 0.1)" }}>
-          <Bell size={18} strokeWidth={1.5} className="text-primary" />
-        </span>
-      ) : (
+    <div className="glass-card p-3">
+      <div className="flex items-start gap-3">
         <motion.button
-          onClick={onToggle}
-          disabled={disabled}
-          whileTap={{ scale: 0.9 }}
-          className="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center transition-all"
-          style={{
-            background: completed ? "var(--gradient-primary)" : "rgba(255, 240, 220, 0.04)",
-            border: completed ? "none" : "1px solid rgba(255, 240, 220, 0.08)",
-          }}
+          whileTap={{ scale: 0.85 }}
+          transition={{ type: "spring", stiffness: 400, damping: 20 }}
+          onClick={handleToggle}
+          className="mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border-2 transition-all"
+          style={
+            checked
+              ? {
+                  background: "var(--gradient-primary)",
+                  borderColor: "transparent",
+                }
+              : {
+                  background: "transparent",
+                  borderColor: "var(--border-color)",
+                }
+          }
+          aria-label={checked ? "Marquer non fait" : "Marquer fait"}
         >
-          {completed && (
-            <motion.span
+          {checked && (
+            <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ type: "spring", stiffness: 500, damping: 25 }}
             >
-              <Check size={18} strokeWidth={2.5} className="text-primary-foreground" />
-            </motion.span>
+              <Check size={22} color="var(--color-success)" strokeWidth={2.5} />
+            </motion.div>
           )}
         </motion.button>
-      )}
 
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className={`text-sm font-medium ${completed ? "line-through text-muted-foreground" : ""}`}>
-            {task.title}
-          </span>
-          <span
-            className="text-[10px] font-medium px-2 py-0.5 rounded-full"
-            style={{
-              backgroundColor: `color-mix(in srgb, ${zoneColor} 15%, transparent)`,
-              color: zoneColor,
-            }}
+        <div className="flex-1 min-w-0">
+          <p
+            className={`text-sm font-medium ${
+              checked ? "line-through text-muted-foreground" : ""
+            }`}
           >
-            {ZONE_LABELS[task.zone as Zone]}
-          </span>
-          {task.is_libre && (
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full border border-dashed border-muted-foreground/30 text-muted-foreground">
-              libre
-            </span>
+            {title}
+          </p>
+          {description && !checked && (
+            <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+          )}
+          {zone && !checked && (
+            <span className="pill mt-1 inline-block text-[10px]">{zone}</span>
           )}
         </div>
-        {task.note && !completed && (
-          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{task.note}</p>
-        )}
       </div>
-    </motion.div>
+    </div>
   );
 }

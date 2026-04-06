@@ -1,9 +1,6 @@
-import type { Zone, Moment, DayOfWeek } from "./types";
+import type { Zone, Moment, Day, ReservationSource, ReservationSeating, ReservationType, TableZone } from "./types";
 
-// ============================================================
-// Zone configuration
-// ============================================================
-
+// ── Zone ───────────────────────────────────────────────────
 export const ZONE_LABELS: Record<Zone, string> = {
   terrasse: "Terrasse",
   terrasse_wc: "Toilettes",
@@ -16,31 +13,17 @@ export const ZONE_LABELS: Record<Zone, string> = {
 };
 
 export const ZONE_COLORS: Record<Zone, string> = {
-  terrasse: "var(--zone-terrasse)",
-  terrasse_wc: "var(--zone-toilettes)",
-  restaurant: "var(--zone-restaurant)",
-  bar_escaliers: "var(--zone-escaliers)",
-  bar_salle: "var(--zone-salle)",
-  bar_gaming: "var(--zone-gaming)",
-  bar_backbar: "var(--zone-backbar)",
-  bar_reserve: "var(--zone-reserve)",
+  terrasse: "#C9906A",
+  terrasse_wc: "#B8845C",
+  restaurant: "#A8616A",
+  bar_escaliers: "#6B93A0",
+  bar_salle: "#6B8B5E",
+  bar_gaming: "#9B8B6E",
+  bar_backbar: "#8B7BB0",
+  bar_reserve: "#7B7060",
 };
 
-export const ZONE_OPTIONS: Zone[] = [
-  "terrasse",
-  "terrasse_wc",
-  "restaurant",
-  "bar_escaliers",
-  "bar_salle",
-  "bar_gaming",
-  "bar_backbar",
-  "bar_reserve",
-];
-
-// ============================================================
-// Moment configuration
-// ============================================================
-
+// ── Moment ─────────────────────────────────────────────────
 export const MOMENT_LABELS: Record<Moment, string> = {
   ouverture: "Ouverture",
   service: "Service",
@@ -49,11 +32,8 @@ export const MOMENT_LABELS: Record<Moment, string> = {
 
 export const MOMENT_ORDER: Moment[] = ["ouverture", "service", "fermeture"];
 
-// ============================================================
-// Days configuration
-// ============================================================
-
-export const DAY_LABELS: Record<DayOfWeek, string> = {
+// ── Day ────────────────────────────────────────────────────
+export const DAY_LABELS: Record<Day, string> = {
   lundi: "Lundi",
   mardi: "Mardi",
   mercredi: "Mercredi",
@@ -63,77 +43,98 @@ export const DAY_LABELS: Record<DayOfWeek, string> = {
   dimanche: "Dimanche",
 };
 
-export const WORK_DAYS: DayOfWeek[] = [
+export const WORK_DAYS: Day[] = [
+  "lundi",
   "mardi",
   "mercredi",
   "jeudi",
   "vendredi",
   "samedi",
+  "dimanche",
 ];
 
-// ============================================================
-// Reservation configuration
-// ============================================================
-
-export const SOURCE_LABELS = {
-  instagram: "Instagram",
+// ── Reservation Sources ────────────────────────────────────
+export const SOURCE_LABELS: Record<ReservationSource, string> = {
   telephone: "Téléphone",
   "walk-in": "Walk-in",
-} as const;
+  instagram: "Instagram",
+};
 
-export const SOURCE_ICONS = {
-  instagram: "📱",
+export const SOURCE_ICONS: Record<ReservationSource, string> = {
   telephone: "📞",
   "walk-in": "🚶",
-} as const;
+  instagram: "📱",
+};
 
-export const TABLE_ZONE_LABELS = {
+// ── Seating ────────────────────────────────────────────────
+export const SEATING_LABELS: Record<ReservationSeating, string> = {
+  interieur: "Intérieur",
+  terrasse: "Terrasse",
+};
+
+export const SEATING_ICONS: Record<ReservationSeating, string> = {
+  interieur: "🏠",
+  terrasse: "☀️",
+};
+
+// ── Reservation Type ───────────────────────────────────────
+export const TYPE_LABELS: Record<ReservationType, string> = {
+  diner: "Dîner",
+  drinks: "Drinks",
+};
+
+// ── Table Zones ────────────────────────────────────────────
+export const TABLE_ZONE_LABELS: Record<TableZone, string> = {
   restaurant: "Restaurant",
   terrasse: "Terrasse",
   terrasse_couverte: "Couverte",
   bar: "Bar",
-} as const;
-
-export const SEATING_LABELS = {
-  interieur: "Intérieur",
-  terrasse: "Terrasse",
-} as const;
-
-export const SEATING_ICONS = {
-  interieur: "🏠",
-  terrasse: "☀️",
-} as const;
-
-export const TYPE_LABELS = {
-  diner: "Dîner",
-  drinks: "Drinks",
-} as const;
-
-// ============================================================
-// Debrief categories
-// ============================================================
-
-export const DEBRIEF_CATEGORIES = [
-  { key: "service" as const, label: "Service" },
-  { key: "coordination" as const, label: "Coordination" },
-  { key: "ambiance" as const, label: "Ambiance" },
-  { key: "proprete" as const, label: "Propreté" },
-];
-
-// ============================================================
-// Animation tokens
-// ============================================================
-
-export const ANIMATIONS = {
-  spring: { type: "spring" as const, stiffness: 500, damping: 25 },
-  easeOutExpo: [0.16, 1, 0.3, 1] as [number, number, number, number],
-  staggerDelay: 0.035,
 };
 
-// ============================================================
-// Score color helper (debrief scores)
-// ============================================================
+// ── Debrief Categories ─────────────────────────────────────
+export const DEBRIEF_CATEGORIES = [
+  "service",
+  "ambiance",
+  "cuisine",
+  "equipe",
+  "proprete",
+  "stock",
+] as const;
 
+// ── Animations ─────────────────────────────────────────────
+export const ANIMATIONS = {
+  fadeIn: {
+    initial: { opacity: 0 },
+    animate: { opacity: 1 },
+    exit: { opacity: 0 },
+  },
+  slideUp: {
+    initial: { opacity: 0, y: 20 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: 20 },
+  },
+  slideDown: {
+    initial: { opacity: 0, y: -20 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: -20 },
+  },
+  scale: {
+    initial: { opacity: 0, scale: 0.95 },
+    animate: { opacity: 1, scale: 1 },
+    exit: { opacity: 0, scale: 0.95 },
+  },
+  stagger: {
+    container: {
+      animate: { transition: { staggerChildren: 0.05 } },
+    },
+    item: {
+      initial: { opacity: 0, y: 10 },
+      animate: { opacity: 1, y: 0 },
+    },
+  },
+} as const;
+
+// ── Score Color ────────────────────────────────────────────
 export function scoreColor(score: number): string {
   if (score >= 4) return "var(--color-success)";
   if (score >= 3) return "var(--color-primary)";

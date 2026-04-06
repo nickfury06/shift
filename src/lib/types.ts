@@ -1,17 +1,9 @@
-// ============================================================
-// Le Hive Management — Type Definitions
-// Uses snake_case to match Supabase column names directly
-// ============================================================
-
+// ── Roles ──────────────────────────────────────────────────
 export type Role = "patron" | "responsable" | "staff";
 export type StockDomain = "boissons" | "vins";
-export type Moment = "ouverture" | "service" | "fermeture";
-export type DayOfWeek = "lundi" | "mardi" | "mercredi" | "jeudi" | "vendredi" | "samedi" | "dimanche";
-export type ReservationSource = "instagram" | "telephone" | "walk-in";
-export type ReservationSeating = "interieur" | "terrasse";
-export type ReservationType = "diner" | "drinks";
-export type ReservationStatus = "attendu" | "arrive";
+export type StockCategory = "spiritueux" | "sirops_cocktails" | "bieres" | "vins" | "champagnes" | "softs" | "consommables";
 
+// ── Zones ──────────────────────────────────────────────────
 export type Zone =
   | "terrasse"
   | "terrasse_wc"
@@ -22,8 +14,31 @@ export type Zone =
   | "bar_backbar"
   | "bar_reserve";
 
-// --- Database row types (match Supabase columns) ---
+// ── Moments ────────────────────────────────────────────────
+export type Moment = "ouverture" | "service" | "fermeture";
 
+// ── Days ───────────────────────────────────────────────────
+export type Day =
+  | "lundi"
+  | "mardi"
+  | "mercredi"
+  | "jeudi"
+  | "vendredi"
+  | "samedi"
+  | "dimanche";
+
+export type DayOfWeek = Day;
+
+// ── Reservation fields ─────────────────────────────────────
+export type ReservationSource = "instagram" | "telephone" | "walk-in";
+export type ReservationSeating = "interieur" | "terrasse";
+export type ReservationType = "diner" | "drinks";
+export type ReservationStatus = "attendu" | "arrive";
+
+// ── Table zones ────────────────────────────────────────────
+export type TableZone = "restaurant" | "terrasse" | "terrasse_couverte" | "bar";
+
+// ── Profile ────────────────────────────────────────────────
 export interface Profile {
   id: string;
   name: string;
@@ -31,189 +46,212 @@ export interface Profile {
   role: Role;
   stock_domain: StockDomain | null;
   must_change_password: boolean;
+  onboarding_completed: boolean;
   created_at: string;
 }
 
+// ── Tasks ──────────────────────────────────────────────────
 export interface Task {
   id: string;
   title: string;
-  note: string | null;
   zone: Zone;
   moment: Moment;
-  assigned_to: string[];
-  days: DayOfWeek[];
+  day: Day;
+  assigned_to: string | null;
   priority: number;
-  is_reminder: boolean;
-  is_libre: boolean;
-  created_by: string | null;
+  description: string | null;
   created_at: string;
 }
 
 export interface OneOffTask {
   id: string;
   title: string;
-  note: string | null;
   zone: Zone;
   moment: Moment;
-  assigned_to: string[];
   date: string;
+  assigned_to: string | null;
+  created_by: string;
   priority: number;
-  is_reminder: boolean;
-  is_libre: boolean;
-  created_by: string | null;
+  description: string | null;
+  completed: boolean;
   created_at: string;
 }
 
 export interface TaskCompletion {
   id: string;
   task_id: string;
-  task_type: "recurring" | "one_off";
-  shift_date: string;
-  completed_by: string;
+  user_id: string;
+  date: string;
   moment: Moment;
   completed_at: string;
 }
 
+// ── Schedule ───────────────────────────────────────────────
 export interface Schedule {
   id: string;
   user_id: string;
-  date: string;
+  day: Day;
   start_time: string;
   end_time: string;
-  created_by: string | null;
+  zone: Zone;
+  week_start: string;
   created_at: string;
+  updated_at: string;
 }
 
+// ── Reservations ───────────────────────────────────────────
 export interface Reservation {
   id: string;
   name: string;
-  covers: number;
-  time: string;
   date: string;
+  time: string;
+  covers: number;
+  table_id: string | null;
   seating: ReservationSeating;
   type: ReservationType;
-  source: ReservationSource;
-  notes: string | null;
   status: ReservationStatus;
+  source: ReservationSource;
   arrived_by: string | null;
-  table_id: string | null;
+  notes: string | null;
+  phone: string | null;
   created_by: string;
   created_at: string;
+  updated_at: string;
 }
 
-export type TableZone = "restaurant" | "terrasse" | "terrasse_couverte" | "bar";
-export type TableType = "standard" | "high" | "round";
-
-export interface VenueTable {
-  id: string;
-  zone: TableZone;
-  capacity: number;
-  max_capacity: number;
-  table_type: TableType;
-  sort_order: number;
-}
-
+// ── Manager Messages ───────────────────────────────────────
 export interface ManagerMessage {
   id: string;
+  title: string;
   content: string;
   date: string;
+  priority: "normal" | "urgent";
   created_by: string;
   created_at: string;
 }
 
+// ── Events ─────────────────────────────────────────────────
 export interface Event {
   id: string;
   title: string;
   description: string | null;
   date: string;
+  start_time: string;
+  end_time: string | null;
   created_by: string;
   created_at: string;
 }
 
+// ── Debrief ────────────────────────────────────────────────
 export interface Debrief {
   id: string;
   user_id: string;
   date: string;
-  global_score: number;
-  service_score: number;
-  coordination_score: number;
-  ambiance_score: number;
-  proprete_score: number;
-  service_comment: string | null;
-  coordination_comment: string | null;
-  ambiance_comment: string | null;
-  proprete_comment: string | null;
-  suggestions: string | null;
+  shift: Moment;
+  category: string;
+  score: number;
+  comment: string | null;
   created_at: string;
 }
 
+// ── Availability Requests ──────────────────────────────────
 export interface AvailabilityRequest {
   id: string;
   user_id: string;
   date: string;
+  type: "conge" | "indisponible" | "preference";
   reason: string | null;
-  status: "pending" | "accepted" | "refused";
+  status: "pending" | "approved" | "rejected";
+  reviewed_by: string | null;
   created_at: string;
+  updated_at: string;
 }
 
+// ── Discount Requests ──────────────────────────────────────
 export interface DiscountRequest {
   id: string;
   user_id: string;
-  guest_name: string;
   date: string;
-  time: string | null;
-  guest_count: number;
-  status: "pending" | "accepted" | "refused";
-  patron_note: string | null;
+  table_id: string | null;
+  amount: number;
+  reason: string;
+  status: "pending" | "approved" | "rejected";
+  reviewed_by: string | null;
   created_at: string;
+  updated_at: string;
 }
 
-export type StockCategory = "spiritueux" | "sirops_cocktails" | "bieres" | "vins" | "champagnes" | "softs" | "consommables";
-export type StockMovementType = "opened" | "inventory" | "received" | "adjustment";
-
+// ── Stock ──────────────────────────────────────────────────
 export interface StockProduct {
   id: string;
   name: string;
-  category: StockCategory;
-  domain: StockDomain;
+  category: string;
   unit: string;
-  current_stock: number;
-  min_stock: number;
   bottle_size: string | null;
   cost_price: number | null;
   supplier: string | null;
-  sort_order: number;
+  par_level: number;
+  current_stock: number;
   created_at: string;
+  updated_at: string;
 }
 
 export interface StockMovement {
   id: string;
   product_id: string;
-  type: StockMovementType;
   quantity: number;
-  level: number | null;
-  note: string | null;
-  created_by: string;
+  type: "in" | "out" | "adjustment";
+  reason: string | null;
+  user_id: string;
   created_at: string;
 }
-
-export type StockOrderStatus = "pending" | "ordered" | "received";
 
 export interface StockOrder {
   id: string;
   product_id: string;
-  quantity_needed: number | null;
-  status: StockOrderStatus;
-  delivery_date: string | null;
-  created_by: string;
+  quantity: number;
+  status: "pending" | "ordered" | "received";
+  ordered_by: string;
+  received_by: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 export interface StockAlert {
   id: string;
   product_id: string;
-  message: string | null;
-  created_by: string;
-  acknowledged: boolean;
+  type: "low_stock" | "out_of_stock" | "expiring";
+  message: string;
+  resolved: boolean;
   created_at: string;
+}
+
+// ── Venue Tables ───────────────────────────────────────────
+export interface VenueTable {
+  id: string;
+  label: string;
+  zone: TableZone;
+  seats: number;
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
+// ── Onboarding ─────────────────────────────────────────────
+export interface OnboardingDoc {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  sort_order: number;
+  required: boolean;
+  created_at: string;
+}
+
+export interface OnboardingCompletion {
+  id: string;
+  user_id: string;
+  doc_id: string;
+  signed_name: string;
+  completed_at: string;
 }

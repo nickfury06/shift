@@ -3,34 +3,31 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 
 export default function ChangePasswordPage() {
   const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [error, setError] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError("");
+    setError(null);
 
     if (password.length < 6) {
-      setError("Le mot de passe doit faire au moins 6 caractères");
+      setError("Le mot de passe doit contenir au moins 6 caracteres");
       return;
     }
 
-    if (password !== confirm) {
+    if (password !== confirmPassword) {
       setError("Les mots de passe ne correspondent pas");
       return;
     }
 
     setLoading(true);
-    const supabase = createClient();
 
-    // Update password in auth
+    const supabase = createClient();
     const { error: updateError } = await supabase.auth.updateUser({
       password,
     });
@@ -41,66 +38,76 @@ export default function ChangePasswordPage() {
       return;
     }
 
-    // Update must_change_password flag in profile
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      await supabase
-        .from("profiles")
-        .update({ must_change_password: false })
-        .eq("id", user.id);
-    }
-
-    router.push("/ce-soir");
+    router.push("/tonight");
   }
 
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center p-6">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-10">
-          <h1 className="text-xl font-semibold tracking-tight mb-2">
-            Bienvenue !
+    <div className="min-h-dvh flex items-center justify-center px-6">
+      <div className="w-full max-w-sm space-y-8">
+        {/* Logo */}
+        <div className="text-center space-y-2">
+          <h1 className="text-4xl font-bold tracking-tight">
+            <span className="text-gradient">Shift</span>
           </h1>
-          <p className="text-sm text-muted-foreground">
-            Choisis ton mot de passe pour sécuriser ton compte
+          <p className="text-muted-foreground text-sm tracking-widest uppercase">
+            Nouveau mot de passe
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Input
-              type="password"
-              placeholder="Nouveau mot de passe"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="new-password"
-              className="h-12"
-            />
-          </div>
-          <div>
-            <Input
-              type="password"
-              placeholder="Confirmer le mot de passe"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              required
-              autoComplete="new-password"
-              className="h-12"
-            />
-          </div>
+        {/* Form */}
+        <div className="glass-card p-6 space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <label
+                htmlFor="password"
+                className="text-sm font-medium text-muted-foreground"
+              >
+                Nouveau mot de passe
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="new-password"
+                className="w-full rounded-xl border border-border bg-background/50 px-4 py-3 text-sm outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
+                placeholder="••••••••"
+              />
+            </div>
 
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
+            <div className="space-y-2">
+              <label
+                htmlFor="confirm-password"
+                className="text-sm font-medium text-muted-foreground"
+              >
+                Confirmer le mot de passe
+              </label>
+              <input
+                id="confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                autoComplete="new-password"
+                className="w-full rounded-xl border border-border bg-background/50 px-4 py-3 text-sm outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
+                placeholder="••••••••"
+              />
+            </div>
 
-          <Button
-            type="submit"
-            disabled={loading}
-            className="w-full h-12 text-base font-medium"
-          >
-            {loading ? "Enregistrement..." : "Enregistrer"}
-          </Button>
-        </form>
+            {error && (
+              <p className="text-sm text-destructive text-center">{error}</p>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="pill-button w-full"
+            >
+              {loading ? "Mise a jour..." : "Changer le mot de passe"}
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );

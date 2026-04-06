@@ -1,99 +1,174 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
-import { getShiftDate } from "@/lib/shift-utils";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
+import { getShiftDate, formatDateFr } from "@/lib/shift-utils";
 import type { ManagerMessage } from "@/lib/types";
-import { useRouter } from "next/navigation";
+import MessageBanner from "@/components/MessageBanner";
+import { Send, Trash2 } from "lucide-react";
 
 export default function MessagesPage() {
-  const { profile, user } = useAuth();
-  const router = useRouter();
-  const supabase = createClient();
-  const today = getShiftDate();
+  const { profile } = useAuth();
+  const supabase = useRef(createClient()).current;
 
   const [messages, setMessages] = useState<ManagerMessage[]>([]);
-  const [profiles, setProfiles] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+
+  // Compose state
+  const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [date, setDate] = useState(today);
+  const [priority, setPriority] = useState<"normal" | "urgent">("normal");
+  const [sending, setSending] = useState(false);
+
+  const shiftDate = getShiftDate();
+
+  const fetchMessages = useCallback(async () => {
+    const { data } = await supabase
+      .from("manager_messages")
+      .select("*")
+      .order("date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(30);
+    setMessages((data as ManagerMessage[]) || []);
+    setLoading(false);
+  }, [supabase]);
 
   useEffect(() => {
-    if (profile && profile.role !== "patron") {
-      router.push("/ce-soir");
-      return;
-    }
-    if (!user) return;
+    fetchMessages();
+  }, [fetchMessages]);
 
-    async function load() {
-      const [{ data: msgs }, { data: profs }] = await Promise.all([
-        supabase.from("messages").select("*").order("date", { ascending: false }).order("created_at", { ascending: false }),
-        supabase.from("profiles").select("id, name"),
-      ]);
-      setMessages(msgs || []);
-      const map: Record<string, string> = {};
-      profs?.forEach((p: { id: string; name: string }) => { map[p.id] = p.name; });
-      setProfiles(map);
-    }
-    load();
-  }, [profile, user, router, supabase]);
+  // Guard: patron only
+  if (profile && profile.role !== "patron") {
+    return (
+      <div className="p-4 pb-28 max-w-lg mx-auto">
+        <div className="glass-card p-6 text-center">
+          <p className="text-muted-foreground">Acces reserve au patron</p>
+        </div>
+      </div>
+    );
+  }
 
-  async function handlePublish() {
-    if (!content.trim() || !user) return;
-    const { data } = await supabase.from("messages").insert({
-      content: content.trim(), date, created_by: user.id,
-    }).select().single();
-    if (data) setMessages((prev) => [data, ...prev]);
+  async function handleSend() {
+    if (!title.trim() || !content.trim() || !profile) return;
+    setSending(true);
+
+    await supabase.from("manager_messages").insert({
+      title: title.trim(),
+      content: content.trim(),
+      date: shiftDate,
+      priority,
+      created_by: profile.id,
+    });
+
+    setTitle("");
     setContent("");
+    setPriority("normal");
+    setSending(false);
+    fetchMessages();
   }
 
   async function handleDelete(id: string) {
-    await supabase.from("messages").delete().eq("id", id);
-    setMessages((prev) => prev.filter((m) => m.id !== id));
+    await supabase.from("manager_messages").delete().eq("id", id);
+    fetchMessages();
   }
 
-  if (!profile || profile.role !== "patron") return null;
+  if (loading) {
+    return (
+      <div className="p-4 pb-28 max-w-lg mx-auto space-y-4">
+        <div className="bg-card rounded-lg animate-pulse h-10 w-1/2" />
+        <div className="bg-card rounded-lg animate-pulse h-32" />
+        {[1, 2].map((i) => (
+          <div key={i} className="bg-card rounded-lg animate-pulse h-20" />
+        ))}
+      </div>
+    );
+  }
 
   return (
-    <div className="p-4 pb-28 max-w-lg mx-auto">
-      <h1 className="text-xl font-semibold tracking-tight mb-4">Messages</h1>
+    <div className="p-4 pb-28 max-w-lg mx-auto space-y-6">
+      <h1 className="text-xl font-semibold tracking-tight">Messages</h1>
 
       {/* Compose */}
-      <div className="mb-6 p-4 rounded-lg glass-card space-y-3">
-        <Textarea
-          placeholder="Message pour l'équipe..."
+      <div className="glass-card p-4 space-y-3">
+        <h3 className="text-base font-semibold tracking-tight">Nouveau message</h3>
+
+        <input
+          type="text"
+          placeholder="Titre / auteur"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="w-full rounded-xl bg-input px-3 py-2 text-sm outline-none"
+        />
+
+        <textarea
+          placeholder="Contenu du message..."
           value={content}
           onChange={(e) => setContent(e.target.value)}
+          className="w-full rounded-xl bg-input px-3 py-2 text-sm outline-none resize-none"
           rows={3}
         />
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">Pour le :</span>
-          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-auto" />
+
+        <div className="flex items-center justify-between">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPriority("normal")}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                priority === "normal" ? "text-white" : "pill"
+              }`}
+              style={priority === "normal" ? { background: "var(--gradient-primary)" } : undefined}
+            >
+              Normal
+            </button>
+            <button
+              onClick={() => setPriority("urgent")}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                priority === "urgent" ? "bg-destructive text-white" : "pill"
+              }`}
+            >
+              Urgent
+            </button>
+          </div>
+
+          <button
+            onClick={handleSend}
+            disabled={sending || !title.trim() || !content.trim()}
+            className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            style={{ background: "var(--gradient-primary)" }}
+          >
+            <Send size={14} />
+            Envoyer
+          </button>
         </div>
-        <Button className="w-full" onClick={handlePublish} disabled={!content.trim()}>
-          Publier
-        </Button>
       </div>
 
       {/* Message history */}
-      <div className="space-y-2">
-        {messages.map((m) => {
-          const isPast = m.date < today;
-          return (
-            <div key={m.id} className={`p-3 rounded-lg glass-card border-l-[3px] ${m.date === today ? "border-l-primary" : "border-l-border"} ${isPast ? "opacity-50" : ""}`}>
-              <p className="text-sm">{m.content}</p>
-              <div className="flex justify-between items-center mt-2">
-                <span className="text-xs text-muted-foreground">
-                  {profiles[m.created_by] || "?"} · {m.date}
-                </span>
-                <button onClick={() => handleDelete(m.id)} className="text-xs text-destructive">Supprimer</button>
-              </div>
+      <div>
+        <h3 className="text-base font-semibold tracking-tight mb-2">Historique</h3>
+        <div className="space-y-2 stagger-children">
+          {messages.map((msg) => (
+            <div key={msg.id} className="relative">
+              <MessageBanner
+                content={msg.content}
+                author={`${msg.title} · ${formatDateFr(msg.date)}`}
+                priority={msg.priority}
+              />
+              <button
+                onClick={() => handleDelete(msg.id)}
+                className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-lg hover:bg-secondary"
+                aria-label="Supprimer"
+              >
+                <Trash2 size={13} className="text-destructive" />
+              </button>
             </div>
-          );
-        })}
+          ))}
+
+          {messages.length === 0 && (
+            <div className="glass-card p-6 text-center">
+              <p className="text-sm text-muted-foreground">Aucun message</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
