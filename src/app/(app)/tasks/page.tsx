@@ -148,9 +148,9 @@ export default function TasksPage() {
   if (!profile || profile.role !== "patron") return null;
 
   return (
-    <div className="p-4 max-w-lg mx-auto">
+    <div className="p-4 pb-28 max-w-lg mx-auto">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl" style={{ fontFamily: "var(--font-dm-serif)" }}>Tâches</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Tâches</h1>
         <Button size="sm" onClick={() => { resetForm(); setShowForm(true); }}>
           <Plus size={16} className="mr-1" /> Nouvelle
         </Button>
@@ -179,7 +179,7 @@ export default function TasksPage() {
 
       {/* Form */}
       {showForm && (
-        <div className="mb-6 p-4 rounded-lg bg-card space-y-3">
+        <div className="mb-6 p-4 rounded-lg glass-card space-y-3">
           <div className="flex justify-between items-center">
             <h3 className="font-medium">{editing ? "Modifier" : "Nouvelle tâche"}</h3>
             <button onClick={resetForm}><X size={18} className="text-muted-foreground" /></button>
@@ -287,7 +287,7 @@ export default function TasksPage() {
       {/* Task list */}
       <div className="space-y-2">
         {filtered.map((task) => (
-          <div key={task.id} className="p-3 rounded-lg bg-card flex items-start justify-between">
+          <div key={task.id} className="p-3 rounded-lg glass-card flex items-start justify-between">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-medium text-sm">{task.title}</span>

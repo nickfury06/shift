@@ -5,126 +5,218 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  /* Le Hive Signature palette — hardcoded for Tailwind v4 */
-  --color-background: #0D0C0A;
-  --color-foreground: #E8E4DE;
-  --color-card: #171613;
-  --color-card-foreground: #E8E4DE;
-  --color-popover: #171613;
-  --color-popover-foreground: #E8E4DE;
-  --color-primary: #CC8B5E;
-  --color-primary-foreground: #0D0C0A;
-  --color-secondary: #211F1B;
-  --color-secondary-foreground: #E8E4DE;
-  --color-muted: #211F1B;
+  /* Terroir Design System */
+  --color-background: #0B0A08;
+  --color-foreground: #FAFAF8;
+  --color-card: rgba(255, 240, 220, 0.04);
+  --color-card-foreground: #FAFAF8;
+  --color-popover: #141310;
+  --color-popover-foreground: #FAFAF8;
+  --color-primary: #7BA37A;
+  --color-primary-foreground: #0B0A08;
+  --color-secondary: rgba(255, 240, 220, 0.06);
+  --color-secondary-foreground: #FAFAF8;
+  --color-muted: rgba(255, 240, 220, 0.06);
   --color-muted-foreground: #787470;
-  --color-accent: #211F1B;
-  --color-accent-foreground: #E8E4DE;
+  --color-accent: rgba(255, 240, 220, 0.08);
+  --color-accent-foreground: #FAFAF8;
   --color-destructive: #D95555;
-  --color-success: #7CB88A;
+  --color-success: #7BA37A;
   --color-warning: #D4A94E;
-  --color-border: #262421;
-  --color-input: #262421;
-  --color-ring: #CC8B5E;
-  --color-sidebar: #131210;
-  --color-sidebar-foreground: #E8E4DE;
-  --color-sidebar-primary: #CC8B5E;
-  --color-sidebar-primary-foreground: #0D0C0A;
-  --color-sidebar-accent: #211F1B;
-  --color-sidebar-accent-foreground: #E8E4DE;
-  --color-sidebar-border: #262421;
-  --color-sidebar-ring: #CC8B5E;
+  --color-border: rgba(255, 240, 220, 0.08);
+  --color-input: rgba(255, 240, 220, 0.08);
+  --color-ring: #7BA37A;
+  --color-sidebar: #090807;
+  --color-sidebar-foreground: #FAFAF8;
+  --color-sidebar-primary: #7BA37A;
+  --color-sidebar-primary-foreground: #0B0A08;
+  --color-sidebar-accent: rgba(255, 240, 220, 0.06);
+  --color-sidebar-accent-foreground: #FAFAF8;
+  --color-sidebar-border: rgba(255, 240, 220, 0.08);
+  --color-sidebar-ring: #7BA37A;
   --font-sans: var(--font-inter);
-  --font-heading: var(--font-dm-serif);
-  --radius-sm: 0.45rem;
-  --radius-md: 0.6rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1.05rem;
-  --radius-2xl: 1.35rem;
+  --font-heading: var(--font-inter);
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.5rem;
 }
 
-/* Le Hive Signature — Dark Mode Only */
 :root {
-  /* Core palette */
-  --background: #0D0C0A;
-  --foreground: #E8E4DE;
-  --card: #171613;
-  --card-foreground: #E8E4DE;
-  --popover: #171613;
-  --popover-foreground: #E8E4DE;
-
-  /* Primary — Burnished Gold */
-  --primary: #CC8B5E;
-  --primary-foreground: #0D0C0A;
-
-  /* Secondary */
-  --secondary: #211F1B;
-  --secondary-foreground: #E8E4DE;
-
-  /* Muted */
-  --muted: #211F1B;
+  --background: #0B0A08;
+  --foreground: #FAFAF8;
+  --card: rgba(255, 240, 220, 0.04);
+  --card-foreground: #FAFAF8;
+  --popover: #141310;
+  --popover-foreground: #FAFAF8;
+  --primary: #7BA37A;
+  --primary-foreground: #0B0A08;
+  --secondary: rgba(255, 240, 220, 0.06);
+  --secondary-foreground: #FAFAF8;
+  --muted: rgba(255, 240, 220, 0.06);
   --muted-foreground: #787470;
-
-  /* Accent */
-  --accent: #211F1B;
-  --accent-foreground: #E8E4DE;
-
-  /* Semantic */
+  --accent: rgba(255, 240, 220, 0.08);
+  --accent-foreground: #FAFAF8;
   --destructive: #D95555;
-  --success: #7CB88A;
+  --success: #7BA37A;
   --warning: #D4A94E;
+  --border: rgba(255, 240, 220, 0.08);
+  --input: rgba(255, 240, 220, 0.08);
+  --ring: #7BA37A;
+  --radius: 1rem;
 
-  /* Borders & inputs */
-  --border: #262421;
-  --input: #262421;
-  --ring: #CC8B5E;
+  /* Gradient accents */
+  --gradient-primary: linear-gradient(135deg, #7BA37A, #5B8B5E);
+  --gradient-warm: linear-gradient(135deg, rgba(123, 163, 122, 0.15), rgba(91, 139, 94, 0.05));
 
-  /* Radius */
-  --radius: 0.75rem;
-
-  /* Sidebar (desktop patron) */
-  --sidebar: #131210;
-  --sidebar-foreground: #E8E4DE;
-  --sidebar-primary: #CC8B5E;
-  --sidebar-primary-foreground: #0D0C0A;
-  --sidebar-accent: #211F1B;
-  --sidebar-accent-foreground: #E8E4DE;
-  --sidebar-border: #262421;
-  --sidebar-ring: #CC8B5E;
-
-  /* Zone colors */
-  --zone-terrasse: #D4956A;
-  --zone-toilettes: #C9906A;
-  --zone-restaurant: #B5616A;
-  --zone-escaliers: #7BA3A8;
+  /* Zone colors — earthy tones */
+  --zone-terrasse: #C9906A;
+  --zone-toilettes: #B8845C;
+  --zone-restaurant: #A8616A;
+  --zone-escaliers: #6B93A0;
   --zone-salle: #6B8B5E;
-  --zone-gaming: #CC8B5E;
-  --zone-backbar: #9B7BB5;
-  --zone-reserve: #8B7B65;
+  --zone-gaming: #9B8B6E;
+  --zone-backbar: #8B7BB0;
+  --zone-reserve: #7B7060;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
-    background-color: var(--background);
-    color: var(--foreground);
+    background-color: #0B0A08;
+    color: #FAFAF8;
     min-height: 100dvh;
+    position: relative;
   }
+
+  /* Grain texture overlay */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 256px 256px;
+  }
+
+  /* Ambient gradient orb */
+  body::after {
+    content: "";
+    position: fixed;
+    top: -20%;
+    left: -10%;
+    width: 60%;
+    height: 60%;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(123, 163, 122, 0.06) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
   html {
     @apply antialiased;
     font-family: var(--font-inter), system-ui, sans-serif;
+    letter-spacing: -0.01em;
   }
+
   h1, h2, h3 {
-    font-family: var(--font-heading), serif;
+    font-family: var(--font-inter), system-ui, sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  /* Glass card style */
+  .glass-card {
+    background: rgba(255, 240, 220, 0.04);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 240, 220, 0.06);
+    border-radius: 1rem;
+  }
+
+  /* Gradient text utility */
+  .text-gradient {
+    background: linear-gradient(135deg, #7BA37A, #5B8B5E);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Subtle card hover */
+  .card-hover {
+    transition: all 0.2s ease;
+  }
+  .card-hover:hover {
+    background: rgba(255, 240, 220, 0.06);
+    border-color: rgba(255, 240, 220, 0.1);
+  }
+
+  /* Progress bar gradient */
+  .progress-gradient {
+    background: linear-gradient(90deg, #7BA37A, #5B8B5E);
   }
 
   /* Scrollbar */
   * {
     scrollbar-width: thin;
-    scrollbar-color: var(--border) transparent;
+    scrollbar-color: rgba(255, 240, 220, 0.1) transparent;
   }
+
+  /* Animations */
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-8px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  @keyframes pulse-soft {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  .animate-fade-in-up {
+    animation: fadeInUp 0.4s ease-out forwards;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.3s ease-out forwards;
+  }
+
+  .animate-slide-in {
+    animation: slideIn 0.3s ease-out forwards;
+  }
+
+  /* Stagger children */
+  .stagger-children > * {
+    opacity: 0;
+    animation: fadeInUp 0.4s ease-out forwards;
+  }
+  .stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+  .stagger-children > *:nth-child(2) { animation-delay: 50ms; }
+  .stagger-children > *:nth-child(3) { animation-delay: 100ms; }
+  .stagger-children > *:nth-child(4) { animation-delay: 150ms; }
+  .stagger-children > *:nth-child(5) { animation-delay: 200ms; }
+  .stagger-children > *:nth-child(6) { animation-delay: 250ms; }
+  .stagger-children > *:nth-child(7) { animation-delay: 300ms; }
+  .stagger-children > *:nth-child(8) { animation-delay: 350ms; }
+  .stagger-children > *:nth-child(9) { animation-delay: 400ms; }
+  .stagger-children > *:nth-child(10) { animation-delay: 450ms; }
 
   /* Reduced motion */
   @media (prefers-reduced-motion: reduce) {

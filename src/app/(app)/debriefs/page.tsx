@@ -159,8 +159,8 @@ export default function DebriefsPage() {
   if (!profile || profile.role === "staff") return null;
 
   return (
-    <div className="p-4 max-w-lg mx-auto">
-      <h1 className="text-2xl mb-4" style={{ fontFamily: "var(--font-dm-serif)" }}>Debriefs</h1>
+    <div className="p-4 pb-28 max-w-lg mx-auto">
+      <h1 className="text-xl font-semibold tracking-tight mb-4">Debriefs</h1>
 
       {/* Filters */}
       <div className="flex gap-2 mb-4">
@@ -185,7 +185,7 @@ export default function DebriefsPage() {
 
       {/* Scores moyens */}
       {avgScores && (
-        <div className="mb-6 p-4 rounded-lg bg-card">
+        <div className="mb-6 p-4 rounded-lg glass-card">
           <h2 className="text-sm font-medium mb-3 text-muted-foreground">
             Scores moyens ({filtered.length} debrief{filtered.length > 1 ? "s" : ""})
           </h2>
@@ -204,7 +204,7 @@ export default function DebriefsPage() {
 
       {/* Tendances semaine */}
       {trends && (
-        <div className="mb-6 p-4 rounded-lg bg-card">
+        <div className="mb-6 p-4 rounded-lg glass-card">
           <h2 className="text-sm font-medium mb-3 text-muted-foreground">Tendances (cette semaine vs précédente)</h2>
           <div className="space-y-2">
             {trends.map((t) => (
@@ -232,7 +232,7 @@ export default function DebriefsPage() {
 
       {/* Thèmes récurrents */}
       {recurringThemes.length > 0 && (
-        <div className="mb-6 p-4 rounded-lg bg-card">
+        <div className="mb-6 p-4 rounded-lg glass-card">
           <h2 className="text-sm font-medium mb-3 text-muted-foreground">Mots récurrents dans les commentaires</h2>
           <div className="flex flex-wrap gap-2">
             {recurringThemes.map(([word, count]) => (
@@ -250,7 +250,7 @@ export default function DebriefsPage() {
           <h2 className="text-sm font-medium mb-2 text-muted-foreground">Suggestions ({allSuggestions.length})</h2>
           <div className="space-y-2">
             {allSuggestions.map((s, i) => (
-              <div key={i} className="p-3 rounded-lg bg-card border-l-[3px] border-l-primary">
+              <div key={i} className="p-3 rounded-lg glass-card border-l-[3px] border-l-primary">
                 <p className="text-sm">{s.text}</p>
                 <p className="text-xs text-muted-foreground mt-1">— {s.user}, {s.date}</p>
               </div>
@@ -265,7 +265,7 @@ export default function DebriefsPage() {
         {filtered.map((d) => (
           <div
             key={d.id}
-            className="p-4 rounded-lg bg-card cursor-pointer"
+            className="p-4 rounded-lg glass-card cursor-pointer"
             onClick={() => setExpandedId(expandedId === d.id ? null : d.id)}
           >
             <div className="flex justify-between items-center">

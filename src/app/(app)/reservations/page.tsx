@@ -177,10 +177,10 @@ export default function ReservationsPage() {
   if (!profile) return null;
 
   return (
-    <div className="p-4 pb-24 max-w-lg mx-auto">
+    <div className="p-4 pb-28 max-w-lg mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-2">
-        <h1 className="text-2xl" style={{ fontFamily: "var(--font-dm-serif)" }}>Réservations</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Réservations</h1>
         <div className="flex gap-2">
           {profile?.role !== "patron" && (
             <Button size="lg" variant="secondary" className="h-12 px-5" onClick={() => setShowDiscountForm(!showDiscountForm)}>
@@ -267,7 +267,7 @@ export default function ReservationsPage() {
 
       {/* F&F Discount form */}
       {showDiscountForm && (
-        <div className="mb-4 p-4 rounded-lg bg-card space-y-3">
+        <div className="mb-4 p-4 rounded-lg glass-card space-y-3">
           <div className="flex justify-between items-center">
             <h3 className="font-medium text-sm">Inviter un proche</h3>
             <button onClick={() => setShowDiscountForm(false)}><X size={16} className="text-muted-foreground" /></button>
@@ -305,7 +305,7 @@ export default function ReservationsPage() {
       </div>
 
       {/* Summary + Capacity */}
-      <div className="p-3 rounded-lg bg-card mb-4">
+      <div className="p-3 rounded-lg glass-card mb-4">
         <div className="flex justify-between items-center mb-2">
           <span className="text-sm text-muted-foreground">{reservations.length} résas</span>
           <span className="text-sm font-bold text-primary">{totalCovers} / {totalCapacity} couverts</span>
@@ -328,7 +328,7 @@ export default function ReservationsPage() {
             {attendu.map((r) => {
               const overdue = getOverdueMin(r);
               return (
-                <div key={r.id} className={`p-3 rounded-lg bg-card ${overdue >= 30 ? "border-l-[3px] border-l-destructive" : overdue >= 15 ? "border-l-[3px] border-l-warning" : ""}`}>
+                <div key={r.id} className={`p-3 rounded-lg glass-card ${overdue >= 30 ? "border-l-[3px] border-l-destructive" : overdue >= 15 ? "border-l-[3px] border-l-warning" : ""}`}>
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -374,7 +374,7 @@ export default function ReservationsPage() {
           <h3 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Arrivés</h3>
           <div className="space-y-2">
             {arrive.map((r) => (
-              <div key={r.id} className="p-3 rounded-lg bg-card opacity-60">
+              <div key={r.id} className="p-3 rounded-lg glass-card opacity-60">
                 <div className="flex justify-between items-center">
                   <div>
                     <div className="flex items-center gap-2">

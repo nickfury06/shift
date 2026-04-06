@@ -109,9 +109,9 @@ export default function StaffPage() {
   const roleBadgeVariant = (r: string) => r === "patron" ? "default" as const : r === "responsable" ? "secondary" as const : "outline" as const;
 
   return (
-    <div className="p-4 max-w-lg mx-auto">
+    <div className="p-4 pb-28 max-w-lg mx-auto">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl" style={{ fontFamily: "var(--font-dm-serif)" }}>Staff</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Staff</h1>
         <Button size="sm" onClick={() => setShowForm(!showForm)}>
           <Plus size={14} className="mr-1" /> Nouveau
         </Button>
@@ -119,7 +119,7 @@ export default function StaffPage() {
 
       {/* Credentials modal */}
       {credentials && (
-        <div className="mb-4 p-4 rounded-lg bg-card border-2 border-primary">
+        <div className="mb-4 p-4 rounded-lg glass-card border-2 border-primary">
           <div className="flex justify-between items-center mb-2">
             <h3 className="font-medium text-primary">Identifiants</h3>
             <button onClick={() => setCredentials(null)}><X size={16} className="text-muted-foreground" /></button>
@@ -134,7 +134,7 @@ export default function StaffPage() {
 
       {/* Create form */}
       {showForm && (
-        <div className="mb-4 p-4 rounded-lg bg-card space-y-3">
+        <div className="mb-4 p-4 rounded-lg glass-card space-y-3">
           <div className="flex justify-between items-center">
             <h3 className="font-medium text-sm">Nouveau compte</h3>
             <button onClick={() => setShowForm(false)}><X size={16} className="text-muted-foreground" /></button>
@@ -172,7 +172,7 @@ export default function StaffPage() {
       {/* Staff list */}
       <div className="space-y-2">
         {staffList.map((s) => (
-          <div key={s.id} className="p-3 rounded-lg bg-card flex items-center justify-between">
+          <div key={s.id} className="p-3 rounded-lg glass-card flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-medium text-sm">{s.name}</span>

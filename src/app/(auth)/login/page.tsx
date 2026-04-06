@@ -61,8 +61,8 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Le Hive branding */}
         <div className="text-center mb-10">
-          <h1 className="text-4xl mb-1" style={{ fontFamily: "var(--font-dm-serif)" }}>
-            Le Hive
+          <h1 className="text-3xl font-semibold tracking-tight mb-1">
+            <span className="text-gradient">Le Hive</span>
           </h1>
           <p className="text-sm text-muted-foreground">Management</p>
         </div>

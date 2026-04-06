@@ -252,25 +252,25 @@ export default function CeSoirPage() {
   }
 
   return (
-    <div className="p-4 pb-24 max-w-lg mx-auto">
-      {/* Greeting */}
-      <div className="mb-6">
-        <h1 className="text-2xl" style={{ fontFamily: "var(--font-dm-serif)" }}>
-          {getGreeting()} {profile.name}
-        </h1>
-        <p className="text-sm text-muted-foreground capitalize">
-          {formatDateFr(shiftDate)}
-        </p>
+    <div className="p-4 pb-28 max-w-lg mx-auto">
+      {/* Compact header bar */}
+      <div className="mb-5 flex items-center gap-2 text-sm">
+        <span className="font-medium">{profile.name}</span>
+        <span className="text-muted-foreground">·</span>
+        <span className="text-muted-foreground capitalize">{formatDateFr(shiftDate)}</span>
         {mySchedule && (
-          <p className="text-sm mt-0.5">
-            {formatTime(mySchedule.start_time)} → {formatTime(mySchedule.end_time)}
-          </p>
+          <>
+            <span className="text-muted-foreground">·</span>
+            <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: "rgba(123, 163, 122, 0.1)", color: "var(--color-primary)" }}>
+              {formatTime(mySchedule.start_time)}→{formatTime(mySchedule.end_time)}
+            </span>
+          </>
         )}
       </div>
 
       {/* Manager messages */}
       {messages.length > 0 && (
-        <div className="mb-6 space-y-2">
+        <div className="mb-6 space-y-2 stagger-children">
           {messages.map((m) => (
             <MessageBanner
               key={m.id}
@@ -283,8 +283,8 @@ export default function CeSoirPage() {
 
       {/* Tonight's event */}
       {event && (
-        <div className="mb-6 p-3 rounded-lg bg-card border border-primary/20">
-          <p className="text-sm font-medium text-primary">{event.title}</p>
+        <div className="glass-card mb-6 p-4 animate-fade-in-up" style={{ background: "var(--gradient-warm)" }}>
+          <p className="text-sm font-semibold text-gradient">{event.title}</p>
           {event.description && (
             <p className="text-xs text-muted-foreground mt-0.5">{event.description}</p>
           )}
@@ -292,20 +292,20 @@ export default function CeSoirPage() {
       )}
 
       {/* Reservations */}
-      <div className="mb-6">
-        <div className="flex justify-between items-center mb-2">
-          <h2 className="text-lg font-bold">Réservations</h2>
-          <span className="text-sm font-bold text-primary">
+      <div className="mb-8">
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="text-base font-semibold tracking-tight">Réservations</h2>
+          <span className="text-xs font-medium px-2.5 py-1 rounded-full" style={{ background: "rgba(123, 163, 122, 0.1)", color: "var(--color-primary)" }}>
             {totalResas > 0 ? `${totalResas} résas · ${totalCovers} couverts` : "Aucune résa"}
           </span>
         </div>
 
         {attenduResas.length > 0 && (
-          <div className="space-y-2 mb-3">
+          <div className="space-y-2 mb-3 stagger-children">
             {attenduResas.map((r) => {
               const overdue = getOverdueMin(r);
               return (
-                <div key={r.id} className={`p-3 rounded-lg bg-card ${overdue >= 30 ? "border-l-[3px] border-l-destructive" : overdue >= 15 ? "border-l-[3px] border-l-warning" : ""}`}>
+                <div key={r.id} className={`glass-card p-4 ${overdue >= 30 ? "border-l-[3px] border-l-destructive" : overdue >= 15 ? "border-l-[3px] border-l-warning" : ""}`}>
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -340,18 +340,18 @@ export default function CeSoirPage() {
         {arriveResas.length > 0 && (
           <div className="space-y-1">
             {arriveResas.map((r) => (
-              <div key={r.id} className="p-2 rounded-lg bg-card opacity-50 flex justify-between items-center">
+              <div key={r.id} className="glass-card p-3 opacity-40 flex justify-between items-center">
                 <span className="text-xs">
                   {formatTime(r.time)} — {r.name} ({r.covers}p) ✓
                 </span>
-                <button onClick={() => markAttendu(r.id)} className="text-xs text-muted-foreground">Annuler</button>
+                <button onClick={() => markAttendu(r.id)} className="text-xs text-muted-foreground hover:text-foreground transition-colors">Annuler</button>
               </div>
             ))}
           </div>
         )}
 
         {reservations.length === 0 && (
-          <p className="text-sm text-muted-foreground p-3 rounded-lg bg-card">Aucune résa pour ce soir</p>
+          <p className="text-sm text-muted-foreground glass-card p-4 text-center">Aucune résa pour ce soir</p>
         )}
       </div>
 
@@ -370,9 +370,9 @@ export default function CeSoirPage() {
 
       {/* Tâches libres */}
       {tachesLibres.length > 0 && (
-        <div className="mb-6">
-          <h2 className="text-lg font-bold mb-3 text-muted-foreground">Tâches libres</h2>
-          <div className="space-y-2">
+        <div className="mb-8">
+          <h2 className="text-base font-semibold tracking-tight text-muted-foreground mb-3">Tâches libres</h2>
+          <div className="space-y-2 stagger-children">
             {tachesLibres.map((task) => (
               <TaskCard
                 key={task.id}

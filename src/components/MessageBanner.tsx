@@ -1,6 +1,6 @@
 "use client";
 
-import type { ManagerMessage, Profile } from "@/lib/types";
+import type { ManagerMessage } from "@/lib/types";
 
 interface MessageBannerProps {
   message: ManagerMessage;
@@ -9,10 +9,13 @@ interface MessageBannerProps {
 
 export default function MessageBanner({ message, authorName }: MessageBannerProps) {
   return (
-    <div className="p-3 rounded-lg border-l-[3px] border-l-primary bg-card">
-      <p className="text-sm">{message.content}</p>
+    <div
+      className="glass-card p-4 border-l-[3px] transition-all"
+      style={{ borderLeftColor: "var(--color-primary)" }}
+    >
+      <p className="text-sm leading-relaxed">{message.content}</p>
       {authorName && (
-        <p className="text-xs text-muted-foreground mt-1">— {authorName}</p>
+        <p className="text-xs text-muted-foreground mt-2">— {authorName}</p>
       )}
     </div>
   );

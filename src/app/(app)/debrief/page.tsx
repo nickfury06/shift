@@ -69,11 +69,11 @@ export default function DebriefPage() {
   if (alreadyFilled || submitted) {
     return (
       <div className="p-4 max-w-lg mx-auto">
-        <h1 className="text-2xl mb-4" style={{ fontFamily: "var(--font-dm-serif)" }}>Debrief</h1>
+        <h1 className="text-xl font-semibold tracking-tight mb-4">Debrief</h1>
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="p-8 rounded-lg bg-card text-center"
+          className="p-8 rounded-lg glass-card text-center"
         >
           <p className="text-4xl mb-4">✅</p>
           <p className="text-lg font-medium">Merci {profile.name} !</p>
@@ -86,12 +86,12 @@ export default function DebriefPage() {
   }
 
   return (
-    <div className="p-4 pb-24 max-w-lg mx-auto">
-      <h1 className="text-2xl mb-1" style={{ fontFamily: "var(--font-dm-serif)" }}>Debrief</h1>
+    <div className="p-4 pb-28 max-w-lg mx-auto">
+      <h1 className="text-xl font-semibold tracking-tight mb-1">Debrief</h1>
       <p className="text-sm text-muted-foreground mb-6">Comment s&apos;est passé le service ce soir ?</p>
 
       {/* Global score */}
-      <div className="mb-6 p-4 rounded-lg bg-card">
+      <div className="mb-6 p-4 rounded-lg glass-card">
         <label className="block font-medium mb-3">Note globale</label>
         <div className="flex justify-center">
           <ScoreSelector value={globalScore} onChange={setGlobalScore} size="large" />
@@ -103,7 +103,7 @@ export default function DebriefPage() {
 
       {/* Category scores */}
       {DEBRIEF_CATEGORIES.map((cat) => (
-        <div key={cat.key} className="mb-4 p-4 rounded-lg bg-card">
+        <div key={cat.key} className="mb-4 p-4 rounded-lg glass-card">
           <div className="flex justify-between items-center mb-2">
             <label className="font-medium">{cat.label}</label>
             <ScoreSelector
@@ -123,7 +123,7 @@ export default function DebriefPage() {
       ))}
 
       {/* Suggestions */}
-      <div className="mb-6 p-4 rounded-lg bg-card">
+      <div className="mb-6 p-4 rounded-lg glass-card">
         <label className="block font-medium mb-2">Suggestions d&apos;amélioration</label>
         <Textarea
           placeholder="Une idée de cocktail, un process à changer, un problème à signaler..."

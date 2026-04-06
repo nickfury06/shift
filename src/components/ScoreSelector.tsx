@@ -20,8 +20,8 @@ export default function ScoreSelector({ value, onChange, size = "small" }: Score
           onClick={() => onChange(n)}
           className={`${btnSize} rounded-full font-bold transition-colors`}
           style={{
-            background: value >= n ? "var(--primary)" : "var(--secondary)",
-            color: value >= n ? "var(--primary-foreground)" : "var(--muted-foreground)",
+            background: value >= n ? "var(--gradient-primary)" : "rgba(255, 240, 220, 0.04)",
+            color: value >= n ? "var(--color-primary-foreground)" : "var(--color-muted-foreground)",
           }}
         >
           {n}

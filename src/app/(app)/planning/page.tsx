@@ -112,9 +112,9 @@ export default function PlanningPage() {
   const pendingAvail = availRequests.filter((r) => r.status === "pending");
 
   return (
-    <div className="p-4 max-w-lg mx-auto">
+    <div className="p-4 pb-28 max-w-lg mx-auto">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl" style={{ fontFamily: "var(--font-dm-serif)" }}>Planning</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Planning</h1>
         {isPatron && (
           <Button size="sm" onClick={() => setShowAddShift(!showAddShift)}>
             <Plus size={14} className="mr-1" /> Shift
@@ -127,7 +127,7 @@ export default function PlanningPage() {
         <div className="mb-4 space-y-2">
           <h3 className="text-sm font-medium text-primary">Demandes d&apos;indisponibilité</h3>
           {pendingAvail.map((r) => (
-            <div key={r.id} className="p-3 rounded-lg bg-card border-l-[3px] border-l-warning">
+            <div key={r.id} className="p-3 rounded-lg glass-card border-l-[3px] border-l-warning">
               <p className="text-sm font-medium">{staffList.find((s) => s.id === r.user_id)?.name} — {formatDay(r.date)}</p>
               {r.reason && <p className="text-xs text-muted-foreground">{r.reason}</p>}
               <div className="flex gap-2 mt-2">
@@ -141,7 +141,7 @@ export default function PlanningPage() {
 
       {/* Add shift form (patron) */}
       {showAddShift && isPatron && (
-        <div className="mb-4 p-4 rounded-lg bg-card space-y-3">
+        <div className="mb-4 p-4 rounded-lg glass-card space-y-3">
           <div className="flex justify-between"><h3 className="font-medium text-sm">Nouveau shift</h3><button onClick={() => setShowAddShift(false)}><X size={16} className="text-muted-foreground" /></button></div>
           <Select value={newUserId} onValueChange={setNewUserId}>
             <SelectTrigger><SelectValue placeholder="Employé" /></SelectTrigger>
@@ -176,13 +176,13 @@ export default function PlanningPage() {
               {formatDay(day)} {isToday(day) && "· Aujourd'hui"}
             </h3>
             {daySchedules.length === 0 ? (
-              <div className="p-2.5 rounded-lg bg-card text-xs text-muted-foreground">
+              <div className="p-2.5 rounded-lg glass-card text-xs text-muted-foreground">
                 {isPatron ? "Aucun shift" : "Repos"}
               </div>
             ) : (
               <div className="space-y-1">
                 {daySchedules.map((s) => (
-                  <div key={s.id} className="flex items-center justify-between p-2.5 rounded-lg bg-card">
+                  <div key={s.id} className="flex items-center justify-between p-2.5 rounded-lg glass-card">
                     <div className="flex items-center gap-2">
                       {isPatron && <span className="text-sm font-medium">{staffList.find((p) => p.id === s.user_id)?.name}</span>}
                       <span className="text-sm">{s.start_time.slice(0, 5)} → {s.end_time.slice(0, 5)}</span>
@@ -207,7 +207,7 @@ export default function PlanningPage() {
 
             {/* Availability request inline form */}
             {showAvailForm === day && (
-              <div className="mt-2 p-3 rounded-lg bg-card space-y-2">
+              <div className="mt-2 p-3 rounded-lg glass-card space-y-2">
                 <Textarea placeholder="Raison (optionnel)" value={availReason} onChange={(e) => setAvailReason(e.target.value)} rows={2} />
                 <div className="flex gap-2">
                   <Button size="sm" onClick={() => submitAvailRequest(day)}>Envoyer</Button>

@@ -105,9 +105,9 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="p-4 max-w-lg mx-auto">
+    <div className="p-4 pb-28 max-w-lg mx-auto">
       <div className="flex items-center justify-between mb-1">
-        <h1 className="text-2xl" style={{ fontFamily: "var(--font-dm-serif)" }}>Dashboard</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
         <div className="flex gap-2">
           <Button size="sm" variant="secondary" onClick={() => router.push("/tasks")}>
             <Settings size={14} className="mr-1" /> Tâches
@@ -121,15 +121,15 @@ export default function DashboardPage() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-2 mb-6">
-        <div className="p-3 rounded-lg bg-card text-center">
+        <div className="p-3 rounded-lg glass-card text-center">
           <p className="text-2xl font-bold text-primary">{staffOnDuty.length}</p>
           <p className="text-xs text-muted-foreground">Staff</p>
         </div>
-        <div className="p-3 rounded-lg bg-card text-center">
+        <div className="p-3 rounded-lg glass-card text-center">
           <p className="text-2xl font-bold text-primary">{reservations.length}</p>
           <p className="text-xs text-muted-foreground">Résas</p>
         </div>
-        <div className="p-3 rounded-lg bg-card text-center">
+        <div className="p-3 rounded-lg glass-card text-center">
           <p className="text-2xl font-bold text-primary">{totalCovers}</p>
           <p className="text-xs text-muted-foreground">Couverts</p>
         </div>
@@ -137,7 +137,7 @@ export default function DashboardPage() {
 
       {/* Event */}
       {event && (
-        <div className="mb-4 p-3 rounded-lg bg-card border border-primary/20">
+        <div className="mb-4 p-3 rounded-lg glass-card border border-primary/20">
           <p className="text-sm font-medium text-primary">{event.title}</p>
           {event.description && <p className="text-xs text-muted-foreground mt-0.5">{event.description}</p>}
         </div>
@@ -147,7 +147,7 @@ export default function DashboardPage() {
       {messages.length > 0 && (
         <div className="mb-4 space-y-1">
           {messages.map((m) => (
-            <div key={m.id} className="p-2 rounded text-sm bg-card border-l-[3px] border-l-primary">{m.content}</div>
+            <div key={m.id} className="p-2 rounded text-sm glass-card border-l-[3px] border-l-primary">{m.content}</div>
           ))}
         </div>
       )}
@@ -159,7 +159,7 @@ export default function DashboardPage() {
           {momentStats.map(({ moment, done, total }) => {
             const pct = total > 0 ? Math.round((done / total) * 100) : 0;
             return (
-              <div key={moment} className="p-3 rounded-lg bg-card">
+              <div key={moment} className="p-3 rounded-lg glass-card">
                 <div className="flex justify-between text-sm mb-1">
                   <span>{MOMENT_LABELS[moment]}</span>
                   <span style={{ color: pct === 100 ? "var(--success)" : "var(--muted-foreground)" }}>{done}/{total}</span>
@@ -176,7 +176,7 @@ export default function DashboardPage() {
         <h2 className="text-sm font-medium mb-2 text-muted-foreground">Suivi staff</h2>
         <div className="space-y-2">
           {staffStats.map(({ staff, assignedDone, assignedTotal, libresDone, pct }) => (
-            <div key={staff.id} className="p-3 rounded-lg bg-card flex items-center gap-3">
+            <div key={staff.id} className="p-3 rounded-lg glass-card flex items-center gap-3">
               <div
                 className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
                 style={{ background: pct === 100 ? "var(--success)" : "var(--primary)", color: "var(--primary-foreground)" }}
@@ -207,7 +207,7 @@ export default function DashboardPage() {
           </div>
           <div className="space-y-2">
             {debriefs.map((d) => (
-              <div key={d.id} className="p-3 rounded-lg bg-card">
+              <div key={d.id} className="p-3 rounded-lg glass-card">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium">{profileMap[d.user_id]?.name || "?"}</span>
                   <span className="font-bold" style={{ color: scoreColor(d.global_score) }}>{d.global_score}/5</span>

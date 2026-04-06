@@ -58,11 +58,11 @@ export default function MessagesPage() {
   if (!profile || profile.role !== "patron") return null;
 
   return (
-    <div className="p-4 max-w-lg mx-auto">
-      <h1 className="text-2xl mb-4" style={{ fontFamily: "var(--font-dm-serif)" }}>Messages</h1>
+    <div className="p-4 pb-28 max-w-lg mx-auto">
+      <h1 className="text-xl font-semibold tracking-tight mb-4">Messages</h1>
 
       {/* Compose */}
-      <div className="mb-6 p-4 rounded-lg bg-card space-y-3">
+      <div className="mb-6 p-4 rounded-lg glass-card space-y-3">
         <Textarea
           placeholder="Message pour l'équipe..."
           value={content}
@@ -83,7 +83,7 @@ export default function MessagesPage() {
         {messages.map((m) => {
           const isPast = m.date < today;
           return (
-            <div key={m.id} className={`p-3 rounded-lg bg-card border-l-[3px] ${m.date === today ? "border-l-primary" : "border-l-border"} ${isPast ? "opacity-50" : ""}`}>
+            <div key={m.id} className={`p-3 rounded-lg glass-card border-l-[3px] ${m.date === today ? "border-l-primary" : "border-l-border"} ${isPast ? "opacity-50" : ""}`}>
               <p className="text-sm">{m.content}</p>
               <div className="flex justify-between items-center mt-2">
                 <span className="text-xs text-muted-foreground">

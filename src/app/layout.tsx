@@ -1,16 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { DM_Serif_Display, Inter } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import ServiceWorkerRegistrar from "@/components/ServiceWorkerRegistrar";
 
 const inter = Inter({
   variable: "--font-inter",
-  subsets: ["latin"],
-});
-
-const dmSerif = DM_Serif_Display({
-  variable: "--font-dm-serif",
-  weight: "400",
   subsets: ["latin"],
 });
 
@@ -26,7 +20,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0D0C0A",
+  themeColor: "#0B0A08",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -39,7 +33,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr" className={`${inter.variable} ${dmSerif.variable}`}>
+    <html lang="fr" className={inter.variable}>
       <body className="min-h-dvh flex flex-col">
         <ServiceWorkerRegistrar />
         {children}

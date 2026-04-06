@@ -218,10 +218,10 @@ export default function StocksPage() {
   const inventoryProgress = `${inventoryCounted.size}/${filtered.length}`;
 
   return (
-    <div className="p-4 max-w-lg mx-auto">
+    <div className="p-4 pb-28 max-w-lg mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl" style={{ fontFamily: "var(--font-dm-serif)" }}>Stocks</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Stocks</h1>
         <div className="flex gap-1.5">
           {canManageStock && (
             <>
@@ -256,7 +256,7 @@ export default function StocksPage() {
       {canManageStock && unacknowledgedAlerts.length > 0 && (
         <div className="mb-4 space-y-2">
           {unacknowledgedAlerts.map((a) => (
-            <div key={a.id} className="p-3 rounded-lg bg-card border-l-[3px] border-l-warning flex justify-between items-center">
+            <div key={a.id} className="p-3 rounded-lg glass-card border-l-[3px] border-l-warning flex justify-between items-center">
               <div>
                 <p className="text-sm font-medium flex items-center gap-1.5">
                   <Bell size={14} className="text-warning" />
@@ -274,7 +274,7 @@ export default function StocksPage() {
 
       {/* Low stock warning */}
       {lowStockProducts.length > 0 && mode === "default" && (
-        <div className="mb-4 p-3 rounded-lg bg-card border-l-[3px] border-l-warning">
+        <div className="mb-4 p-3 rounded-lg glass-card border-l-[3px] border-l-warning">
           <p className="text-sm flex items-center gap-1.5">
             <AlertTriangle size={14} className="text-warning" />
             <span className="font-medium">{lowStockProducts.length} produit{lowStockProducts.length > 1 ? "s" : ""} en stock bas</span>
@@ -284,7 +284,7 @@ export default function StocksPage() {
 
       {/* Commander mode: order summary */}
       {mode === "commander" && pendingOrders.length > 0 && (
-        <div className="mb-4 p-4 rounded-lg bg-card border border-primary/20">
+        <div className="mb-4 p-4 rounded-lg glass-card border border-primary/20">
           <h3 className="text-sm font-medium mb-2">Liste de commande ({pendingOrders.length})</h3>
           <div className="space-y-1 mb-3">
             {pendingOrders.map((o) => {
@@ -305,7 +305,7 @@ export default function StocksPage() {
 
       {/* Inventaire mode: progress */}
       {mode === "inventaire" && (
-        <div className="mb-4 p-3 rounded-lg bg-card">
+        <div className="mb-4 p-3 rounded-lg glass-card">
           <p className="text-sm text-muted-foreground">
             Progression : <span className="font-bold text-foreground">{inventoryProgress}</span> comptés
           </p>
@@ -361,7 +361,7 @@ export default function StocksPage() {
 
       {/* Add product form */}
       {showAddForm && canManageStock && (
-        <div className="mb-4 p-4 rounded-lg bg-card space-y-3">
+        <div className="mb-4 p-4 rounded-lg glass-card space-y-3">
           <div className="flex justify-between items-center">
             <h3 className="font-medium text-sm">Nouveau produit {addedCount > 0 && <span className="text-muted-foreground">({addedCount} ajoutés)</span>}</h3>
             <button onClick={() => { setShowAddForm(false); setAddedCount(0); }}><X size={16} className="text-muted-foreground" /></button>
@@ -405,7 +405,7 @@ export default function StocksPage() {
           return (
             <div
               key={product.id}
-              className={`p-3 rounded-lg bg-card transition-all ${isLow && mode === "default" ? "border-l-[3px] border-l-warning" : ""} ${isCounted ? "border-l-[3px] border-l-success" : ""} ${isAlertSent ? "ring-2 ring-success/50" : ""}`}
+              className={`p-3 rounded-lg glass-card transition-all ${isLow && mode === "default" ? "border-l-[3px] border-l-warning" : ""} ${isCounted ? "border-l-[3px] border-l-success" : ""} ${isAlertSent ? "ring-2 ring-success/50" : ""}`}
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="flex-1 min-w-0">

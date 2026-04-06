@@ -57,7 +57,7 @@ export default function ChangePasswordPage() {
     <div className="min-h-dvh flex flex-col items-center justify-center p-6">
       <div className="w-full max-w-sm">
         <div className="text-center mb-10">
-          <h1 className="text-3xl mb-2" style={{ fontFamily: "var(--font-dm-serif)" }}>
+          <h1 className="text-xl font-semibold tracking-tight mb-2">
             Bienvenue !
           </h1>
           <p className="text-sm text-muted-foreground">
