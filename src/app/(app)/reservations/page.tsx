@@ -6,7 +6,8 @@ import { createClient } from "@/lib/supabase/client";
 import { getShiftDate, formatDateFr, formatTime, getNow } from "@/lib/shift-utils";
 import { SEATING_LABELS, SEATING_ICONS, TYPE_LABELS, SOURCE_LABELS, SOURCE_ICONS } from "@/lib/constants";
 import type { Reservation, VenueTable, ReservationSeating, ReservationType, ReservationSource } from "@/lib/types";
-import { Plus, ChevronLeft, ChevronRight, Check, Trash2, X, Armchair, Phone, ChevronDown } from "lucide-react";
+import type { Profile } from "@/lib/types";
+import { Plus, ChevronLeft, ChevronRight, Check, Trash2, X, Armchair, Phone, ChevronDown, Heart, ThumbsUp, ThumbsDown } from "lucide-react";
 
 export default function ReservationsPage() {
   const { profile, user } = useAuth();
@@ -20,6 +21,8 @@ export default function ReservationsPage() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [profileMap, setProfileMap] = useState<Record<string, string>>({});
+  const isPatron = profile?.role === "patron";
 
   // Form
   const [name, setName] = useState("");
@@ -43,12 +46,16 @@ export default function ReservationsPage() {
   const isToday = dateOffset === 0;
 
   const fetchData = useCallback(async () => {
-    const [resaRes, tableRes] = await Promise.all([
+    const [resaRes, tableRes, profRes] = await Promise.all([
       supabase.from("reservations").select("*").eq("date", viewDate).order("time", { ascending: true }),
       supabase.from("venue_tables").select("*").order("sort_order", { ascending: true }),
+      supabase.from("profiles").select("id, name"),
     ]);
     setReservations((resaRes.data as Reservation[]) || []);
     setTables((tableRes.data as VenueTable[]) || []);
+    const map: Record<string, string> = {};
+    ((profRes.data as Pick<Profile, "id" | "name">[]) || []).forEach((p) => { map[p.id] = p.name; });
+    setProfileMap(map);
     setLoading(false);
   }, [supabase, viewDate]);
 
@@ -141,6 +148,28 @@ export default function ReservationsPage() {
     } else {
       await supabase.from("reservations").update({ status: "arrive", arrived_by: profile.id }).eq("id", resa.id);
     }
+    fetchData();
+  }
+
+  async function requestFnF(resaId: string) {
+    if (!user) return;
+    await supabase.from("reservations").update({
+      fnf_requested_by: user.id,
+      fnf_status: "pending",
+    }).eq("id", resaId);
+    fetchData();
+  }
+
+  async function respondFnF(resaId: string, status: "accepted" | "refused") {
+    await supabase.from("reservations").update({ fnf_status: status }).eq("id", resaId);
+    fetchData();
+  }
+
+  async function cancelFnF(resaId: string) {
+    await supabase.from("reservations").update({
+      fnf_requested_by: null,
+      fnf_status: null,
+    }).eq("id", resaId);
     fetchData();
   }
 
@@ -275,8 +304,74 @@ export default function ReservationsPage() {
                       🔔 {overdue}min de retard
                     </div>
                   )}
+                  {/* F&F badge */}
+                  {resa.fnf_status && (
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: 6, marginTop: 4,
+                      padding: "4px 10px", borderRadius: 8,
+                      background: resa.fnf_status === "accepted" ? "rgba(139,90,64,0.1)"
+                        : resa.fnf_status === "refused" ? "rgba(200,60,60,0.08)"
+                        : "rgba(200,170,50,0.1)",
+                      fontSize: 11, fontWeight: 600,
+                    }}>
+                      <Heart size={12} style={{
+                        color: resa.fnf_status === "accepted" ? "#8B5A40"
+                          : resa.fnf_status === "refused" ? "var(--danger)"
+                          : "var(--warning)",
+                        fill: resa.fnf_status === "accepted" ? "#8B5A40" : "none",
+                      }} />
+                      <span style={{
+                        color: resa.fnf_status === "accepted" ? "#8B5A40"
+                          : resa.fnf_status === "refused" ? "var(--danger)"
+                          : "var(--warning)",
+                      }}>
+                        F&F {resa.fnf_status === "pending" ? `— ${profileMap[resa.fnf_requested_by!] || "Staff"}` : resa.fnf_status === "accepted" ? "accepté" : "refusé"}
+                      </span>
+                      {/* Patron: approve/refuse buttons */}
+                      {isPatron && resa.fnf_status === "pending" && (
+                        <>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); respondFnF(resa.id, "accepted"); }}
+                            style={{ background: "none", border: "none", cursor: "pointer", padding: 2, marginLeft: 4 }}
+                          >
+                            <ThumbsUp size={14} style={{ color: "#8B5A40" }} />
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); respondFnF(resa.id, "refused"); }}
+                            style={{ background: "none", border: "none", cursor: "pointer", padding: 2 }}
+                          >
+                            <ThumbsDown size={14} style={{ color: "var(--danger)" }} />
+                          </button>
+                        </>
+                      )}
+                      {/* Staff can cancel their own pending request */}
+                      {!isPatron && resa.fnf_status === "pending" && resa.fnf_requested_by === user?.id && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); cancelFnF(resa.id); }}
+                          style={{ background: "none", border: "none", cursor: "pointer", padding: 2, marginLeft: 2 }}
+                        >
+                          <X size={12} style={{ color: "var(--text-tertiary)" }} />
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, flexShrink: 0 }}>
+                  {/* F&F request button (staff only, no existing request) */}
+                  {!resa.fnf_status && (
+                    <button
+                      onClick={() => requestFnF(resa.id)}
+                      title="Demander F&F"
+                      style={{
+                        width: 36, height: 36, borderRadius: "50%",
+                        background: "transparent", border: "1px dashed var(--border-color)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        cursor: "pointer", padding: 0,
+                      }}
+                    >
+                      <Heart size={14} style={{ color: "var(--text-tertiary)" }} />
+                    </button>
+                  )}
                   <button onClick={() => toggleArrived(resa)} style={{ width: 36, height: 36, borderRadius: "50%", border: "2px solid #8B5A40", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}>
                     <Check size={16} strokeWidth={2.5} style={{ color: "rgba(139,90,64,0.5)" }} />
                   </button>

@@ -108,6 +108,8 @@ export interface Reservation {
   arrived_by: string | null;
   notes: string | null;
   phone: string | null;
+  fnf_requested_by: string | null;
+  fnf_status: "pending" | "accepted" | "refused" | null;
   created_by: string;
   created_at: string;
 }
