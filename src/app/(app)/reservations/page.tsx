@@ -35,6 +35,7 @@ export default function ReservationsPage() {
   const [source, setSource] = useState<ReservationSource>("telephone");
   const [tableId, setTableId] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
+  const [isFnF, setIsFnF] = useState(false);
 
   const shiftDate = getShiftDate();
   const viewDate = (() => {
@@ -108,6 +109,7 @@ export default function ReservationsPage() {
     setSource("telephone");
     setTableId(null);
     setNotes("");
+    setIsFnF(false);
     setShowDetails(false);
     setShowForm(true);
   }
@@ -127,6 +129,8 @@ export default function ReservationsPage() {
       table_id: tableId,
       notes: notes.trim() || null,
       created_by: user.id,
+      fnf_requested_by: isFnF ? user.id : null,
+      fnf_status: isFnF ? "pending" : null,
     });
     setSaving(false);
     setShowForm(false);
@@ -574,6 +578,35 @@ export default function ReservationsPage() {
                 ))}
               </div>
             </div>
+
+            {/* ── F&F toggle ────────────────────────────── */}
+            <button
+              onClick={() => setIsFnF(!isFnF)}
+              style={{
+                display: "flex", alignItems: "center", gap: 10, width: "100%",
+                padding: "12px 14px", borderRadius: 12, border: "none", cursor: "pointer",
+                background: isFnF ? "rgba(139,90,64,0.1)" : "var(--secondary-bg)",
+                transition: "all 0.2s",
+                marginBottom: 4,
+              }}
+            >
+              <Heart
+                size={18}
+                style={{
+                  color: isFnF ? "#8B5A40" : "var(--text-tertiary)",
+                  fill: isFnF ? "#8B5A40" : "none",
+                  transition: "all 0.2s",
+                }}
+              />
+              <span style={{ fontSize: 14, fontWeight: 500, color: isFnF ? "#8B5A40" : "var(--text-secondary)" }}>
+                Family & Friends
+              </span>
+              {isFnF && (
+                <span style={{ marginLeft: "auto", fontSize: 11, color: "#8B5A40", fontWeight: 400 }}>
+                  Demande envoyée au patron
+                </span>
+              )}
+            </button>
 
             {/* ── Plus de détails (collapsible) ──────────── */}
             <button
