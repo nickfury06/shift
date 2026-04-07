@@ -33,6 +33,8 @@ export default function TasksPage() {
 
   // Form state
   const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [note, setNote] = useState("");
@@ -120,7 +122,8 @@ export default function TasksPage() {
   }
 
   async function handleSave() {
-    if (!title.trim() || selectedDays.length === 0) return;
+    if (!title.trim() || selectedDays.length === 0 || saving) return;
+    setSaving(true);
 
     const payload = {
       title: title.trim(),
@@ -136,18 +139,27 @@ export default function TasksPage() {
     };
 
     if (editId) {
-      // Don't send created_by on update
       const { created_by, ...updatePayload } = payload;
+      // Optimistic update
+      setTasks((prev) =>
+        prev.map((t) => (t.id === editId ? { ...t, ...updatePayload } : t))
+      );
       await supabase.from("tasks").update(updatePayload).eq("id", editId);
     } else {
       await supabase.from("tasks").insert(payload);
     }
 
+    setSaving(false);
     resetForm();
     fetchTasks();
   }
 
   async function handleDelete(id: string) {
+    // Optimistic: fade out then remove
+    setDeletingId(id);
+    await new Promise((r) => setTimeout(r, 300));
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+    setDeletingId(null);
     await supabase.from("tasks").delete().eq("id", id);
     fetchTasks();
   }
@@ -209,9 +221,24 @@ export default function TasksPage() {
           ))}
         </div>
 
-        {/* ── Form ────────────────────────────────────────── */}
+        {/* ── Form Modal ──────────────────────────────────── */}
         {showForm && (
-          <div className="card-medium" style={{ padding: 16 }}>
+          <div style={{
+            position: "fixed", inset: 0, zIndex: 100,
+            display: "flex", alignItems: "flex-end", justifyContent: "center",
+          }}>
+            <div
+              onClick={resetForm}
+              style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }}
+            />
+            <div
+              className="card-medium"
+              style={{
+                position: "relative", width: "100%", maxWidth: 512, maxHeight: "85vh",
+                overflowY: "auto", padding: 20, borderRadius: "20px 20px 0 0",
+                animation: "fadeInUp 0.25s ease-out",
+              }}
+            >
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <p className="section-label">
                 {editId ? "Modifier" : "Nouvelle tache"}
@@ -419,10 +446,15 @@ export default function TasksPage() {
               <div style={{ display: "flex", gap: 8 }}>
                 <button
                   onClick={handleSave}
+                  disabled={saving}
                   className="flex-1 rounded-xl px-3 py-2 text-sm font-medium text-white"
-                  style={{ background: "var(--gradient-primary)" }}
+                  style={{
+                    background: "var(--gradient-primary)",
+                    opacity: saving ? 0.7 : 1,
+                    transition: "opacity 0.2s",
+                  }}
                 >
-                  {editId ? "Enregistrer" : "Creer"}
+                  {saving ? "..." : editId ? "Enregistrer" : "Créer"}
                 </button>
                 <button
                   onClick={resetForm}
@@ -434,6 +466,7 @@ export default function TasksPage() {
               </div>
             </div>
           </div>
+          </div>
         )}
 
         {/* ── Task list ───────────────────────────────────── */}
@@ -442,7 +475,12 @@ export default function TasksPage() {
             <div
               key={task.id}
               className="card-light"
-              style={{ padding: 16, display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}
+              style={{
+                padding: 16, display: "flex", alignItems: "flex-start", justifyContent: "space-between",
+                transition: "all 0.3s ease",
+                opacity: deletingId === task.id ? 0 : 1,
+                transform: deletingId === task.id ? "translateX(-40px) scale(0.95)" : "translateX(0) scale(1)",
+              }}
             >
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

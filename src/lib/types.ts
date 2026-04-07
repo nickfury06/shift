@@ -141,10 +141,16 @@ export interface Debrief {
   id: string;
   user_id: string;
   date: string;
-  shift: Moment;
-  category: string;
-  score: number;
-  comment: string | null;
+  global_score: number;
+  service_score: number;
+  coordination_score: number;
+  ambiance_score: number;
+  proprete_score: number;
+  service_comment: string | null;
+  coordination_comment: string | null;
+  ambiance_comment: string | null;
+  proprete_comment: string | null;
+  suggestions: string | null;
   created_at: string;
 }
 

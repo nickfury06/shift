@@ -15,11 +15,12 @@ import type {
   Reservation,
   Moment,
   Zone,
+  Profile,
 } from "@/lib/types";
 import MessageBanner from "@/components/MessageBanner";
 import MomentSection from "@/components/MomentSection";
 import TaskCard from "@/components/TaskCard";
-import { Check } from "lucide-react";
+import { Check, Users } from "lucide-react";
 
 interface MergedTask {
   id: string;
@@ -39,8 +40,30 @@ export default function TonightPage() {
 
   const [loading, setLoading] = useState(true);
   const [messages, setMessages] = useState<ManagerMessage[]>([]);
-  const [dismissedMsgIds, setDismissedMsgIds] = useState<Set<string>>(new Set());
+  const [dismissedMsgIds, setDismissedMsgIds] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const stored = localStorage.getItem("shift-dismissed-msgs");
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); }
+  });
+
+  // Persist dismissed messages
+  function dismissMsg(id: string) {
+    setDismissedMsgIds((prev) => {
+      const next = new Set([...prev, id]);
+      localStorage.setItem("shift-dismissed-msgs", JSON.stringify([...next]));
+      return next;
+    });
+  }
+  function resetDismissed() {
+    setDismissedMsgIds(new Set());
+    localStorage.removeItem("shift-dismissed-msgs");
+  }
   const [profiles, setProfiles] = useState<Record<string, string>>({});
+  const [staffProfiles, setStaffProfiles] = useState<Pick<Profile, "id" | "name" | "role">[]>([]);
+  const [rawCompletions, setRawCompletions] = useState<TaskCompletion[]>([]);
+  const [rawTasks, setRawTasks] = useState<Task[]>([]);
   const [event, setEvent] = useState<Event | null>(null);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [tasks, setTasks] = useState<MergedTask[]>([]);
@@ -89,21 +112,26 @@ export default function TonightPage() {
           .eq("date", shiftDate),
         supabase
           .from("profiles")
-          .select("id, name"),
+          .select("id, name, role"),
       ]);
 
     setMessages((msgRes.data as ManagerMessage[]) || []);
     setEvent((eventRes.data as Event) || null);
     setReservations((resaRes.data as Reservation[]) || []);
+    const profList = (profRes.data as Pick<Profile, "id" | "name" | "role">[]) || [];
     const profMap: Record<string, string> = {};
-    ((profRes.data as { id: string; name: string }[]) || []).forEach((p) => { profMap[p.id] = p.name; });
+    profList.forEach((p) => { profMap[p.id] = p.name; });
     setProfiles(profMap);
+    setStaffProfiles(profList.filter((p) => p.role !== "patron"));
 
     const completions = (compRes.data as TaskCompletion[]) || [];
+    setRawCompletions(completions);
     const completedIds = new Set(completions.map((c) => c.task_id));
 
-    const recurring: MergedTask[] = ((taskRes.data as Task[]) || [])
-      .filter((t) => t.days && t.days.includes(shiftDay))
+    const todayTasks = ((taskRes.data as Task[]) || []).filter((t) => t.days && t.days.includes(shiftDay));
+    setRawTasks(todayTasks);
+
+    const recurring: MergedTask[] = todayTasks
       .map((t) => ({
         id: t.id,
         title: t.title,
@@ -157,6 +185,16 @@ export default function TonightPage() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "reservations", filter: `date=eq.${shiftDate}` },
+        () => fetchData()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "messages", filter: `date=eq.${shiftDate}` },
+        () => fetchData()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "tasks" },
         () => fetchData()
       )
       .subscribe();
@@ -275,6 +313,75 @@ export default function TonightPage() {
         <ThemeToggle />
       </div>
 
+      {/* ── Patron: Staff Progress ────────────────────────────── */}
+      {profile?.role === "patron" && staffProfiles.length > 0 && (() => {
+        // Compute per-staff progress from raw tasks + completions
+        const staffProgress = staffProfiles
+          .map((s) => {
+            const assigned = rawTasks.filter(
+              (t) => !t.is_libre && t.assigned_to.includes(s.id)
+            );
+            if (assigned.length === 0) return null;
+            const completedSet = new Set(
+              rawCompletions
+                .filter((c) => c.user_id === s.id)
+                .map((c) => c.task_id)
+            );
+            const done = assigned.filter((t) => completedSet.has(t.id)).length;
+            return { id: s.id, name: s.name, total: assigned.length, done };
+          })
+          .filter(Boolean) as { id: string; name: string; total: number; done: number }[];
+
+        if (staffProgress.length === 0) return null;
+
+        return (
+          <div style={{ marginBottom: 28 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <Users size={14} style={{ color: "var(--text-tertiary)" }} />
+              <span style={{
+                fontSize: 13, fontWeight: 500, textTransform: "uppercase",
+                letterSpacing: "0.08em", color: "var(--text-tertiary)",
+              }}>
+                Équipe
+              </span>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {staffProgress.map((s) => {
+                const pct = Math.round((s.done / s.total) * 100);
+                return (
+                  <div key={s.id} className="card-light" style={{ padding: "12px 16px" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                      <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>
+                        {s.name}
+                      </span>
+                      <span style={{
+                        fontSize: 12, fontWeight: 500, color: "#8B5A40",
+                        background: "rgba(139,90,64,0.1)", padding: "3px 8px", borderRadius: 6,
+                      }}>
+                        {s.done}/{s.total}
+                      </span>
+                    </div>
+                    <div style={{
+                      height: 4, background: "var(--input-bg, #F7F6F2)",
+                      borderRadius: 2, overflow: "hidden",
+                    }}>
+                      <div style={{
+                        height: "100%", borderRadius: 2,
+                        background: pct === 100
+                          ? "linear-gradient(90deg, #8B5A40, #6B3F2A)"
+                          : "linear-gradient(90deg, #C4785A, #8B5A40)",
+                        width: `${pct}%`,
+                        transition: "width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)",
+                      }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── Manager Messages (tap to dismiss) ──────────────── */}
       {messages.filter((m) => !dismissedMsgIds.has(m.id)).length > 0 && (
         <div className="stagger" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -283,7 +390,7 @@ export default function TonightPage() {
             .map((msg) => (
               <div
                 key={msg.id}
-                onClick={() => setDismissedMsgIds((prev) => new Set([...prev, msg.id]))}
+                onClick={() => dismissMsg(msg.id)}
                 style={{ cursor: "pointer", transition: "opacity 0.3s ease" }}
               >
                 <MessageBanner content={msg.content} author={profiles[msg.created_by] || "Manager"} />
@@ -291,7 +398,7 @@ export default function TonightPage() {
             ))}
           {dismissedMsgIds.size > 0 && dismissedMsgIds.size < messages.length && (
             <button
-              onClick={() => setDismissedMsgIds(new Set())}
+              onClick={() => resetDismissed()}
               style={{ fontSize: 12, color: "var(--text-tertiary)", background: "none", border: "none", cursor: "pointer", padding: "4px 0" }}
             >
               Revoir les messages ({dismissedMsgIds.size} lu{dismissedMsgIds.size > 1 ? "s" : ""})
@@ -301,7 +408,7 @@ export default function TonightPage() {
       )}
       {messages.length > 0 && dismissedMsgIds.size === messages.length && (
         <button
-          onClick={() => setDismissedMsgIds(new Set())}
+          onClick={() => resetDismissed()}
           style={{ fontSize: 12, color: "var(--text-tertiary)", background: "none", border: "none", cursor: "pointer", padding: "4px 0", marginBottom: 8 }}
         >
           {messages.length} message{messages.length > 1 ? "s" : ""} lu{messages.length > 1 ? "s" : ""} — tap pour revoir

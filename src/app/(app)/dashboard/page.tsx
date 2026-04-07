@@ -26,7 +26,7 @@ export default function DashboardPage() {
 
   const fetchData = useCallback(async () => {
     const [taskRes, compRes, debriefRes, staffRes] = await Promise.all([
-      supabase.from("tasks").select("*").eq("day", shiftDay),
+      supabase.from("tasks").select("*").order("priority", { ascending: true }),
       supabase.from("task_completions").select("*").eq("date", shiftDate),
       supabase
         .from("debriefs")
@@ -39,7 +39,9 @@ export default function DashboardPage() {
         .in("role", ["staff", "responsable"]),
     ]);
 
-    setTasks((taskRes.data as Task[]) || []);
+    // Filter tasks client-side for today's day (PG array filter doesn't work)
+    const allTasks = (taskRes.data as Task[]) || [];
+    setTasks(allTasks.filter((t) => t.days && t.days.includes(shiftDay)));
     setCompletions((compRes.data as TaskCompletion[]) || []);
     setDebriefs((debriefRes.data as Debrief[]) || []);
     setStaffProfiles((staffRes.data as Profile[]) || []);
@@ -49,6 +51,32 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Realtime: sync task completions + tasks changes
+  useEffect(() => {
+    const channel = supabase
+      .channel("dashboard-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "task_completions", filter: `date=eq.${shiftDate}` },
+        () => fetchData()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "tasks" },
+        () => fetchData()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "debriefs" },
+        () => fetchData()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabase, shiftDate, fetchData]);
 
   // Guard: patron only
   if (profile && profile.role !== "patron") {
@@ -84,7 +112,7 @@ export default function DashboardPage() {
 
   const avgScore =
     debriefs.length > 0
-      ? (debriefs.reduce((s, d) => s + d.score, 0) / debriefs.length).toFixed(1)
+      ? (debriefs.reduce((s, d) => s + d.global_score, 0) / debriefs.length).toFixed(1)
       : "--";
 
   // Moment progress
@@ -186,15 +214,17 @@ export default function DashboardPage() {
               {debriefs.slice(0, 5).map((d) => (
                 <div key={d.id} className="card-light" style={{ padding: 16, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <div style={{ minWidth: 0, flex: 1 }}>
-                    <span style={{ fontSize: 14, fontWeight: 500, textTransform: "capitalize", color: "var(--text-primary)" }}>{d.category}</span>
-                    {d.comment && (
-                      <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.comment}</p>
+                    <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>
+                      {staffProfiles.find((s) => s.id === d.user_id)?.name || "Staff"}
+                    </span>
+                    {d.suggestions && (
+                      <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.suggestions}</p>
                     )}
                   </div>
                   <span
-                    style={{ fontSize: 18, fontWeight: 600, marginLeft: 16, color: scoreColor(d.score) }}
+                    style={{ fontSize: 18, fontWeight: 600, marginLeft: 16, color: scoreColor(d.global_score) }}
                   >
-                    {d.score}
+                    {d.global_score}
                   </span>
                 </div>
               ))}
