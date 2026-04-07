@@ -107,10 +107,17 @@ export interface Reservation {
   source: ReservationSource;
   arrived_by: string | null;
   notes: string | null;
-  phone: string | null;
   created_by: string;
   created_at: string;
-  updated_at: string;
+}
+
+export interface VenueTable {
+  id: string;
+  zone: string;
+  capacity: number;
+  max_capacity: number;
+  table_type: string;
+  sort_order: number;
 }
 
 // ── Manager Messages ───────────────────────────────────────
@@ -224,16 +231,6 @@ export interface StockAlert {
   created_at: string;
 }
 
-// ── Venue Tables ───────────────────────────────────────────
-export interface VenueTable {
-  id: string;
-  label: string;
-  zone: TableZone;
-  seats: number;
-  active: boolean;
-  sort_order: number;
-  created_at: string;
-}
 
 // ── Onboarding ─────────────────────────────────────────────
 export interface OnboardingDoc {
