@@ -23,7 +23,7 @@ export type DayOfWeek = Day;
 
 // ── Reservation fields ─────────────────────────────────────
 export type ReservationSource = "instagram" | "telephone" | "walk-in";
-export type ReservationSeating = "interieur" | "terrasse";
+export type ReservationSeating = "interieur" | "terrasse" | "bar";
 export type ReservationType = "diner" | "drinks";
 export type ReservationStatus = "attendu" | "arrive";
 
@@ -107,6 +107,7 @@ export interface Reservation {
   source: ReservationSource;
   arrived_by: string | null;
   notes: string | null;
+  phone: string | null;
   created_by: string;
   created_at: string;
 }

@@ -60,11 +60,13 @@ export const SOURCE_ICONS: Record<ReservationSource, string> = {
 export const SEATING_LABELS: Record<ReservationSeating, string> = {
   interieur: "Intérieur",
   terrasse: "Terrasse",
+  bar: "Bar",
 };
 
 export const SEATING_ICONS: Record<ReservationSeating, string> = {
   interieur: "🏠",
   terrasse: "☀️",
+  bar: "🍸",
 };
 
 // ── Reservation Type ───────────────────────────────────────

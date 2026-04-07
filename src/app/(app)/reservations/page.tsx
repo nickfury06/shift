@@ -4,9 +4,9 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
 import { getShiftDate, formatDateFr, formatTime, getNow } from "@/lib/shift-utils";
-import { SEATING_LABELS, SEATING_ICONS, TYPE_LABELS, SOURCE_LABELS, SOURCE_ICONS, TABLE_ZONE_LABELS } from "@/lib/constants";
+import { SEATING_LABELS, SEATING_ICONS, TYPE_LABELS, SOURCE_LABELS, SOURCE_ICONS } from "@/lib/constants";
 import type { Reservation, VenueTable, ReservationSeating, ReservationType, ReservationSource } from "@/lib/types";
-import { Plus, ChevronLeft, ChevronRight, Check, Trash2, X, Users, Armchair } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Check, Trash2, X, Armchair, Phone, ChevronDown } from "lucide-react";
 
 export default function ReservationsPage() {
   const { profile, user } = useAuth();
@@ -19,10 +19,13 @@ export default function ReservationsPage() {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
 
-  // Form state
+  // Form
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [covers, setCovers] = useState(2);
+  const [formDate, setFormDate] = useState("");
   const [time, setTime] = useState("20:00");
   const [seating, setSeating] = useState<ReservationSeating>("terrasse");
   const [type, setType] = useState<ReservationType>("diner");
@@ -41,89 +44,85 @@ export default function ReservationsPage() {
 
   const fetchData = useCallback(async () => {
     const [resaRes, tableRes] = await Promise.all([
-      supabase
-        .from("reservations")
-        .select("*")
-        .eq("date", viewDate)
-        .order("time", { ascending: true }),
-      supabase
-        .from("venue_tables")
-        .select("*")
-        .order("sort_order", { ascending: true }),
+      supabase.from("reservations").select("*").eq("date", viewDate).order("time", { ascending: true }),
+      supabase.from("venue_tables").select("*").order("sort_order", { ascending: true }),
     ]);
     setReservations((resaRes.data as Reservation[]) || []);
     setTables((tableRes.data as VenueTable[]) || []);
     setLoading(false);
   }, [supabase, viewDate]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Realtime
   useEffect(() => {
-    const channel = supabase
-      .channel("reservations-realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "reservations", filter: `date=eq.${viewDate}` },
-        () => fetchData()
-      )
+    const ch = supabase
+      .channel("reservations-rt")
+      .on("postgres_changes", { event: "*", schema: "public", table: "reservations", filter: `date=eq.${viewDate}` }, () => fetchData())
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => { supabase.removeChannel(ch); };
   }, [supabase, viewDate, fetchData]);
 
-  // ── Capacity calculations ─────────────────────────────
+  // ── Capacity ──────────────────────────────────────────
   const totalCapacity = tables.reduce((sum, t) => sum + t.capacity, 0);
   const bookedCovers = reservations.reduce((sum, r) => sum + r.covers, 0);
-  const insideCovers = reservations.filter((r) => r.seating === "interieur").reduce((sum, r) => sum + r.covers, 0);
-  const outsideCovers = reservations.filter((r) => r.seating === "terrasse").reduce((sum, r) => sum + r.covers, 0);
-  const insideCapacity = tables.filter((t) => t.zone === "restaurant").reduce((sum, t) => sum + t.capacity, 0);
-  const outsideCapacity = tables.filter((t) => t.zone !== "restaurant" && t.zone !== "bar").reduce((sum, t) => sum + t.capacity, 0);
 
-  // Tables available for assignment (filter by seating choice & capacity)
-  const availableTables = tables
-    .filter((t) => {
-      if (seating === "interieur") return t.zone === "restaurant";
-      return t.zone === "terrasse" || t.zone === "terrasse_couverte";
-    })
-    .filter((t) => t.capacity >= covers || t.max_capacity >= covers);
+  // For form: tables filtered by seating
+  const formTables = tables.filter((t) => {
+    if (seating === "interieur") return t.zone === "restaurant";
+    if (seating === "bar") return t.zone === "bar";
+    return t.zone === "terrasse" || t.zone === "terrasse_couverte";
+  });
+  // For the date the form targets
+  const formTargetDate = formDate || viewDate;
+  const [formDateResas, setFormDateResas] = useState<Reservation[]>([]);
 
-  // Tables already booked for this date
-  const bookedTableIds = new Set(reservations.filter((r) => r.table_id).map((r) => r.table_id));
+  // Fetch resas for the form's selected date (for table availability)
+  useEffect(() => {
+    if (!showForm) return;
+    if (formTargetDate === viewDate) {
+      setFormDateResas(reservations);
+      return;
+    }
+    supabase.from("reservations").select("*").eq("date", formTargetDate).then(({ data }) => {
+      setFormDateResas((data as Reservation[]) || []);
+    });
+  }, [showForm, formTargetDate, viewDate, reservations, supabase]);
 
-  function resetForm() {
+  const bookedTableIds = new Set(formDateResas.filter((r) => r.table_id).map((r) => r.table_id));
+
+  function openForm() {
     setName("");
+    setPhone("");
     setCovers(2);
+    setFormDate(viewDate);
     setTime("20:00");
     setSeating("terrasse");
     setType("diner");
     setSource("telephone");
     setTableId(null);
     setNotes("");
-    setShowForm(false);
+    setShowDetails(false);
+    setShowForm(true);
   }
 
   async function handleSave() {
     if (!name.trim() || !user || saving) return;
     setSaving(true);
-
-    const payload = {
+    await supabase.from("reservations").insert({
       name: name.trim(),
+      phone: phone.trim() || null,
       covers,
       time,
-      date: viewDate,
+      date: formTargetDate,
       seating,
       type,
       source,
       table_id: tableId,
       notes: notes.trim() || null,
       created_by: user.id,
-    };
-
-    await supabase.from("reservations").insert(payload);
+    });
     setSaving(false);
-    resetForm();
+    setShowForm(false);
     fetchData();
   }
 
@@ -145,15 +144,14 @@ export default function ReservationsPage() {
     fetchData();
   }
 
-  // Overdue helper
   function getOverdueMin(resaTime: string): number {
     if (!isToday) return 0;
     const now = getNow();
     const [h, m] = resaTime.split(":").map(Number);
     if (isNaN(h) || isNaN(m)) return 0;
-    const resTime = new Date(now);
-    resTime.setHours(h, m, 0);
-    const diff = Math.floor((now.getTime() - resTime.getTime()) / 60000);
+    const rt = new Date(now);
+    rt.setHours(h, m, 0);
+    const diff = Math.floor((now.getTime() - rt.getTime()) / 60000);
     return diff > 0 ? diff : 0;
   }
 
@@ -173,13 +171,13 @@ export default function ReservationsPage() {
   return (
     <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
 
-      {/* ── Header ─────────────────────────────────────────── */}
+      {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
         <h1 style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-primary)" }}>
           Réservations
         </h1>
         <button
-          onClick={() => { resetForm(); setShowForm(true); }}
+          onClick={openForm}
           className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-white"
           style={{ background: "var(--gradient-primary)" }}
         >
@@ -188,7 +186,7 @@ export default function ReservationsPage() {
         </button>
       </div>
 
-      {/* ── Date nav ───────────────────────────────────────── */}
+      {/* Date nav */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <button onClick={() => setDateOffset((o) => o - 1)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
           <ChevronLeft size={20} style={{ color: "var(--text-secondary)" }} />
@@ -201,64 +199,53 @@ export default function ReservationsPage() {
         </button>
       </div>
 
-      {/* ── Capacity summary ───────────────────────────────── */}
-      <div className="card-medium" style={{ padding: 14, marginBottom: 20, display: "flex", justifyContent: "space-around", textAlign: "center" }}>
-        <div>
-          <div style={{ fontSize: 20, fontWeight: 600, color: "var(--text-primary)" }}>
-            {reservations.length}
-          </div>
-          <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Résas</div>
+      {/* Capacity summary */}
+      <div className="card-medium" style={{ padding: "12px 16px", marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-around" }}>
+        <div style={{ textAlign: "center" }}>
+          <span style={{ fontSize: 22, fontWeight: 600, color: "var(--text-primary)" }}>{reservations.length}</span>
+          <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>résas</div>
         </div>
-        <div style={{ width: 1, background: "var(--border-color)" }} />
-        <div>
-          <div style={{ fontSize: 20, fontWeight: 600, color: bookedCovers > totalCapacity ? "var(--danger)" : "var(--text-primary)" }}>
-            {bookedCovers}<span style={{ fontSize: 13, fontWeight: 400, color: "var(--text-tertiary)" }}>/{totalCapacity}</span>
-          </div>
-          <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Couverts</div>
+        <div style={{ width: 1, height: 32, background: "var(--border-color)" }} />
+        <div style={{ textAlign: "center" }}>
+          <span style={{ fontSize: 22, fontWeight: 600, color: bookedCovers > totalCapacity ? "var(--danger)" : "var(--text-primary)" }}>
+            {bookedCovers}
+          </span>
+          <span style={{ fontSize: 13, color: "var(--text-tertiary)" }}>/{totalCapacity}</span>
+          <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>couverts</div>
         </div>
-        <div style={{ width: 1, background: "var(--border-color)" }} />
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-secondary)" }}>
-            🏠 {insideCovers}/{insideCapacity}
-          </div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-secondary)", marginTop: 2 }}>
-            ☀️ {outsideCovers}/{outsideCapacity}
-          </div>
+        <div style={{ width: 1, height: 32, background: "var(--border-color)" }} />
+        <div style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 12, color: "var(--text-secondary)" }}>
+          <span>☀️ {reservations.filter((r) => r.seating === "terrasse").reduce((s, r) => s + r.covers, 0)}</span>
+          <span>🏠 {reservations.filter((r) => r.seating === "interieur").reduce((s, r) => s + r.covers, 0)}</span>
+          <span>🍸 {reservations.filter((r) => r.seating === "bar").reduce((s, r) => s + r.covers, 0)}</span>
         </div>
       </div>
 
-      {/* ── Reservation list ───────────────────────────────── */}
+      {/* Reservation list — attendu */}
       {attendu.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: arrived.length > 0 ? 24 : 0 }}>
           {attendu.map((resa) => {
             const overdue = getOverdueMin(resa.time);
-            const tableInfo = resa.table_id ? tables.find((t) => t.id === resa.table_id) : null;
+            const tbl = resa.table_id ? tables.find((t) => t.id === resa.table_id) : null;
             return (
               <div
                 key={resa.id}
                 className="card-medium"
                 style={{
-                  padding: "12px 14px",
-                  display: "flex", alignItems: "center", gap: 12,
+                  padding: "12px 14px", display: "flex", alignItems: "center", gap: 12,
                   transition: "all 0.3s ease",
                   opacity: deletingId === resa.id ? 0 : 1,
                   transform: deletingId === resa.id ? "translateX(-40px)" : "translateX(0)",
                   borderLeft: overdue >= 15 ? `3px solid ${overdue >= 30 ? "var(--danger)" : "var(--warning)"}` : undefined,
                 }}
               >
-                {/* Time */}
                 <div style={{ fontSize: 14, fontWeight: 600, color: "#8B5A40", minWidth: 42, flexShrink: 0 }}>
                   {formatTime(resa.time)}
                 </div>
-
-                {/* Details */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <span style={{ fontSize: 15, fontWeight: 500, color: "var(--text-primary)" }}>{resa.name}</span>
-                    <span style={{
-                      fontSize: 11, fontWeight: 600, color: "#A85D3F",
-                      background: "rgba(196,120,90,0.08)", padding: "2px 7px", borderRadius: 6,
-                    }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: "#A85D3F", background: "rgba(196,120,90,0.08)", padding: "2px 7px", borderRadius: 6 }}>
                       {resa.covers} pers.
                     </span>
                   </div>
@@ -266,49 +253,34 @@ export default function ReservationsPage() {
                     <span>{SEATING_ICONS[resa.seating]} {SEATING_LABELS[resa.seating]}</span>
                     <span style={{ color: "var(--text-tertiary)" }}>&middot;</span>
                     <span>{TYPE_LABELS[resa.type]}</span>
-                    {tableInfo && (
+                    {tbl && (
                       <>
                         <span style={{ color: "var(--text-tertiary)" }}>&middot;</span>
-                        <span style={{ fontWeight: 500 }}>Table {tableInfo.id}</span>
+                        <span style={{ fontWeight: 500 }}>T.{tbl.id}</span>
                       </>
                     )}
-                    {resa.notes && (
-                      <span style={{ fontSize: 11, color: "var(--warning)", fontWeight: 500 }}>
-                        ⚠️ {resa.notes}
-                      </span>
-                    )}
-                    {overdue >= 15 && (
-                      <span style={{ fontSize: 11, fontWeight: 600, color: overdue >= 30 ? "var(--danger)" : "var(--warning)" }}>
-                        🔔 {overdue}min retard
-                      </span>
+                    {resa.phone && (
+                      <a href={`tel:${resa.phone}`} style={{ color: "#8B5A40", fontWeight: 500, textDecoration: "none", display: "flex", alignItems: "center", gap: 2 }}>
+                        <Phone size={10} /> {resa.phone}
+                      </a>
                     )}
                   </div>
+                  {resa.notes && (
+                    <div style={{ fontSize: 11, color: "var(--warning)", fontWeight: 500, marginTop: 3 }}>
+                      ⚠️ {resa.notes}
+                    </div>
+                  )}
+                  {overdue >= 15 && (
+                    <div style={{ fontSize: 11, fontWeight: 600, color: overdue >= 30 ? "var(--danger)" : "var(--warning)", marginTop: 2 }}>
+                      🔔 {overdue}min de retard
+                    </div>
+                  )}
                 </div>
-
-                {/* Actions */}
                 <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-                  <button
-                    onClick={() => toggleArrived(resa)}
-                    style={{
-                      width: 36, height: 36, borderRadius: "50%",
-                      border: "2px solid #8B5A40", background: "transparent",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      cursor: "pointer", padding: 0,
-                    }}
-                    aria-label="Marquer arrivé"
-                  >
+                  <button onClick={() => toggleArrived(resa)} style={{ width: 36, height: 36, borderRadius: "50%", border: "2px solid #8B5A40", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}>
                     <Check size={16} strokeWidth={2.5} style={{ color: "rgba(139,90,64,0.5)" }} />
                   </button>
-                  <button
-                    onClick={() => handleDelete(resa.id)}
-                    style={{
-                      width: 36, height: 36, borderRadius: "50%",
-                      background: "transparent", border: "none",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      cursor: "pointer", padding: 0,
-                    }}
-                    aria-label="Supprimer"
-                  >
+                  <button onClick={() => handleDelete(resa.id)} style={{ width: 36, height: 36, borderRadius: "50%", background: "transparent", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}>
                     <Trash2 size={14} style={{ color: "var(--text-tertiary)" }} />
                   </button>
                 </div>
@@ -318,7 +290,7 @@ export default function ReservationsPage() {
         </div>
       )}
 
-      {/* Arrived section */}
+      {/* Arrived */}
       {arrived.length > 0 && (
         <>
           <div style={{ fontSize: 12, fontWeight: 500, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
@@ -326,32 +298,13 @@ export default function ReservationsPage() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {arrived.map((resa) => (
-              <div
-                key={resa.id}
-                className="card-light"
-                style={{
-                  padding: "10px 14px", opacity: 0.55,
-                  display: "flex", alignItems: "center", gap: 12,
-                  transition: "all 0.3s ease",
-                }}
-              >
-                <div style={{ fontSize: 13, fontWeight: 500, color: "#8B5A40", minWidth: 42 }}>
-                  {formatTime(resa.time)}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
+              <div key={resa.id} className="card-light" style={{ padding: "10px 14px", opacity: 0.5, display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: "#8B5A40", minWidth: 42 }}>{formatTime(resa.time)}</div>
+                <div style={{ flex: 1 }}>
                   <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>{resa.name}</span>
                   <span style={{ fontSize: 12, color: "var(--text-tertiary)", marginLeft: 8 }}>{resa.covers} pers.</span>
                 </div>
-                <button
-                  onClick={() => toggleArrived(resa)}
-                  style={{
-                    width: 32, height: 32, borderRadius: "50%",
-                    border: "2px solid #8B5A40", background: "#8B5A40",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    cursor: "pointer", padding: 0,
-                  }}
-                  aria-label="Annuler arrivée"
-                >
+                <button onClick={() => toggleArrived(resa)} style={{ width: 32, height: 32, borderRadius: "50%", border: "2px solid #8B5A40", background: "#8B5A40", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}>
                   <Check size={14} strokeWidth={2.5} style={{ color: "#fff" }} />
                 </button>
               </div>
@@ -364,36 +317,31 @@ export default function ReservationsPage() {
         <div className="card-light" style={{ padding: 32, textAlign: "center" }}>
           <Armchair size={28} style={{ color: "var(--text-tertiary)", margin: "0 auto 12px" }} />
           <p style={{ fontSize: 14, color: "var(--text-secondary)" }}>Aucune réservation</p>
-          <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 4 }}>
-            Appuie sur &quot;Ajouter&quot; pour en créer une
-          </p>
         </div>
       )}
 
-      {/* ── Add reservation modal ──────────────────────────── */}
+      {/* ── FORM MODAL ───────────────────────────────────── */}
       {showForm && (
         <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-          <div onClick={resetForm} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }} />
+          <div onClick={() => setShowForm(false)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }} />
           <div
             className="card-medium"
             style={{
-              position: "relative", width: "100%", maxWidth: 512, maxHeight: "90vh",
-              overflowY: "auto", padding: 20, borderRadius: "20px 20px 0 0",
+              position: "relative", width: "100%", maxWidth: 512, maxHeight: "92vh",
+              overflowY: "auto", padding: "24px 20px", borderRadius: "20px 20px 0 0",
               animation: "fadeInUp 0.25s ease-out",
             }}
           >
-            {/* Close button */}
-            <button
-              onClick={resetForm}
-              style={{ position: "absolute", top: 16, right: 16, background: "none", border: "none", cursor: "pointer", padding: 4 }}
-            >
+            <button onClick={() => setShowForm(false)} style={{ position: "absolute", top: 16, right: 16, background: "none", border: "none", cursor: "pointer", padding: 4 }}>
               <X size={20} style={{ color: "var(--text-tertiary)" }} />
             </button>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <p className="section-label">Nouvelle réservation</p>
+            <p style={{ fontSize: 16, fontWeight: 600, color: "var(--text-primary)", marginBottom: 20 }}>
+              Nouvelle réservation
+            </p>
 
-              {/* Name */}
+            {/* ── Row 1: Nom + Téléphone ─────────────────── */}
+            <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
               <input
                 type="text"
                 placeholder="Nom"
@@ -401,196 +349,253 @@ export default function ReservationsPage() {
                 onChange={(e) => setName(e.target.value)}
                 autoFocus
                 style={{
-                  width: "100%", borderRadius: 12, border: "1px solid var(--border-color)",
-                  background: "var(--input-bg)", padding: "10px 12px", fontSize: 14,
+                  flex: 2, borderRadius: 12, border: "1px solid var(--border-color)",
+                  background: "var(--input-bg)", padding: "12px 14px", fontSize: 15,
                   color: "var(--text-primary)", outline: "none",
                 }}
               />
+              <div style={{ flex: 1, position: "relative" }}>
+                <Phone size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-tertiary)" }} />
+                <input
+                  type="tel"
+                  placeholder="Tél."
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  style={{
+                    width: "100%", borderRadius: 12, border: "1px solid var(--border-color)",
+                    background: "var(--input-bg)", padding: "12px 14px 12px 32px", fontSize: 14,
+                    color: "var(--text-primary)", outline: "none",
+                  }}
+                />
+              </div>
+            </div>
 
-              {/* Covers + Time row */}
-              <div style={{ display: "flex", gap: 12 }}>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Personnes</p>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <button
-                      onClick={() => setCovers(Math.max(1, covers - 1))}
-                      style={{
-                        width: 36, height: 36, borderRadius: 10,
-                        background: "var(--secondary-bg)", border: "none", cursor: "pointer",
-                        fontSize: 18, color: "var(--text-secondary)", display: "flex", alignItems: "center", justifyContent: "center",
-                      }}
-                    >
-                      −
-                    </button>
-                    <span style={{ fontSize: 18, fontWeight: 600, color: "var(--text-primary)", minWidth: 28, textAlign: "center" }}>
-                      {covers}
-                    </span>
-                    <button
-                      onClick={() => setCovers(covers + 1)}
-                      style={{
-                        width: 36, height: 36, borderRadius: 10,
-                        background: "var(--secondary-bg)", border: "none", cursor: "pointer",
-                        fontSize: 18, color: "var(--text-secondary)", display: "flex", alignItems: "center", justifyContent: "center",
-                      }}
-                    >
-                      +
-                    </button>
+            {/* ── Row 2: Personnes ────────────────────────── */}
+            <div style={{ marginBottom: 16 }}>
+              <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: 8 }}>Nombre de personnes</p>
+              <div style={{ display: "flex", gap: 6 }}>
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => setCovers(n)}
+                    style={{
+                      flex: 1, height: 42, borderRadius: 10, border: "none", cursor: "pointer",
+                      fontSize: 15, fontWeight: 600,
+                      background: covers === n ? "var(--gradient-primary)" : "var(--secondary-bg)",
+                      color: covers === n ? "#fff" : "var(--text-secondary)",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    {n}
+                  </button>
+                ))}
+                <button
+                  onClick={() => {
+                    const v = prompt("Nombre de personnes ?");
+                    if (v && !isNaN(Number(v)) && Number(v) > 0) setCovers(Number(v));
+                  }}
+                  style={{
+                    flex: 1, height: 42, borderRadius: 10, border: "none", cursor: "pointer",
+                    fontSize: 13, fontWeight: 500,
+                    background: covers > 8 ? "var(--gradient-primary)" : "var(--secondary-bg)",
+                    color: covers > 8 ? "#fff" : "var(--text-tertiary)",
+                  }}
+                >
+                  {covers > 8 ? covers : "9+"}
+                </button>
+              </div>
+            </div>
+
+            {/* ── Row 3: Date + Heure ────────────────────── */}
+            <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: 6 }}>Date</p>
+                <input
+                  type="date"
+                  value={formDate || viewDate}
+                  onChange={(e) => setFormDate(e.target.value)}
+                  style={{
+                    width: "100%", borderRadius: 12, border: "1px solid var(--border-color)",
+                    background: "var(--input-bg)", padding: "10px 12px", fontSize: 14,
+                    color: "var(--text-primary)", outline: "none",
+                  }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: 6 }}>Heure</p>
+                <input
+                  type="time"
+                  value={time}
+                  onChange={(e) => setTime(e.target.value)}
+                  style={{
+                    width: "100%", borderRadius: 12, border: "1px solid var(--border-color)",
+                    background: "var(--input-bg)", padding: "10px 12px", fontSize: 14,
+                    color: "var(--text-primary)", outline: "none",
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* ── Row 4: Emplacement (3 gros boutons) ────── */}
+            <div style={{ marginBottom: 16 }}>
+              <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: 8 }}>Emplacement</p>
+              <div style={{ display: "flex", gap: 8 }}>
+                {(["terrasse", "interieur", "bar"] as ReservationSeating[]).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => { setSeating(s); setTableId(null); }}
+                    style={{
+                      flex: 1, borderRadius: 12, padding: "12px 0", border: "none", cursor: "pointer",
+                      fontSize: 14, fontWeight: 500, textAlign: "center",
+                      background: seating === s ? "var(--gradient-primary)" : "var(--secondary-bg)",
+                      color: seating === s ? "#fff" : "var(--text-secondary)",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    <div style={{ fontSize: 20, marginBottom: 2 }}>{SEATING_ICONS[s]}</div>
+                    {SEATING_LABELS[s]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Row 5: Type ────────────────────────────── */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", gap: 8 }}>
+                {(["diner", "drinks"] as ReservationType[]).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setType(t)}
+                    style={{
+                      flex: 1, borderRadius: 12, padding: "10px 0", border: "none", cursor: "pointer",
+                      fontSize: 14, fontWeight: 500,
+                      background: type === t ? "var(--gradient-primary)" : "var(--secondary-bg)",
+                      color: type === t ? "#fff" : "var(--text-secondary)",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    {t === "diner" ? "🍽️" : "🥂"} {TYPE_LABELS[t]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Plus de détails (collapsible) ──────────── */}
+            <button
+              onClick={() => setShowDetails(!showDetails)}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                width: "100%", padding: "10px 0", background: "none", border: "none",
+                borderTop: "1px solid var(--border-color)",
+                cursor: "pointer", marginBottom: showDetails ? 12 : 0,
+              }}
+            >
+              <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-secondary)" }}>
+                Plus de détails
+              </span>
+              <ChevronDown
+                size={16}
+                style={{
+                  color: "var(--text-tertiary)",
+                  transition: "transform 0.2s",
+                  transform: showDetails ? "rotate(180deg)" : "rotate(0)",
+                }}
+              />
+            </button>
+
+            {showDetails && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 16 }}>
+                {/* Source */}
+                <div>
+                  <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: 6 }}>Source</p>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {(["telephone", "instagram", "walk-in"] as ReservationSource[]).map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => setSource(s)}
+                        style={{
+                          flex: 1, borderRadius: 10, padding: "8px 0", border: "none", cursor: "pointer",
+                          fontSize: 12, fontWeight: 500,
+                          background: source === s ? "var(--gradient-primary)" : "var(--secondary-bg)",
+                          color: source === s ? "#fff" : "var(--text-secondary)",
+                        }}
+                      >
+                        {SOURCE_ICONS[s]} {SOURCE_LABELS[s]}
+                      </button>
+                    ))}
                   </div>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Heure</p>
-                  <input
-                    type="time"
-                    value={time}
-                    onChange={(e) => setTime(e.target.value)}
+
+                {/* Table */}
+                <div>
+                  <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: 6 }}>Table</p>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    <button
+                      onClick={() => setTableId(null)}
+                      style={{
+                        borderRadius: 8, padding: "6px 12px", border: "none", cursor: "pointer",
+                        fontSize: 12, fontWeight: 500,
+                        background: tableId === null ? "var(--gradient-primary)" : "var(--secondary-bg)",
+                        color: tableId === null ? "#fff" : "var(--text-secondary)",
+                      }}
+                    >
+                      Auto
+                    </button>
+                    {formTables.map((t) => {
+                      const booked = bookedTableIds.has(t.id);
+                      const sel = tableId === t.id;
+                      return (
+                        <button
+                          key={t.id}
+                          onClick={() => !booked && setTableId(sel ? null : t.id)}
+                          disabled={booked}
+                          style={{
+                            borderRadius: 8, padding: "6px 10px", border: "none",
+                            cursor: booked ? "not-allowed" : "pointer",
+                            fontSize: 12, fontWeight: 500, opacity: booked ? 0.3 : 1,
+                            background: sel ? "var(--gradient-primary)" : "var(--secondary-bg)",
+                            color: sel ? "#fff" : "var(--text-secondary)",
+                          }}
+                        >
+                          {t.id} ({t.capacity}p)
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: 6 }}>Notes</p>
+                  <textarea
+                    placeholder="Allergènes, enfants, anniversaire..."
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    rows={2}
                     style={{
                       width: "100%", borderRadius: 12, border: "1px solid var(--border-color)",
-                      background: "var(--input-bg)", padding: "8px 12px", fontSize: 14,
-                      color: "var(--text-primary)", outline: "none",
+                      background: "var(--input-bg)", padding: "10px 12px", fontSize: 13,
+                      color: "var(--text-primary)", outline: "none", resize: "none",
                     }}
                   />
                 </div>
               </div>
+            )}
 
-              {/* Seating */}
-              <div>
-                <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Emplacement</p>
-                <div style={{ display: "flex", gap: 8 }}>
-                  {(["terrasse", "interieur"] as ReservationSeating[]).map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => { setSeating(s); setTableId(null); }}
-                      style={{
-                        flex: 1, borderRadius: 12, padding: "10px 0", border: "none", cursor: "pointer",
-                        fontSize: 14, fontWeight: 500,
-                        background: seating === s ? "var(--gradient-primary)" : "var(--secondary-bg)",
-                        color: seating === s ? "#fff" : "var(--text-secondary)",
-                        transition: "all 0.2s",
-                      }}
-                    >
-                      {SEATING_ICONS[s]} {SEATING_LABELS[s]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Type */}
-              <div>
-                <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Type</p>
-                <div style={{ display: "flex", gap: 8 }}>
-                  {(["diner", "drinks"] as ReservationType[]).map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => setType(t)}
-                      style={{
-                        flex: 1, borderRadius: 12, padding: "10px 0", border: "none", cursor: "pointer",
-                        fontSize: 14, fontWeight: 500,
-                        background: type === t ? "var(--gradient-primary)" : "var(--secondary-bg)",
-                        color: type === t ? "#fff" : "var(--text-secondary)",
-                        transition: "all 0.2s",
-                      }}
-                    >
-                      {TYPE_LABELS[t]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Source */}
-              <div>
-                <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Source</p>
-                <div style={{ display: "flex", gap: 8 }}>
-                  {(["telephone", "instagram", "walk-in"] as ReservationSource[]).map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => setSource(s)}
-                      style={{
-                        flex: 1, borderRadius: 12, padding: "8px 0", border: "none", cursor: "pointer",
-                        fontSize: 12, fontWeight: 500,
-                        background: source === s ? "var(--gradient-primary)" : "var(--secondary-bg)",
-                        color: source === s ? "#fff" : "var(--text-secondary)",
-                        transition: "all 0.2s",
-                      }}
-                    >
-                      {SOURCE_ICONS[s]} {SOURCE_LABELS[s]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Table assignment */}
-              <div>
-                <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>
-                  Table (optionnel)
-                </p>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  <button
-                    onClick={() => setTableId(null)}
-                    style={{
-                      borderRadius: 10, padding: "6px 12px", border: "none", cursor: "pointer",
-                      fontSize: 12, fontWeight: 500,
-                      background: tableId === null ? "var(--gradient-primary)" : "var(--secondary-bg)",
-                      color: tableId === null ? "#fff" : "var(--text-secondary)",
-                    }}
-                  >
-                    Aucune
-                  </button>
-                  {availableTables.map((t) => {
-                    const isBooked = bookedTableIds.has(t.id);
-                    const isSelected = tableId === t.id;
-                    return (
-                      <button
-                        key={t.id}
-                        onClick={() => !isBooked && setTableId(isSelected ? null : t.id)}
-                        disabled={isBooked}
-                        style={{
-                          borderRadius: 10, padding: "6px 10px", border: "none", cursor: isBooked ? "not-allowed" : "pointer",
-                          fontSize: 12, fontWeight: 500,
-                          opacity: isBooked ? 0.35 : 1,
-                          background: isSelected ? "var(--gradient-primary)" : "var(--secondary-bg)",
-                          color: isSelected ? "#fff" : "var(--text-secondary)",
-                        }}
-                      >
-                        {t.id} <span style={{ fontSize: 10, opacity: 0.7 }}>({t.capacity}p)</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Notes */}
-              <div>
-                <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>
-                  Détails (allergènes, enfants, demandes...)
-                </p>
-                <textarea
-                  placeholder="Ex: allergie gluten, 2 enfants, anniversaire..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={2}
-                  style={{
-                    width: "100%", borderRadius: 12, border: "1px solid var(--border-color)",
-                    background: "var(--input-bg)", padding: "10px 12px", fontSize: 13,
-                    color: "var(--text-primary)", outline: "none", resize: "none",
-                  }}
-                />
-              </div>
-
-              {/* Submit */}
-              <button
-                onClick={handleSave}
-                disabled={!name.trim() || saving}
-                style={{
-                  width: "100%", borderRadius: 12, padding: "12px 0",
-                  fontSize: 14, fontWeight: 500, color: "#fff",
-                  background: "var(--gradient-primary)", border: "none", cursor: "pointer",
-                  opacity: !name.trim() || saving ? 0.5 : 1,
-                  transition: "opacity 0.2s",
-                }}
-              >
-                {saving ? "..." : "Confirmer la réservation"}
-              </button>
-            </div>
+            {/* Submit */}
+            <button
+              onClick={handleSave}
+              disabled={!name.trim() || saving}
+              style={{
+                width: "100%", borderRadius: 14, padding: "14px 0", marginTop: 8,
+                fontSize: 15, fontWeight: 600, color: "#fff",
+                background: "var(--gradient-primary)", border: "none", cursor: "pointer",
+                opacity: !name.trim() || saving ? 0.5 : 1,
+                transition: "opacity 0.2s",
+              }}
+            >
+              {saving ? "..." : "Confirmer"}
+            </button>
           </div>
         </div>
       )}
