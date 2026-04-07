@@ -86,13 +86,11 @@ export interface TaskCompletion {
 export interface Schedule {
   id: string;
   user_id: string;
-  day: Day;
+  date: string;
   start_time: string;
   end_time: string;
-  zone: Zone;
-  week_start: string;
+  created_by: string | null;
   created_at: string;
-  updated_at: string;
 }
 
 // ── Reservations ───────────────────────────────────────────
@@ -155,10 +153,8 @@ export interface AvailabilityRequest {
   id: string;
   user_id: string;
   date: string;
-  type: "conge" | "indisponible" | "preference";
   reason: string | null;
-  status: "pending" | "approved" | "rejected";
-  reviewed_by: string | null;
+  status: "pending" | "accepted" | "refused";
   created_at: string;
   updated_at: string;
 }

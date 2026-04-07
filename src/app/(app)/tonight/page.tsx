@@ -77,7 +77,6 @@ export default function TonightPage() {
         supabase
           .from("tasks")
           .select("*")
-          .contains("days", [shiftDay])
           .order("priority", { ascending: true }),
         supabase
           .from("one_off_tasks")
