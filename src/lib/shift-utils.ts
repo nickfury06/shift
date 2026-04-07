@@ -1,5 +1,17 @@
 import type { Day } from "./types";
 
+// ── SIMULATION MODE ───────────────────────────────────────
+// Set to a date string to simulate a different day/time
+// Set to null for real time
+// Example: "2026-04-07T21:00:00" = mardi 21h
+// Mardi 7 avril 18h — pendant l'ouverture
+export const SIMULATE_DATE: string | null = "2026-04-07T18:00:00+02:00";
+
+export function getNow(): Date {
+  if (SIMULATE_DATE) return new Date(SIMULATE_DATE);
+  return new Date();
+}
+
 const FR_DAYS: Day[] = [
   "dimanche",
   "lundi",
@@ -13,7 +25,7 @@ const FR_DAYS: Day[] = [
 /**
  * Returns the "shift date" — if before 4 AM, we're still on yesterday's shift.
  */
-export function getShiftDate(now = new Date()): string {
+export function getShiftDate(now = getNow()): string {
   const d = new Date(now);
   if (d.getHours() < 4) {
     d.setDate(d.getDate() - 1);
@@ -24,7 +36,7 @@ export function getShiftDate(now = new Date()): string {
 /**
  * Returns the day-of-week key for the current shift.
  */
-export function getShiftDay(now = new Date()): Day {
+export function getShiftDay(now = getNow()): Day {
   const d = new Date(now);
   if (d.getHours() < 4) {
     d.setDate(d.getDate() - 1);
@@ -35,7 +47,7 @@ export function getShiftDay(now = new Date()): Day {
 /**
  * Returns a French greeting based on the time of day.
  */
-export function getGreeting(now = new Date()): string {
+export function getGreeting(now = getNow()): string {
   const h = now.getHours();
   if (h < 4) return "Bonne nuit";
   if (h < 12) return "Bonjour";
