@@ -25,11 +25,11 @@ const CLOSING_OPTIONS: { value: ClosingState; label: string; icon: string }[] = 
 ];
 
 export default function DebriefPage() {
-  const { profile, user } = useAuth();
+  const { profile, user, loading: authLoading } = useAuth();
   const supabase = useRef(createClient()).current;
   const isPatron = profile?.role === "patron" || profile?.role === "responsable";
 
-  const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(true);
   const [submitted, setSubmitted] = useState(false);
   const [myDebrief, setMyDebrief] = useState<Debrief | null>(null);
   const [saving, setSaving] = useState(false);
@@ -58,7 +58,10 @@ export default function DebriefPage() {
   })();
 
   const fetchData = useCallback(async () => {
-    if (!user || !profile) return;
+    if (!user || !profile) {
+      if (!authLoading) setDataLoading(false);
+      return;
+    }
 
     const isP = profile.role === "patron" || profile.role === "responsable";
 
@@ -82,8 +85,8 @@ export default function DebriefPage() {
       setMyDebrief(mine as Debrief);
       setSubmitted(true);
     }
-    setLoading(false);
-  }, [user, profile, supabase, shiftDate, viewDate]);
+    setDataLoading(false);
+  }, [user, profile, authLoading, supabase, shiftDate, viewDate]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -154,6 +157,8 @@ export default function DebriefPage() {
 
   const affluenceLabel = (a: Affluence) => AFFLUENCE_OPTIONS.find((o) => o.value === a);
   const closingLabel = (c: ClosingState) => CLOSING_OPTIONS.find((o) => o.value === c);
+
+  const loading = authLoading || dataLoading;
 
   if (loading) {
     return (
