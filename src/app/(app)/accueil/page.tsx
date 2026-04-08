@@ -19,7 +19,7 @@ import type {
 import MessageBanner from "@/components/MessageBanner";
 import MomentSection from "@/components/MomentSection";
 import Link from "next/link";
-import { Users, Bell, Search, X } from "lucide-react";
+import { Users, Bell, Search, X, ArrowRight } from "lucide-react";
 
 interface MergedTask {
   id: string;
@@ -211,23 +211,55 @@ export default function AccueilPage() {
             </div>
           ))}
           {/* Stock alerts (shown here when panel is closed) */}
-          {!showStockSignal && stockAlerts.map((a) => {
-            const prod = stockProducts.find((p) => p.id === a.product_id);
-            return (
-              <div key={a.id} style={{
-                display: "flex", alignItems: "center", gap: 10,
-                padding: "10px 14px", borderRadius: 14,
-                background: "rgba(212,160,74,0.06)",
+          {!showStockSignal && stockAlerts.length > 0 && stockAlerts.length <= 2 && (
+            stockAlerts.map((a) => {
+              const prod = stockProducts.find((p) => p.id === a.product_id);
+              return (
+                <div key={a.id} style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "10px 14px", borderRadius: 14,
+                  background: "rgba(212,160,74,0.06)",
+                  border: "1px solid rgba(212,160,74,0.15)",
+                }}>
+                  <Bell size={15} style={{ color: "var(--warning)", flexShrink: 0 }} />
+                  <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{prod?.name}</span>
+                  <span style={{ fontSize: 11, color: "var(--text-tertiary)", marginLeft: "auto" }}>
+                    {profiles[a.created_by] || "Staff"}
+                  </span>
+                </div>
+              );
+            })
+          )}
+          {/* 3+ alerts → unified card */}
+          {!showStockSignal && stockAlerts.length >= 3 && (
+            <div
+              onClick={() => setShowStockSignal(true)}
+              style={{
+                display: "flex", alignItems: "center", gap: 12,
+                padding: "12px 16px", borderRadius: 14, cursor: "pointer",
+                background: "rgba(212,160,74,0.08)",
                 border: "1px solid rgba(212,160,74,0.15)",
+              }}
+            >
+              <div style={{
+                width: 32, height: 32, borderRadius: 8,
+                background: "rgba(212,160,74,0.15)",
+                display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
               }}>
-                <Bell size={15} style={{ color: "var(--warning)", flexShrink: 0 }} />
-                <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{prod?.name}</span>
-                <span style={{ fontSize: 11, color: "var(--text-tertiary)", marginLeft: "auto" }}>
-                  {profiles[a.created_by] || "Staff"}
-                </span>
+                <Bell size={16} style={{ color: "var(--warning)" }} />
               </div>
-            );
-          })}
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
+                  {stockAlerts.length} produits manquants
+                </div>
+                <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 1 }}>
+                  {stockAlerts.slice(0, 3).map((a) => stockProducts.find((p) => p.id === a.product_id)?.name).filter(Boolean).join(", ")}
+                  {stockAlerts.length > 3 && "..."}
+                </div>
+              </div>
+              <ArrowRight size={16} style={{ color: "var(--text-tertiary)" }} />
+            </div>
+          )}
         </div>
       )}
 
