@@ -194,44 +194,45 @@ export interface DiscountRequest {
 export interface StockProduct {
   id: string;
   name: string;
-  category: string;
+  category: StockCategory;
+  domain: StockDomain;
   unit: string;
+  current_stock: number;
+  min_stock: number;
   bottle_size: string | null;
   cost_price: number | null;
   supplier: string | null;
-  par_level: number;
-  current_stock: number;
+  sort_order: number;
   created_at: string;
-  updated_at: string;
 }
 
 export interface StockMovement {
   id: string;
   product_id: string;
+  type: "opened" | "inventory" | "received" | "adjustment";
   quantity: number;
-  type: "in" | "out" | "adjustment";
-  reason: string | null;
-  user_id: string;
+  level: number | null;
+  note: string | null;
+  created_by: string;
   created_at: string;
 }
 
 export interface StockOrder {
   id: string;
   product_id: string;
-  quantity: number;
+  quantity_needed: number | null;
   status: "pending" | "ordered" | "received";
-  ordered_by: string;
-  received_by: string | null;
+  delivery_date: string | null;
+  created_by: string;
   created_at: string;
-  updated_at: string;
 }
 
 export interface StockAlert {
   id: string;
   product_id: string;
-  type: "low_stock" | "out_of_stock" | "expiring";
-  message: string;
-  resolved: boolean;
+  message: string | null;
+  created_by: string;
+  acknowledged: boolean;
   created_at: string;
 }
 
