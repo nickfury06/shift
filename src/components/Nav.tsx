@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Sun,
+  Home,
   Calendar,
   BookOpen,
   PenLine,
@@ -42,7 +42,7 @@ export default function Nav() {
   function getMainItems(): NavItem[] {
     if (role === "staff") {
       return [
-        { href: "/tonight", label: "Ce soir", icon: <Sun size={iconSize} strokeWidth={strokeWidth} /> },
+        { href: "/accueil", label: "Accueil", icon: <Home size={iconSize} strokeWidth={strokeWidth} /> },
         { href: "/planning", label: "Planning", icon: <Calendar size={iconSize} strokeWidth={strokeWidth} /> },
         { href: "/reservations", label: "Résas", icon: <BookOpen size={iconSize} strokeWidth={strokeWidth} /> },
         { href: "/debrief", label: "Debrief", icon: <PenLine size={iconSize} strokeWidth={strokeWidth} /> },
@@ -50,7 +50,7 @@ export default function Nav() {
     }
     if (role === "responsable") {
       return [
-        { href: "/tonight", label: "Ce soir", icon: <Sun size={iconSize} strokeWidth={strokeWidth} /> },
+        { href: "/accueil", label: "Accueil", icon: <Home size={iconSize} strokeWidth={strokeWidth} /> },
         { href: "/planning", label: "Planning", icon: <Calendar size={iconSize} strokeWidth={strokeWidth} /> },
         { href: "/stocks", label: "Stocks", icon: <Package size={iconSize} strokeWidth={strokeWidth} /> },
         { href: "/reservations", label: "Résas", icon: <BookOpen size={iconSize} strokeWidth={strokeWidth} /> },
@@ -60,7 +60,7 @@ export default function Nav() {
     // patron main
     return [
       { href: "/dashboard", label: "Board", icon: <LayoutDashboard size={iconSize} strokeWidth={strokeWidth} /> },
-      { href: "/tonight", label: "Ce soir", icon: <Sun size={iconSize} strokeWidth={strokeWidth} /> },
+      { href: "/accueil", label: "Accueil", icon: <Home size={iconSize} strokeWidth={strokeWidth} /> },
       { href: "/reservations", label: "Résas", icon: <BookOpen size={iconSize} strokeWidth={strokeWidth} /> },
       { href: "/stocks", label: "Stocks", icon: <Package size={iconSize} strokeWidth={strokeWidth} /> },
     ];

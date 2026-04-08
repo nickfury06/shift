@@ -16,11 +16,13 @@ import type {
   Moment,
   Zone,
   Profile,
+  StockAlert,
+  StockProduct,
 } from "@/lib/types";
 import MessageBanner from "@/components/MessageBanner";
 import MomentSection from "@/components/MomentSection";
 import TaskCard from "@/components/TaskCard";
-import { Check, Users } from "lucide-react";
+import { Check, Users, Bell, Search, X } from "lucide-react";
 
 interface MergedTask {
   id: string;
@@ -68,6 +70,10 @@ export default function TonightPage() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [tasks, setTasks] = useState<MergedTask[]>([]);
   const [freeTasks, setFreeTasks] = useState<MergedTask[]>([]);
+  const [stockAlerts, setStockAlerts] = useState<StockAlert[]>([]);
+  const [stockProducts, setStockProducts] = useState<StockProduct[]>([]);
+  const [stockSearch, setStockSearch] = useState("");
+  const [showStockSignal, setShowStockSignal] = useState(false);
 
   const shiftDate = getShiftDate();
   const shiftDay = getShiftDay();
@@ -79,7 +85,7 @@ export default function TonightPage() {
   const fetchData = useCallback(async () => {
     if (!profile) return;
 
-    const [msgRes, eventRes, resaRes, taskRes, oneOffRes, compRes, profRes] =
+    const [msgRes, eventRes, resaRes, taskRes, oneOffRes, compRes, profRes, alertRes, prodRes] =
       await Promise.all([
         supabase
           .from("messages")
@@ -113,6 +119,15 @@ export default function TonightPage() {
         supabase
           .from("profiles")
           .select("id, name, role"),
+        supabase
+          .from("stock_alerts")
+          .select("*")
+          .eq("acknowledged", false)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("stock_products")
+          .select("id, name, category")
+          .order("name"),
       ]);
 
     setMessages((msgRes.data as ManagerMessage[]) || []);
@@ -123,6 +138,8 @@ export default function TonightPage() {
     profList.forEach((p) => { profMap[p.id] = p.name; });
     setProfiles(profMap);
     setStaffProfiles(profList.filter((p) => p.role !== "patron"));
+    setStockAlerts((alertRes.data as StockAlert[]) || []);
+    setStockProducts((prodRes.data as StockProduct[]) || []);
 
     const completions = (compRes.data as TaskCompletion[]) || [];
     setRawCompletions(completions);
@@ -171,7 +188,7 @@ export default function TonightPage() {
   // Realtime subscriptions
   useEffect(() => {
     const channel = supabase
-      .channel("tonight-realtime")
+      .channel("accueil-realtime")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "task_completions", filter: `date=eq.${shiftDate}` },
@@ -197,12 +214,35 @@ export default function TonightPage() {
         { event: "*", schema: "public", table: "tasks" },
         () => fetchData()
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "stock_alerts" },
+        () => fetchData()
+      )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
   }, [supabase, shiftDate, fetchData]);
+
+  // ── Stock signal ──────────────────────────────────────────
+  async function sendStockAlert(productId: string) {
+    if (!profile) return;
+    const p = stockProducts.find((x) => x.id === productId);
+    await supabase.from("stock_alerts").insert({
+      product_id: productId,
+      message: `${p?.name} est bas`,
+      created_by: profile.id,
+    });
+    setStockSearch("");
+    setShowStockSignal(false);
+  }
+
+  const stockSearchResults = stockSearch.length >= 2
+    ? stockProducts.filter((p) => p.name.toLowerCase().includes(stockSearch.toLowerCase())).slice(0, 6)
+    : [];
+  const alertedProductIds = new Set(stockAlerts.map((a) => a.product_id));
 
   // ── Toggle task completion ────────────────────────────────
   async function handleToggleTask(taskId: string, completed: boolean) {
@@ -662,7 +702,7 @@ export default function TonightPage() {
             color: "var(--text-secondary)",
           }}
         >
-          Aucune réservation ce soir
+          Aucune réservation
         </div>
       )}
 
@@ -730,6 +770,110 @@ export default function TonightPage() {
           </div>
         </>
       )}
+
+      {/* ── Stock Alerts + Signal ──────────────────────────── */}
+      <div style={{ height: 28 }} />
+      <div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          <span className="section-label">Stock</span>
+          <button
+            onClick={() => setShowStockSignal(!showStockSignal)}
+            style={{
+              display: "flex", alignItems: "center", gap: 4,
+              padding: "5px 12px", borderRadius: 10, border: "none", cursor: "pointer",
+              background: showStockSignal ? "var(--gradient-primary)" : "rgba(212,160,74,0.1)",
+              color: showStockSignal ? "#fff" : "var(--warning)",
+              fontSize: 12, fontWeight: 600,
+              transition: "all 0.2s",
+            }}
+          >
+            <Bell size={12} /> Signaler
+          </button>
+        </div>
+
+        {/* Quick signal search */}
+        {showStockSignal && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ position: "relative", marginBottom: 8 }}>
+              <Search size={16} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-tertiary)" }} />
+              <input
+                type="text"
+                placeholder="Rechercher un produit..."
+                value={stockSearch}
+                onChange={(e) => setStockSearch(e.target.value)}
+                autoFocus
+                style={{
+                  width: "100%", borderRadius: 12, border: "1px solid var(--border-color)",
+                  background: "var(--input-bg)", padding: "10px 14px 10px 36px", fontSize: 14,
+                  color: "var(--text-primary)", outline: "none",
+                }}
+              />
+              {stockSearch && (
+                <button onClick={() => setStockSearch("")} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+                  <X size={14} style={{ color: "var(--text-tertiary)" }} />
+                </button>
+              )}
+            </div>
+            {stockSearchResults.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {stockSearchResults.map((p) => {
+                  const flagged = alertedProductIds.has(p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => !flagged && sendStockAlert(p.id)}
+                      disabled={flagged}
+                      className="card-light"
+                      style={{
+                        width: "100%", textAlign: "left", border: "none", cursor: flagged ? "default" : "pointer",
+                        padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between",
+                        opacity: flagged ? 0.5 : 1,
+                      }}
+                    >
+                      <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>{p.name}</span>
+                      {flagged
+                        ? <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Déjà signalé</span>
+                        : <span style={{ fontSize: 12, fontWeight: 600, color: "var(--warning)" }}>Signaler</span>
+                      }
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Active alerts */}
+        {stockAlerts.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {stockAlerts.map((a) => {
+              const prod = stockProducts.find((p) => p.id === a.product_id);
+              return (
+                <div key={a.id} style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  padding: "8px 12px", borderRadius: 10,
+                  background: "rgba(212,160,74,0.08)",
+                  borderLeft: "3px solid var(--warning)",
+                }}>
+                  <Bell size={13} style={{ color: "var(--warning)", flexShrink: 0 }} />
+                  <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>
+                    {prod?.name || "Produit"}
+                  </span>
+                  <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                    {profiles[a.created_by] || "Staff"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {stockAlerts.length === 0 && !showStockSignal && (
+          <p style={{ fontSize: 12, color: "var(--text-tertiary)", textAlign: "center", padding: "8px 0" }}>
+            Rien à signaler
+          </p>
+        )}
+      </div>
 
       {/* Extra bottom padding for nav clearance */}
       <div style={{ height: 20 }} />

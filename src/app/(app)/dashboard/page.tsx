@@ -194,7 +194,7 @@ export default function DashboardPage() {
         {/* Staff progress */}
         {staffProgress.length > 0 && (
           <div>
-            <p className="section-label" style={{ marginBottom: 8 }}>Equipe ce soir</p>
+            <p className="section-label" style={{ marginBottom: 8 }}>Équipe</p>
             <div className="stagger" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {staffProgress.map((sp) => (
                 <div key={sp.name} className="card-light" style={{ padding: 16, display: "flex", alignItems: "center", justifyContent: "space-between" }}>

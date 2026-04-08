@@ -33,7 +33,7 @@ export default function Home() {
       } else if (!profile.onboarding_completed) {
         router.replace("/onboarding");
       } else {
-        router.replace("/tonight");
+        router.replace("/accueil");
       }
     }
 

@@ -38,7 +38,7 @@ export default function ChangePasswordPage() {
       return;
     }
 
-    router.push("/tonight");
+    router.push("/accueil");
   }
 
   return (

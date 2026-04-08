@@ -21,7 +21,7 @@ export default function OnboardingPage() {
   useEffect(() => {
     if (!user) return;
     if (profile?.onboarding_completed) {
-      router.push("/tonight");
+      router.push("/accueil");
       return;
     }
 
@@ -60,7 +60,7 @@ export default function OnboardingPage() {
   async function completeOnboarding() {
     if (!user) return;
     await supabase.from("profiles").update({ onboarding_completed: true }).eq("id", user.id);
-    router.push("/tonight");
+    router.push("/accueil");
   }
 
   if (loading) {

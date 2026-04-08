@@ -186,7 +186,6 @@ export default function StocksPage() {
           {([
             { key: "signal" as View, label: "Signaler", icon: <Bell size={14} /> },
             { key: "inventaire" as View, label: "Inventaire", icon: <ClipboardList size={14} /> },
-            { key: "commande" as View, label: "Commande", icon: <ShoppingCart size={14} />, badge: pendingOrders.length },
           ]).map((t) => (
             <button
               key={t.key}
@@ -202,11 +201,6 @@ export default function StocksPage() {
               }}
             >
               {t.icon} {t.label}
-              {t.badge ? (
-                <span style={{ fontSize: 10, fontWeight: 700, color: "#fff", background: "var(--terra-medium)", borderRadius: 8, padding: "1px 6px" }}>
-                  {t.badge}
-                </span>
-              ) : null}
             </button>
           ))}
         </div>
@@ -281,7 +275,7 @@ export default function StocksPage() {
           {alerts.length > 0 && (
             <div style={{ marginBottom: search ? 0 : 16 }}>
               <p className="section-label" style={{ marginBottom: 8 }}>
-                Signalés ce soir ({alerts.length})
+                Signalés ({alerts.length})
               </p>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {alerts.map((a) => {
@@ -414,137 +408,6 @@ export default function StocksPage() {
         </div>
       )}
 
-      {/* ═══════════════════════════════════════════════════ */}
-      {/* COMMANDE (manager only)                            */}
-      {/* ═══════════════════════════════════════════════════ */}
-      {view === "commande" && isManager && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-
-          {/* FB Deadline banner */}
-          <div className="card-medium" style={{
-            padding: "12px 16px", display: "flex", alignItems: "center", gap: 10,
-            borderLeft: deadline.urgent ? "3px solid var(--danger)" : "3px solid var(--terra-medium)",
-          }}>
-            <Clock size={16} style={{ color: deadline.urgent ? "var(--danger)" : "var(--terra-medium)", flexShrink: 0 }} />
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: deadline.urgent ? "var(--danger)" : "var(--text-primary)" }}>
-                France Boissons
-              </div>
-              <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{deadline.label}</div>
-            </div>
-          </div>
-
-          {/* Low stock suggestions */}
-          {lowProducts.filter((p) => !orderProductIds.has(p.id)).length > 0 && (
-            <div>
-              <p className="section-label" style={{ marginBottom: 8 }}>Stock bas</p>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {lowProducts.filter((p) => !orderProductIds.has(p.id)).map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => addToOrder(p.id)}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 4,
-                      padding: "7px 12px", borderRadius: 10, border: "1px dashed var(--warning)",
-                      background: "rgba(212,160,74,0.06)", cursor: "pointer",
-                      fontSize: 13, fontWeight: 500, color: "var(--warning)",
-                    }}
-                  >
-                    <Plus size={12} /> {p.name} <span style={{ fontSize: 11, opacity: 0.7 }}>({p.current_stock})</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Pending orders */}
-          {pendingOrders.length > 0 && (
-            <div>
-              <p className="section-label" style={{ marginBottom: 8 }}>
-                À commander ({pendingOrders.length})
-              </p>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {pendingOrders.map((o) => {
-                  const prod = products.find((p) => p.id === o.product_id);
-                  if (!prod) return null;
-                  return (
-                    <div key={o.id} className="card-light" style={{ padding: "10px 14px", display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>{prod.name}</div>
-                        <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Stock: {prod.current_stock} / min. {prod.min_stock}</div>
-                      </div>
-                      <button onClick={() => markOrdered(o.id)} style={{
-                        padding: "6px 10px", borderRadius: 8, border: "none", cursor: "pointer",
-                        background: "var(--gradient-primary)", fontSize: 11, fontWeight: 600, color: "#fff",
-                        display: "flex", alignItems: "center", gap: 4,
-                      }}>
-                        <Truck size={12} /> Commandé
-                      </button>
-                      <button onClick={() => removeOrder(o.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
-                        <X size={14} style={{ color: "var(--text-tertiary)" }} />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Ordered — waiting delivery */}
-          {orderedOrders.length > 0 && (
-            <div>
-              <p className="section-label" style={{ marginBottom: 8 }}>En livraison</p>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {orderedOrders.map((o) => {
-                  const prod = products.find((p) => p.id === o.product_id);
-                  if (!prod) return null;
-                  return (
-                    <div key={o.id} className="card-light" style={{ padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, opacity: 0.7 }}>
-                      <Truck size={14} style={{ color: "var(--terra-medium)", flexShrink: 0 }} />
-                      <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>{prod.name}</span>
-                      <button onClick={() => markReceived(o.id)} style={{
-                        padding: "6px 10px", borderRadius: 8, border: "none", cursor: "pointer",
-                        background: "var(--secondary-bg)", fontSize: 11, fontWeight: 500, color: "var(--text-secondary)",
-                        display: "flex", alignItems: "center", gap: 4,
-                      }}>
-                        <Check size={12} /> Reçu
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Add manually */}
-          <div>
-            <p className="section-label" style={{ marginBottom: 8 }}>Ajouter à la commande</p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxHeight: 140, overflowY: "auto" }}>
-              {visibleProducts.filter((p) => !orderProductIds.has(p.id)).map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => addToOrder(p.id)}
-                  style={{
-                    padding: "5px 10px", borderRadius: 8, border: "none", cursor: "pointer",
-                    background: "var(--secondary-bg)", fontSize: 11, fontWeight: 500,
-                    color: "var(--text-secondary)",
-                  }}
-                >
-                  + {p.name}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Empty */}
-          {pendingOrders.length === 0 && orderedOrders.length === 0 && lowProducts.filter((p) => !orderProductIds.has(p.id)).length === 0 && (
-            <div className="card-light" style={{ padding: 28, textAlign: "center" }}>
-              <Package size={24} style={{ color: "var(--text-tertiary)", margin: "0 auto 8px" }} />
-              <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>Tout est en stock</p>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
