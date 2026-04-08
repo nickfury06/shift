@@ -10,8 +10,10 @@ import type {
   OneOffTask,
   TaskCompletion,
   ManagerMessage,
+  Event,
   Reservation,
   Moment,
+  Day,
   Profile,
   StockAlert,
   StockProduct,
@@ -20,6 +22,15 @@ import MessageBanner from "@/components/MessageBanner";
 import MomentSection from "@/components/MomentSection";
 import Link from "next/link";
 import { Users, Bell, Search, X, ChevronDown } from "lucide-react";
+
+// ── Rituels hebdomadaires Le Hive ─────────────────────────
+const RITUELS: Partial<Record<Day, { time: string; name: string }[]>> = {
+  mardi: [{ time: "21h", name: "Le Village Maudit — Joelson" }],
+  mercredi: [{ time: "21h", name: "Le Hive Trials — Alexis & Alan" }],
+  jeudi: [{ time: "20h30", name: "Just Dance" }, { time: "22h", name: "Karaoké" }],
+  vendredi: [{ time: "22h30", name: "Beer Pong — Tournoi 2v2" }],
+  samedi: [{ time: "22h30", name: "Blindtest" }],
+};
 
 interface MergedTask {
   id: string;
@@ -63,6 +74,7 @@ export default function AccueilPage() {
   const [tasks, setTasks] = useState<MergedTask[]>([]);
   const [stockAlerts, setStockAlerts] = useState<StockAlert[]>([]);
   const [stockProducts, setStockProducts] = useState<StockProduct[]>([]);
+  const [event, setEvent] = useState<Event | null>(null);
   const [stockSearch, setStockSearch] = useState("");
   const [showStockSignal, setShowStockSignal] = useState(false);
   const [alertsExpanded, setAlertsExpanded] = useState(false);
@@ -75,7 +87,7 @@ export default function AccueilPage() {
   const fetchData = useCallback(async () => {
     if (!profile) return;
 
-    const [msgRes, resaRes, taskRes, oneOffRes, compRes, profRes, alertRes, prodRes] =
+    const [msgRes, resaRes, taskRes, oneOffRes, compRes, profRes, alertRes, prodRes, eventRes] =
       await Promise.all([
         supabase.from("messages").select("*").eq("date", shiftDate).order("created_at", { ascending: false }),
         supabase.from("reservations").select("*").eq("date", shiftDate).order("time", { ascending: true }),
@@ -85,6 +97,7 @@ export default function AccueilPage() {
         supabase.from("profiles").select("id, name, role"),
         supabase.from("stock_alerts").select("*").eq("acknowledged", false).order("created_at", { ascending: false }),
         supabase.from("stock_products").select("id, name, category").order("name"),
+        supabase.from("events").select("*").eq("date", shiftDate).limit(1).maybeSingle(),
       ]);
 
     setMessages((msgRes.data as ManagerMessage[]) || []);
@@ -96,6 +109,7 @@ export default function AccueilPage() {
     setStaffProfiles(profList.filter((p) => p.role !== "patron"));
     setStockAlerts((alertRes.data as StockAlert[]) || []);
     setStockProducts((prodRes.data as StockProduct[]) || []);
+    setEvent((eventRes.data as Event) || null);
 
     const completions = (compRes.data as TaskCompletion[]) || [];
     setRawCompletions(completions);
@@ -201,6 +215,31 @@ export default function AccueilPage() {
           <p style={{ fontSize: 13, color: "var(--text-tertiary)", marginTop: 2 }}>{dateLabelShort}</p>
         </div>
       </div>
+
+      {/* ── Ce soir (rituels + events) ─────────────────────── */}
+      {(() => {
+        const rituels = RITUELS[shiftDay] || [];
+        const items = [
+          ...rituels.map((r) => `${r.time} · ${r.name}`),
+          ...(event ? [`${event.start_time ? formatTime(event.start_time) + " · " : ""}${event.title}`] : []),
+        ];
+        if (items.length === 0) return null;
+        return (
+          <div style={{
+            marginBottom: 16, padding: "10px 14px", borderRadius: 12,
+            background: "linear-gradient(135deg, rgba(196,120,90,0.06) 0%, rgba(196,120,90,0.02) 100%)",
+            border: "1px solid rgba(196,120,90,0.1)",
+          }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {items.map((item, i) => (
+                <div key={i} style={{ fontSize: 13, color: "var(--text-primary)", fontWeight: 500 }}>
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Infos du shift ──────────────────────────────────── */}
       {(activeMessages.length > 0 || (stockAlerts.length > 0 && !showStockSignal)) && (
