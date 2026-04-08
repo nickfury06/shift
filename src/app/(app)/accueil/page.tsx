@@ -18,9 +18,8 @@ import type {
 } from "@/lib/types";
 import MessageBanner from "@/components/MessageBanner";
 import MomentSection from "@/components/MomentSection";
-import TaskCard from "@/components/TaskCard";
 import Link from "next/link";
-import { Users, BookOpen, Bell, Search, X, ArrowRight, Check } from "lucide-react";
+import { Users, Bell, Search, X } from "lucide-react";
 
 interface MergedTask {
   id: string;
@@ -62,7 +61,6 @@ export default function AccueilPage() {
   const [rawTasks, setRawTasks] = useState<Task[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [tasks, setTasks] = useState<MergedTask[]>([]);
-  const [freeTasks, setFreeTasks] = useState<MergedTask[]>([]);
   const [stockAlerts, setStockAlerts] = useState<StockAlert[]>([]);
   const [stockProducts, setStockProducts] = useState<StockProduct[]>([]);
   const [stockSearch, setStockSearch] = useState("");
@@ -120,7 +118,6 @@ export default function AccueilPage() {
 
     const allTasks = [...recurring, ...oneOff];
     setTasks(allTasks.filter((t) => !t.isLibre));
-    setFreeTasks(allTasks.filter((t) => t.isLibre));
     setLoading(false);
   }, [profile, supabase, shiftDate, shiftDay]);
 
@@ -155,7 +152,7 @@ export default function AccueilPage() {
   // ── Toggle task ───────────────────────────────────────────
   async function handleToggleTask(taskId: string, completed: boolean) {
     if (!profile) return;
-    const task = [...tasks, ...freeTasks].find((t) => t.id === taskId);
+    const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
 
     if (task.isOneOff) {
@@ -168,14 +165,12 @@ export default function AccueilPage() {
       }
     }
 
-    const update = (list: MergedTask[]) => list.map((t) => (t.id === taskId ? { ...t, completed } : t));
-    setTasks(update);
-    setFreeTasks(update);
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, completed } : t)));
   }
 
   // ── Derived ───────────────────────────────────────────────
-  const totalTasks = tasks.length + freeTasks.length;
-  const doneTasks = [...tasks, ...freeTasks].filter((t) => t.completed).length;
+  const totalTasks = tasks.length;
+  const doneTasks = tasks.filter((t) => t.completed).length;
   const taskPct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
   const totalCovers = reservations.reduce((sum, r) => sum + r.covers, 0);
   const pendingResas = reservations.filter((r) => r.status === "attendu").length;
@@ -422,27 +417,6 @@ export default function AccueilPage() {
           </div>
         );
       })}
-
-      {/* ── Si c'est calme (free tasks = reminders during service) */}
-      {freeTasks.length > 0 && (
-        <>
-          <div style={{ height: 20 }} />
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-            <span style={{ fontSize: 16 }}>🌙</span>
-            <span className="section-label" style={{ opacity: 0.8 }}>Si c&apos;est calme</span>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {freeTasks.map((task) => (
-              <TaskCard
-                key={task.id} id={task.id} title={task.title}
-                zone={task.zone} zoneKey={task.zoneKey}
-                description={task.description} completed={task.completed}
-                isLibre onToggle={handleToggleTask}
-              />
-            ))}
-          </div>
-        </>
-      )}
 
       <div style={{ height: 20 }} />
     </div>
