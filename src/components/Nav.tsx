@@ -66,15 +66,22 @@ export default function Nav() {
     ];
   }
 
-  // ── Patron "More" menu items ──────────────────────────────
-  const moreItems: NavItem[] = [
-    { href: "/messages", label: "Messages", icon: <MessageCircle size={iconSize} strokeWidth={strokeWidth} /> },
-    { href: "/debrief", label: "Debriefs", icon: <PenLine size={iconSize} strokeWidth={strokeWidth} /> },
-    { href: "/planning", label: "Planning", icon: <Calendar size={iconSize} strokeWidth={strokeWidth} /> },
-    { href: "/tasks", label: "Tâches", icon: <ListChecks size={iconSize} strokeWidth={strokeWidth} /> },
-    { href: "/staff", label: "Équipe", icon: <Users size={iconSize} strokeWidth={strokeWidth} /> },
-    { href: "/settings", label: "Réglages", icon: <ClipboardList size={iconSize} strokeWidth={strokeWidth} /> },
-  ];
+  // ── "More" menu items (role-based) ─────────────────────────
+  function getMoreItems(): NavItem[] {
+    if (role === "patron") {
+      return [
+        { href: "/messages", label: "Messages", icon: <MessageCircle size={iconSize} strokeWidth={strokeWidth} /> },
+        { href: "/debrief", label: "Debriefs", icon: <PenLine size={iconSize} strokeWidth={strokeWidth} /> },
+        { href: "/planning", label: "Planning", icon: <Calendar size={iconSize} strokeWidth={strokeWidth} /> },
+        { href: "/tasks", label: "Tâches", icon: <ListChecks size={iconSize} strokeWidth={strokeWidth} /> },
+        { href: "/staff", label: "Équipe", icon: <Users size={iconSize} strokeWidth={strokeWidth} /> },
+        { href: "/settings", label: "Réglages", icon: <ClipboardList size={iconSize} strokeWidth={strokeWidth} /> },
+      ];
+    }
+    // Staff & responsable — fewer items
+    return [];
+  }
+  const moreItems = getMoreItems();
 
   const mainItems = getMainItems();
   const isActive = (href: string) => pathname === href;
@@ -263,8 +270,8 @@ export default function Nav() {
             );
           })}
 
-          {/* "More" button for patron */}
-          {role === "patron" && (
+          {/* "More" button for all roles */}
+          {(
             <button
               onClick={() => setMoreOpen((v) => !v)}
               style={{

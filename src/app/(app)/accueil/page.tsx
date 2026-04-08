@@ -4,17 +4,14 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
 import { getShiftDate, getShiftDay, getNow, formatDateFr, formatTime } from "@/lib/shift-utils";
-import ThemeToggle from "@/components/ThemeToggle";
-import { MOMENT_LABELS, MOMENT_ORDER, ZONE_LABELS, ZONE_COLORS, SEATING_LABELS, SEATING_ICONS } from "@/lib/constants";
+import { MOMENT_LABELS, MOMENT_ORDER } from "@/lib/constants";
 import type {
   Task,
   OneOffTask,
   TaskCompletion,
   ManagerMessage,
-  Event,
   Reservation,
   Moment,
-  Zone,
   Profile,
   StockAlert,
   StockProduct,
@@ -22,13 +19,14 @@ import type {
 import MessageBanner from "@/components/MessageBanner";
 import MomentSection from "@/components/MomentSection";
 import TaskCard from "@/components/TaskCard";
-import { Check, Users, Bell, Search, X } from "lucide-react";
+import Link from "next/link";
+import { Users, BookOpen, Bell, Search, X, ArrowRight, Check } from "lucide-react";
 
 interface MergedTask {
   id: string;
   title: string;
   zone?: string;
-  zoneKey?: Zone;
+  zoneKey?: import("@/lib/types").Zone;
   description?: string | null;
   completed: boolean;
   moment: Moment;
@@ -36,7 +34,7 @@ interface MergedTask {
   isLibre?: boolean;
 }
 
-export default function TonightPage() {
+export default function AccueilPage() {
   const { profile } = useAuth();
   const supabase = useRef(createClient()).current;
 
@@ -50,7 +48,6 @@ export default function TonightPage() {
     } catch { return new Set(); }
   });
 
-  // Persist dismissed messages
   function dismissMsg(id: string) {
     setDismissedMsgIds((prev) => {
       const next = new Set([...prev, id]);
@@ -58,15 +55,11 @@ export default function TonightPage() {
       return next;
     });
   }
-  function resetDismissed() {
-    setDismissedMsgIds(new Set());
-    localStorage.removeItem("shift-dismissed-msgs");
-  }
+
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [staffProfiles, setStaffProfiles] = useState<Pick<Profile, "id" | "name" | "role">[]>([]);
   const [rawCompletions, setRawCompletions] = useState<TaskCompletion[]>([]);
   const [rawTasks, setRawTasks] = useState<Task[]>([]);
-  const [event, setEvent] = useState<Event | null>(null);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [tasks, setTasks] = useState<MergedTask[]>([]);
   const [freeTasks, setFreeTasks] = useState<MergedTask[]>([]);
@@ -78,60 +71,24 @@ export default function TonightPage() {
   const shiftDate = getShiftDate();
   const shiftDay = getShiftDay();
   const dateLabel = formatDateFr(shiftDate);
-
-  // Capitalize first letter for display (e.g. "Mar 1 avril")
-  const dateLabelShort = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1, 3) + " " + dateLabel.split(" ").slice(1).join(" ");
+  const dateLabelShort = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
 
   const fetchData = useCallback(async () => {
     if (!profile) return;
 
-    const [msgRes, eventRes, resaRes, taskRes, oneOffRes, compRes, profRes, alertRes, prodRes] =
+    const [msgRes, resaRes, taskRes, oneOffRes, compRes, profRes, alertRes, prodRes] =
       await Promise.all([
-        supabase
-          .from("messages")
-          .select("*")
-          .eq("date", shiftDate)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("events")
-          .select("*")
-          .eq("date", shiftDate)
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from("reservations")
-          .select("*")
-          .eq("date", shiftDate)
-          .order("time", { ascending: true }),
-        supabase
-          .from("tasks")
-          .select("*")
-          .order("priority", { ascending: true }),
-        supabase
-          .from("one_off_tasks")
-          .select("*")
-          .eq("date", shiftDate)
-          .order("priority", { ascending: true }),
-        supabase
-          .from("task_completions")
-          .select("*")
-          .eq("date", shiftDate),
-        supabase
-          .from("profiles")
-          .select("id, name, role"),
-        supabase
-          .from("stock_alerts")
-          .select("*")
-          .eq("acknowledged", false)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("stock_products")
-          .select("id, name, category")
-          .order("name"),
+        supabase.from("messages").select("*").eq("date", shiftDate).order("created_at", { ascending: false }),
+        supabase.from("reservations").select("*").eq("date", shiftDate).order("time", { ascending: true }),
+        supabase.from("tasks").select("*").order("priority", { ascending: true }),
+        supabase.from("one_off_tasks").select("*").eq("date", shiftDate).order("priority", { ascending: true }),
+        supabase.from("task_completions").select("*").eq("date", shiftDate),
+        supabase.from("profiles").select("id, name, role"),
+        supabase.from("stock_alerts").select("*").eq("acknowledged", false).order("created_at", { ascending: false }),
+        supabase.from("stock_products").select("id, name, category").order("name"),
       ]);
 
     setMessages((msgRes.data as ManagerMessage[]) || []);
-    setEvent((eventRes.data as Event) || null);
     setReservations((resaRes.data as Reservation[]) || []);
     const profList = (profRes.data as Pick<Profile, "id" | "name" | "role">[]) || [];
     const profMap: Record<string, string> = {};
@@ -148,93 +105,44 @@ export default function TonightPage() {
     const todayTasks = ((taskRes.data as Task[]) || []).filter((t) => t.days && t.days.includes(shiftDay));
     setRawTasks(todayTasks);
 
-    const recurring: MergedTask[] = todayTasks
-      .map((t) => ({
-        id: t.id,
-        title: t.title,
-        zone: ZONE_LABELS[t.zone] || t.zone,
-        zoneKey: t.zone,
-        description: t.note,
-        completed: completedIds.has(t.id),
-        moment: t.moment,
-        isOneOff: false,
-        isLibre: t.is_libre,
-      }));
+    const { ZONE_LABELS } = await import("@/lib/constants");
+    const recurring: MergedTask[] = todayTasks.map((t) => ({
+      id: t.id, title: t.title, zone: ZONE_LABELS[t.zone] || t.zone,
+      zoneKey: t.zone, description: t.note, completed: completedIds.has(t.id),
+      moment: t.moment, isOneOff: false, isLibre: t.is_libre,
+    }));
 
     const oneOff: MergedTask[] = ((oneOffRes.data as OneOffTask[]) || []).map((t) => ({
-      id: t.id,
-      title: t.title,
-      zone: ZONE_LABELS[t.zone] || t.zone,
-      zoneKey: t.zone,
-      description: t.note,
-      completed: completedIds.has(t.id),
-      moment: t.moment,
-      isOneOff: true,
+      id: t.id, title: t.title, zone: ZONE_LABELS[t.zone] || t.zone,
+      zoneKey: t.zone, description: t.note, completed: completedIds.has(t.id),
+      moment: t.moment, isOneOff: true,
     }));
 
     const allTasks = [...recurring, ...oneOff];
-    const momentTasks = allTasks.filter((t) => !t.isLibre);
-    const free = allTasks.filter((t) => t.isLibre);
-
-    setTasks(momentTasks);
-    setFreeTasks(free);
+    setTasks(allTasks.filter((t) => !t.isLibre));
+    setFreeTasks(allTasks.filter((t) => t.isLibre));
     setLoading(false);
   }, [profile, supabase, shiftDate, shiftDay]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Realtime subscriptions
   useEffect(() => {
-    const channel = supabase
-      .channel("accueil-realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "task_completions", filter: `date=eq.${shiftDate}` },
-        () => fetchData()
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "one_off_tasks", filter: `date=eq.${shiftDate}` },
-        () => fetchData()
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "reservations", filter: `date=eq.${shiftDate}` },
-        () => fetchData()
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "messages", filter: `date=eq.${shiftDate}` },
-        () => fetchData()
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "tasks" },
-        () => fetchData()
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "stock_alerts" },
-        () => fetchData()
-      )
+    const ch = supabase.channel("accueil-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "task_completions", filter: `date=eq.${shiftDate}` }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "one_off_tasks", filter: `date=eq.${shiftDate}` }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "reservations", filter: `date=eq.${shiftDate}` }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages", filter: `date=eq.${shiftDate}` }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "stock_alerts" }, () => fetchData())
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(ch); };
   }, [supabase, shiftDate, fetchData]);
 
   // ── Stock signal ──────────────────────────────────────────
   async function sendStockAlert(productId: string) {
     if (!profile) return;
     const p = stockProducts.find((x) => x.id === productId);
-    await supabase.from("stock_alerts").insert({
-      product_id: productId,
-      message: `${p?.name} est bas`,
-      created_by: profile.id,
-    });
+    await supabase.from("stock_alerts").insert({ product_id: productId, message: `${p?.name} est bas`, created_by: profile.id });
     setStockSearch("");
     setShowStockSignal(false);
   }
@@ -244,129 +152,185 @@ export default function TonightPage() {
     : [];
   const alertedProductIds = new Set(stockAlerts.map((a) => a.product_id));
 
-  // ── Toggle task completion ────────────────────────────────
+  // ── Toggle task ───────────────────────────────────────────
   async function handleToggleTask(taskId: string, completed: boolean) {
     if (!profile) return;
-
     const task = [...tasks, ...freeTasks].find((t) => t.id === taskId);
     if (!task) return;
 
     if (task.isOneOff) {
-      await supabase
-        .from("one_off_tasks")
-        .update({ completed })
-        .eq("id", taskId);
+      await supabase.from("one_off_tasks").update({ completed }).eq("id", taskId);
     } else {
       if (completed) {
-        await supabase.from("task_completions").insert({
-          task_id: taskId,
-          user_id: profile.id,
-          date: shiftDate,
-          moment: task.moment,
-        });
+        await supabase.from("task_completions").insert({ task_id: taskId, user_id: profile.id, date: shiftDate, moment: task.moment });
       } else {
-        await supabase
-          .from("task_completions")
-          .delete()
-          .eq("task_id", taskId)
-          .eq("date", shiftDate);
+        await supabase.from("task_completions").delete().eq("task_id", taskId).eq("date", shiftDate);
       }
     }
 
-    // Optimistic update
-    const update = (list: MergedTask[]) =>
-      list.map((t) => (t.id === taskId ? { ...t, completed } : t));
+    const update = (list: MergedTask[]) => list.map((t) => (t.id === taskId ? { ...t, completed } : t));
     setTasks(update);
     setFreeTasks(update);
   }
 
-  // ── Reservation actions ───────────────────────────────────
-  async function markArrived(id: string) {
-    if (!profile) return;
-    await supabase
-      .from("reservations")
-      .update({ status: "arrive", arrived_by: profile.id })
-      .eq("id", id);
-    fetchData();
-  }
+  // ── Derived ───────────────────────────────────────────────
+  const totalTasks = tasks.length + freeTasks.length;
+  const doneTasks = [...tasks, ...freeTasks].filter((t) => t.completed).length;
+  const taskPct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
+  const totalCovers = reservations.reduce((sum, r) => sum + r.covers, 0);
+  const pendingResas = reservations.filter((r) => r.status === "attendu").length;
+  const activeMessages = messages.filter((m) => !dismissedMsgIds.has(m.id));
 
-  async function unmarkArrived(id: string) {
-    await supabase
-      .from("reservations")
-      .update({ status: "attendu", arrived_by: null })
-      .eq("id", id);
-    fetchData();
-  }
-
-  // ── Loading skeleton ──────────────────────────────────────
   if (loading) {
     return (
-      <div style={{ padding: "0 20px", paddingBottom: 96, maxWidth: 512, margin: "0 auto" }}>
-        <div style={{ height: 40, background: "var(--card-bg)", borderRadius: 16, marginBottom: 16, opacity: 0.5 }} />
-        <div style={{ height: 80, background: "var(--card-bg)", borderRadius: 16, marginBottom: 16, opacity: 0.5 }} />
-        <div style={{ height: 120, background: "var(--card-bg)", borderRadius: 16, marginBottom: 16, opacity: 0.5 }} />
-        <div style={{ height: 160, background: "var(--card-bg)", borderRadius: 16, opacity: 0.5 }} />
+      <div style={{ padding: "16px 20px", paddingBottom: 96, maxWidth: 512, margin: "0 auto" }}>
+        <div style={{ height: 32, background: "var(--card-bg)", borderRadius: 12, marginBottom: 16, opacity: 0.5 }} />
+        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+          {[1, 2, 3].map((i) => <div key={i} style={{ flex: 1, height: 72, background: "var(--card-bg)", borderRadius: 16, opacity: 0.5 }} />)}
+        </div>
+        <div style={{ height: 100, background: "var(--card-bg)", borderRadius: 16, opacity: 0.5 }} />
       </div>
     );
   }
 
-  // Overdue helper — uses simulated time
-  function getOverdueMin(resaTime: string): number {
-    const now = getNow();
-    const [h, m] = resaTime.split(":").map(Number);
-    if (isNaN(h) || isNaN(m)) return 0;
-    const resTime = new Date(now);
-    resTime.setHours(h, m, 0);
-    const diff = Math.floor((now.getTime() - resTime.getTime()) / 60000);
-    return diff > 0 ? diff : 0;
-  }
-
-  const confirmedResas = reservations.filter((r) => r.status === "attendu");
-  const arrivedResas = reservations.filter((r) => r.status === "arrive");
-  const allDisplayResas = [...confirmedResas, ...arrivedResas];
-  const totalCovers = reservations.reduce((sum, r) => sum + r.covers, 0);
-
   return (
     <div style={{ padding: "0 20px", paddingTop: "env(safe-area-inset-top, 16px)", paddingBottom: 96, maxWidth: 512, margin: "0 auto" }}>
 
-      {/* ── Compact Header ──────────────────────────────────── */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "16px 0 20px",
-          fontSize: 14,
-          color: "var(--text-secondary)",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontWeight: 500, color: "var(--text-primary)" }}>
-            {profile?.name}
-          </span>
-          <span style={{ color: "var(--text-tertiary)" }}>&middot;</span>
-          <span>{dateLabelShort}</span>
-          <span className="pill" style={{ marginLeft: 2 }}>
-            16h&rarr;1h
-          </span>
+      {/* ── Header ──────────────────────────────────────────── */}
+      <div style={{ padding: "16px 0 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div>
+          <h1 style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-primary)", margin: 0 }}>
+            Salut {profile?.name?.split(" ")[0]}
+          </h1>
+          <p style={{ fontSize: 13, color: "var(--text-tertiary)", marginTop: 2 }}>{dateLabelShort}</p>
         </div>
-        <ThemeToggle />
       </div>
 
-      {/* ── Patron: Staff Progress ────────────────────────────── */}
+      {/* ── Messages (urgent, top of page) ──────────────────── */}
+      {activeMessages.length > 0 && (
+        <div style={{ marginBottom: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+          {activeMessages.map((msg) => (
+            <div key={msg.id} onClick={() => dismissMsg(msg.id)} style={{ cursor: "pointer" }}>
+              <MessageBanner content={msg.content} author={profiles[msg.created_by] || "Manager"} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Quick Stats Row ─────────────────────────────────── */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+        {/* Tasks progress */}
+        <div className="card-medium" style={{ flex: 1, padding: "14px 16px" }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+            <span style={{ fontSize: 24, fontWeight: 700, color: "var(--text-primary)" }}>{taskPct}%</span>
+          </div>
+          <div style={{ height: 4, background: "var(--secondary-bg)", borderRadius: 2, marginTop: 8, overflow: "hidden" }}>
+            <div style={{
+              height: "100%", borderRadius: 2, width: `${taskPct}%`,
+              background: taskPct === 100 ? "var(--terra-deep)" : "var(--gradient-primary)",
+              transition: "width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)",
+            }} />
+          </div>
+          <p style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 6 }}>{doneTasks}/{totalTasks} tâches</p>
+        </div>
+
+        {/* Reservations */}
+        <Link href="/reservations" className="card-medium" style={{ flex: 1, padding: "14px 16px", textDecoration: "none" }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+            <span style={{ fontSize: 24, fontWeight: 700, color: "var(--text-primary)" }}>{reservations.length}</span>
+            <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>résas</span>
+          </div>
+          <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4 }}>
+            {totalCovers} couverts{pendingResas > 0 && ` · ${pendingResas} en attente`}
+          </p>
+        </Link>
+
+        {/* Stock alerts */}
+        <div
+          className="card-medium"
+          style={{ padding: "14px 16px", minWidth: 72, cursor: "pointer" }}
+          onClick={() => setShowStockSignal(!showStockSignal)}
+        >
+          <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+            <span style={{ fontSize: 24, fontWeight: 700, color: stockAlerts.length > 0 ? "var(--warning)" : "var(--text-primary)" }}>
+              {stockAlerts.length}
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
+            <Bell size={11} style={{ color: stockAlerts.length > 0 ? "var(--warning)" : "var(--text-tertiary)" }} />
+            <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>alertes</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Stock signal (inline, not a separate page) ──────── */}
+      {showStockSignal && (
+        <div className="card-medium" style={{ padding: 14, marginBottom: 16 }}>
+          <div style={{ position: "relative", marginBottom: stockSearchResults.length > 0 ? 8 : 0 }}>
+            <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-tertiary)" }} />
+            <input
+              type="text"
+              placeholder="Quel produit manque ?"
+              value={stockSearch}
+              onChange={(e) => setStockSearch(e.target.value)}
+              autoFocus
+              style={{
+                width: "100%", borderRadius: 10, border: "1px solid var(--border-color)",
+                background: "var(--input-bg)", padding: "10px 14px 10px 36px", fontSize: 14,
+                color: "var(--text-primary)", outline: "none",
+              }}
+            />
+            <button onClick={() => { setShowStockSignal(false); setStockSearch(""); }} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+              <X size={14} style={{ color: "var(--text-tertiary)" }} />
+            </button>
+          </div>
+          {stockSearchResults.map((p) => {
+            const flagged = alertedProductIds.has(p.id);
+            return (
+              <button
+                key={p.id}
+                onClick={() => !flagged && sendStockAlert(p.id)}
+                disabled={flagged}
+                style={{
+                  width: "100%", textAlign: "left", border: "none", cursor: flagged ? "default" : "pointer",
+                  padding: "8px 12px", borderRadius: 8, background: "transparent",
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  opacity: flagged ? 0.4 : 1,
+                }}
+              >
+                <span style={{ fontSize: 14, color: "var(--text-primary)" }}>{p.name}</span>
+                {flagged
+                  ? <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Signalé</span>
+                  : <span style={{ fontSize: 12, fontWeight: 600, color: "var(--warning)" }}>Signaler</span>
+                }
+              </button>
+            );
+          })}
+          {/* Show active alerts */}
+          {stockAlerts.length > 0 && (
+            <div style={{ marginTop: 8, borderTop: "1px solid var(--border-color)", paddingTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+              {stockAlerts.map((a) => {
+                const prod = stockProducts.find((p) => p.id === a.product_id);
+                return (
+                  <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-secondary)" }}>
+                    <Bell size={11} style={{ color: "var(--warning)" }} />
+                    <span style={{ fontWeight: 500 }}>{prod?.name}</span>
+                    <span style={{ color: "var(--text-tertiary)" }}>— {profiles[a.created_by] || "Staff"}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Patron: Staff Progress ──────────────────────────── */}
       {profile?.role === "patron" && staffProfiles.length > 0 && (() => {
-        // Compute per-staff progress from raw tasks + completions
         const staffProgress = staffProfiles
           .map((s) => {
-            const assigned = rawTasks.filter(
-              (t) => !t.is_libre && t.assigned_to.includes(s.id)
-            );
+            const assigned = rawTasks.filter((t) => !t.is_libre && t.assigned_to.includes(s.id));
             if (assigned.length === 0) return null;
-            const completedSet = new Set(
-              rawCompletions
-                .filter((c) => c.user_id === s.id)
-                .map((c) => c.task_id)
-            );
+            const completedSet = new Set(rawCompletions.filter((c) => c.user_id === s.id).map((c) => c.task_id));
             const done = assigned.filter((t) => completedSet.has(t.id)).length;
             return { id: s.id, name: s.name, total: assigned.length, done };
           })
@@ -375,45 +339,25 @@ export default function TonightPage() {
         if (staffProgress.length === 0) return null;
 
         return (
-          <div style={{ marginBottom: 28 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-              <Users size={14} style={{ color: "var(--text-tertiary)" }} />
-              <span style={{
-                fontSize: 13, fontWeight: 500, textTransform: "uppercase",
-                letterSpacing: "0.08em", color: "var(--text-tertiary)",
-              }}>
-                Équipe
-              </span>
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+              <Users size={13} style={{ color: "var(--text-tertiary)" }} />
+              <span className="section-label">Équipe</span>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
               {staffProgress.map((s) => {
                 const pct = Math.round((s.done / s.total) * 100);
                 return (
-                  <div key={s.id} className="card-light" style={{ padding: "12px 16px" }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                      <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>
-                        {s.name}
-                      </span>
-                      <span style={{
-                        fontSize: 12, fontWeight: 500, color: "#8B5A40",
-                        background: "rgba(139,90,64,0.1)", padding: "3px 8px", borderRadius: 6,
-                      }}>
-                        {s.done}/{s.total}
-                      </span>
-                    </div>
-                    <div style={{
-                      height: 4, background: "var(--input-bg, #F7F6F2)",
-                      borderRadius: 2, overflow: "hidden",
-                    }}>
+                  <div key={s.id} className="card-light" style={{ padding: "10px 14px", minWidth: 120, flexShrink: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)", marginBottom: 6 }}>{s.name}</div>
+                    <div style={{ height: 4, background: "var(--secondary-bg)", borderRadius: 2, overflow: "hidden", marginBottom: 4 }}>
                       <div style={{
-                        height: "100%", borderRadius: 2,
-                        background: pct === 100
-                          ? "linear-gradient(90deg, #8B5A40, #6B3F2A)"
-                          : "linear-gradient(90deg, #C4785A, #8B5A40)",
-                        width: `${pct}%`,
+                        height: "100%", borderRadius: 2, width: `${pct}%`,
+                        background: pct === 100 ? "var(--terra-deep)" : "var(--gradient-primary)",
                         transition: "width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)",
                       }} />
                     </div>
+                    <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{s.done}/{s.total}</div>
                   </div>
                 );
               })}
@@ -422,307 +366,14 @@ export default function TonightPage() {
         );
       })()}
 
-      {/* ── Manager Messages (tap to dismiss) ──────────────── */}
-      {messages.filter((m) => !dismissedMsgIds.has(m.id)).length > 0 && (
-        <div className="stagger" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {messages
-            .filter((m) => !dismissedMsgIds.has(m.id))
-            .map((msg) => (
-              <div
-                key={msg.id}
-                onClick={() => dismissMsg(msg.id)}
-                style={{ cursor: "pointer", transition: "opacity 0.3s ease" }}
-              >
-                <MessageBanner content={msg.content} author={profiles[msg.created_by] || "Manager"} />
-              </div>
-            ))}
-          {dismissedMsgIds.size > 0 && dismissedMsgIds.size < messages.length && (
-            <button
-              onClick={() => resetDismissed()}
-              style={{ fontSize: 12, color: "var(--text-tertiary)", background: "none", border: "none", cursor: "pointer", padding: "4px 0" }}
-            >
-              Revoir les messages ({dismissedMsgIds.size} lu{dismissedMsgIds.size > 1 ? "s" : ""})
-            </button>
-          )}
-        </div>
-      )}
-      {messages.length > 0 && dismissedMsgIds.size === messages.length && (
-        <button
-          onClick={() => resetDismissed()}
-          style={{ fontSize: 12, color: "var(--text-tertiary)", background: "none", border: "none", cursor: "pointer", padding: "4px 0", marginBottom: 8 }}
-        >
-          {messages.length} message{messages.length > 1 ? "s" : ""} lu{messages.length > 1 ? "s" : ""} — tap pour revoir
-        </button>
-      )}
-
-      {/* Gap between sections */}
-      {messages.length > 0 && <div style={{ height: 28 }} />}
-
-      {/* ── Event Card ──────────────────────────────────────── */}
-      {event && (
-        <>
-          <div
-            className="card-medium"
-            style={{
-              background:
-                "linear-gradient(135deg, rgba(196,120,90,0.04) 0%, rgba(196,120,90,0.01) 100%)",
-              border: "1px solid rgba(196,120,90,0.1)",
-              padding: "14px 16px",
-            }}
-          >
-            <div
-              style={{
-                fontSize: 15,
-                fontWeight: 500,
-                color: "var(--text-primary)",
-              }}
-            >
-              {event.title}
-            </div>
-            {event.description && (
-              <div
-                style={{
-                  fontSize: 13,
-                  fontWeight: 400,
-                  color: "var(--text-secondary)",
-                  marginTop: 4,
-                }}
-              >
-                {event.description}
-              </div>
-            )}
-            {(event.start_time || event.end_time) && (
-              <div
-                style={{
-                  fontSize: 13,
-                  fontWeight: 400,
-                  color: "var(--text-secondary)",
-                  marginTop: 4,
-                }}
-              >
-                {formatTime(event.start_time)}
-                {event.end_time ? ` - ${formatTime(event.end_time)}` : ""}
-              </div>
-            )}
-          </div>
-          <div style={{ height: 28 }} />
-        </>
-      )}
-
-      {/* ── Reservations ────────────────────────────────────── */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 12,
-        }}
-      >
-        <span
-          style={{
-            fontSize: 13,
-            fontWeight: 500,
-            textTransform: "uppercase",
-            letterSpacing: "0.08em",
-            color: "var(--text-tertiary)",
-          }}
-        >
-          Réservations
-        </span>
-        <span
-          style={{
-            fontSize: 12,
-            fontWeight: 500,
-            color: "#8B5A40",
-            background: "rgba(139,90,64,0.1)",
-            padding: "4px 10px",
-            borderRadius: 8,
-            letterSpacing: 0,
-          }}
-        >
-          {reservations.length} résas &middot; {totalCovers} couverts
-        </span>
-      </div>
-
-      {allDisplayResas.length > 0 ? (
-        <div className="stagger" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {allDisplayResas.map((resa) => {
-            const isArrived = resa.status === "arrive";
-            const overdue = !isArrived ? getOverdueMin(resa.time) : 0;
-            const seatingIcon = SEATING_ICONS[resa.seating] || "";
-            const seatingLabel = SEATING_LABELS[resa.seating] || "";
-            return (
-              <div
-                key={resa.id}
-                className="card-medium"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "12px 14px",
-                  opacity: isArrived ? 0.5 : 1,
-                  transition: "opacity 0.4s ease",
-                  borderLeft: overdue >= 15 ? `3px solid ${overdue >= 30 ? "var(--danger)" : "var(--warning)"}` : undefined,
-                }}
-              >
-                {/* Time */}
-                <div
-                  style={{
-                    fontSize: 14,
-                    fontWeight: 600,
-                    color: "#8B5A40",
-                    minWidth: 42,
-                    flexShrink: 0,
-                  }}
-                >
-                  {formatTime(resa.time)}
-                </div>
-
-                {/* Details */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    style={{
-                      fontSize: 15,
-                      fontWeight: 500,
-                      color: "var(--text-primary)",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    {resa.name}
-                    <span
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 600,
-                        color: "#A85D3F",
-                        background: "rgba(196,120,90,0.08)",
-                        padding: "2px 7px",
-                        borderRadius: 6,
-                      }}
-                    >
-                      {resa.covers} pers.
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: "var(--text-secondary)",
-                      marginTop: 3,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <span>
-                      {seatingIcon} {seatingLabel}
-                    </span>
-                    {resa.notes && (
-                      <span
-                        style={{
-                          fontSize: 11,
-                          color: "var(--warning)",
-                          fontWeight: 500,
-                        }}
-                      >
-                        ⚠️ {resa.notes}
-                      </span>
-                    )}
-                    {overdue >= 15 && !isArrived && (
-                      <span
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: overdue >= 30 ? "var(--danger)" : "var(--warning)",
-                        }}
-                      >
-                        🔔 {overdue} min de retard
-                      </span>
-                    )}
-                    {isArrived && (
-                      <span
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: "#8B5A40",
-                          background: "rgba(139,90,64,0.1)",
-                          padding: "2px 8px",
-                          borderRadius: 6,
-                        }}
-                      >
-                        ✓ Arrivé
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Check button */}
-                <button
-                  onClick={() =>
-                    isArrived ? unmarkArrived(resa.id) : markArrived(resa.id)
-                  }
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: "50%",
-                    border: `2px solid #8B5A40`,
-                    background: isArrived ? "#8B5A40" : "transparent",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    flexShrink: 0,
-                    padding: 0,
-                    transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
-                  }}
-                  aria-label={isArrived ? "Annuler arrivée" : "Marquer arrivé"}
-                >
-                  <Check
-                    size={18}
-                    strokeWidth={2.5}
-                    style={{
-                      color: isArrived ? "#fff" : "rgba(139,90,64,0.5)",
-                      transition: "all 0.3s ease",
-                    }}
-                  />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div
-          className="card-medium"
-          style={{
-            padding: "16px",
-            textAlign: "center",
-            fontSize: 13,
-            color: "var(--text-secondary)",
-          }}
-        >
-          Aucune réservation
-        </div>
-      )}
-
-      {/* Gap */}
-      <div style={{ height: 28 }} />
-
-      {/* ── Moment Sections (Tasks) ─────────────────────────── */}
+      {/* ── Tasks by moment ─────────────────────────────────── */}
       {MOMENT_ORDER.map((moment, idx) => {
         const momentTasks = tasks.filter((t) => t.moment === moment);
-        // If no tasks for this moment, skip
         if (momentTasks.length === 0 && moment !== "fermeture") return null;
-
         return (
           <div key={moment}>
-            <MomentSection
-              name={MOMENT_LABELS[moment]}
-              tasks={momentTasks}
-              onToggleTask={handleToggleTask}
-            />
-            {idx < MOMENT_ORDER.length - 1 && <div style={{ height: 28 }} />}
+            <MomentSection name={MOMENT_LABELS[moment]} tasks={momentTasks} onToggleTask={handleToggleTask} />
+            {idx < MOMENT_ORDER.length - 1 && <div style={{ height: 20 }} />}
           </div>
         );
       })}
@@ -730,152 +381,21 @@ export default function TonightPage() {
       {/* ── Free Tasks ──────────────────────────────────────── */}
       {freeTasks.length > 0 && (
         <>
-          <div style={{ height: 28 }} />
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: 8,
-            }}
-          >
-            <span
-              style={{
-                fontSize: 13,
-                fontWeight: 500,
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                color: "var(--text-tertiary)",
-                opacity: 0.8,
-              }}
-            >
-              Tâches libres
-            </span>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ height: 20 }} />
+          <span className="section-label" style={{ display: "block", marginBottom: 8, opacity: 0.8 }}>Tâches libres</span>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {freeTasks.map((task) => (
               <TaskCard
-                key={task.id}
-                id={task.id}
-                title={task.title}
-                zone={task.zone}
-                zoneKey={task.zoneKey}
-                description={task.description}
-                completed={task.completed}
-                isLibre
-                onToggle={handleToggleTask}
+                key={task.id} id={task.id} title={task.title}
+                zone={task.zone} zoneKey={task.zoneKey}
+                description={task.description} completed={task.completed}
+                isLibre onToggle={handleToggleTask}
               />
             ))}
           </div>
         </>
       )}
 
-      {/* ── Stock Alerts + Signal ──────────────────────────── */}
-      <div style={{ height: 28 }} />
-      <div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-          <span className="section-label">Stock</span>
-          <button
-            onClick={() => setShowStockSignal(!showStockSignal)}
-            style={{
-              display: "flex", alignItems: "center", gap: 4,
-              padding: "5px 12px", borderRadius: 10, border: "none", cursor: "pointer",
-              background: showStockSignal ? "var(--gradient-primary)" : "rgba(212,160,74,0.1)",
-              color: showStockSignal ? "#fff" : "var(--warning)",
-              fontSize: 12, fontWeight: 600,
-              transition: "all 0.2s",
-            }}
-          >
-            <Bell size={12} /> Signaler
-          </button>
-        </div>
-
-        {/* Quick signal search */}
-        {showStockSignal && (
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ position: "relative", marginBottom: 8 }}>
-              <Search size={16} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-tertiary)" }} />
-              <input
-                type="text"
-                placeholder="Rechercher un produit..."
-                value={stockSearch}
-                onChange={(e) => setStockSearch(e.target.value)}
-                autoFocus
-                style={{
-                  width: "100%", borderRadius: 12, border: "1px solid var(--border-color)",
-                  background: "var(--input-bg)", padding: "10px 14px 10px 36px", fontSize: 14,
-                  color: "var(--text-primary)", outline: "none",
-                }}
-              />
-              {stockSearch && (
-                <button onClick={() => setStockSearch("")} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", padding: 4 }}>
-                  <X size={14} style={{ color: "var(--text-tertiary)" }} />
-                </button>
-              )}
-            </div>
-            {stockSearchResults.length > 0 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                {stockSearchResults.map((p) => {
-                  const flagged = alertedProductIds.has(p.id);
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => !flagged && sendStockAlert(p.id)}
-                      disabled={flagged}
-                      className="card-light"
-                      style={{
-                        width: "100%", textAlign: "left", border: "none", cursor: flagged ? "default" : "pointer",
-                        padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between",
-                        opacity: flagged ? 0.5 : 1,
-                      }}
-                    >
-                      <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>{p.name}</span>
-                      {flagged
-                        ? <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Déjà signalé</span>
-                        : <span style={{ fontSize: 12, fontWeight: 600, color: "var(--warning)" }}>Signaler</span>
-                      }
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Active alerts */}
-        {stockAlerts.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {stockAlerts.map((a) => {
-              const prod = stockProducts.find((p) => p.id === a.product_id);
-              return (
-                <div key={a.id} style={{
-                  display: "flex", alignItems: "center", gap: 8,
-                  padding: "8px 12px", borderRadius: 10,
-                  background: "rgba(212,160,74,0.08)",
-                  borderLeft: "3px solid var(--warning)",
-                }}>
-                  <Bell size={13} style={{ color: "var(--warning)", flexShrink: 0 }} />
-                  <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>
-                    {prod?.name || "Produit"}
-                  </span>
-                  <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-                    {profiles[a.created_by] || "Staff"}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {stockAlerts.length === 0 && !showStockSignal && (
-          <p style={{ fontSize: 12, color: "var(--text-tertiary)", textAlign: "center", padding: "8px 0" }}>
-            Rien à signaler
-          </p>
-        )}
-      </div>
-
-      {/* Extra bottom padding for nav clearance */}
       <div style={{ height: 20 }} />
     </div>
   );
