@@ -372,7 +372,7 @@ export default function AccueilPage() {
         if (momentTasks.length === 0 && moment !== "fermeture") return null;
         return (
           <div key={moment}>
-            <MomentSection name={MOMENT_LABELS[moment]} tasks={momentTasks} onToggleTask={handleToggleTask} />
+            <MomentSection name={MOMENT_LABELS[moment]} tasks={momentTasks} onToggleTask={handleToggleTask} defaultCollapsed={moment === "fermeture"} />
             {idx < MOMENT_ORDER.length - 1 && <div style={{ height: 20 }} />}
           </div>
         );

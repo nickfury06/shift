@@ -20,6 +20,7 @@ interface MomentSectionProps {
   tasks: TaskItem[];
   locked?: boolean;
   lockMessage?: string;
+  defaultCollapsed?: boolean;
   onToggleTask: (id: string, completed: boolean) => void;
 }
 
@@ -28,9 +29,11 @@ export default function MomentSection({
   tasks,
   locked = false,
   lockMessage,
+  defaultCollapsed = false,
   onToggleTask,
 }: MomentSectionProps) {
   const [showCompleted, setShowCompleted] = useState(false);
+  const [collapsed, setCollapsed] = useState(defaultCollapsed);
 
   const activeTasks = tasks.filter((t) => !t.completed);
   const completedTasks = tasks.filter((t) => t.completed);
@@ -96,25 +99,42 @@ export default function MomentSection({
   return (
     <div>
       {/* Header */}
-      <div
+      <button
+        onClick={() => setCollapsed((v) => !v)}
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          marginBottom: 8,
+          marginBottom: collapsed ? 0 : 8,
+          width: "100%",
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          padding: 0,
         }}
       >
-        <span
-          style={{
-            fontSize: 13,
-            fontWeight: 500,
-            textTransform: "uppercase",
-            letterSpacing: "0.08em",
-            color: "var(--text-tertiary)",
-          }}
-        >
-          {name}
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span
+            style={{
+              fontSize: 13,
+              fontWeight: 500,
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              color: "var(--text-tertiary)",
+            }}
+          >
+            {name}
+          </span>
+          <ChevronDown
+            size={14}
+            strokeWidth={1.5}
+            style={{
+              color: "var(--text-tertiary)",
+              transition: "transform 0.2s ease",
+              transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)",
+            }}
+          />
+        </div>
         <span
           style={{
             fontSize: 12,
@@ -129,7 +149,10 @@ export default function MomentSection({
         >
           {done}/{total}
         </span>
-      </div>
+      </button>
+
+      {/* Content (collapsible) */}
+      {!collapsed && (<>
 
       {/* Progress bar */}
       <div
@@ -221,6 +244,8 @@ export default function MomentSection({
           ))}
         </div>
       )}
+
+      </>)}
     </div>
   );
 }
