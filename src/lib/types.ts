@@ -237,6 +237,19 @@ export interface StockAlert {
 }
 
 
+// ── Rituals ───────────────────────────────────────────────
+export interface Ritual {
+  id: string;
+  day: Day;
+  time: string;
+  name: string;
+  description: string | null;
+  organizer: string | null;
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
 // ── Onboarding ─────────────────────────────────────────────
 export interface OnboardingDoc {
   id: string;

@@ -71,6 +71,7 @@ export default function Nav() {
     if (role === "patron") {
       return [
         { href: "/messages", label: "Messages", icon: <MessageCircle size={iconSize} strokeWidth={strokeWidth} /> },
+        { href: "/events", label: "Événements", icon: <Calendar size={iconSize} strokeWidth={strokeWidth} /> },
         { href: "/debrief", label: "Debriefs", icon: <PenLine size={iconSize} strokeWidth={strokeWidth} /> },
         { href: "/planning", label: "Planning", icon: <Calendar size={iconSize} strokeWidth={strokeWidth} /> },
         { href: "/tasks", label: "Tâches", icon: <ListChecks size={iconSize} strokeWidth={strokeWidth} /> },

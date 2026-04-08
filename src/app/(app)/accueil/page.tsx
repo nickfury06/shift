@@ -11,9 +11,9 @@ import type {
   TaskCompletion,
   ManagerMessage,
   Event,
+  Ritual,
   Reservation,
   Moment,
-  Day,
   Profile,
   StockAlert,
   StockProduct,
@@ -22,15 +22,6 @@ import MessageBanner from "@/components/MessageBanner";
 import MomentSection from "@/components/MomentSection";
 import Link from "next/link";
 import { Users, Bell, Search, X, ChevronDown } from "lucide-react";
-
-// ── Rituels hebdomadaires Le Hive ─────────────────────────
-const RITUELS: Partial<Record<Day, { time: string; name: string }[]>> = {
-  mardi: [{ time: "21h", name: "Le Village Maudit — Joelson" }],
-  mercredi: [{ time: "21h", name: "Le Hive Trials — Alexis & Alan" }],
-  jeudi: [{ time: "20h30", name: "Just Dance" }, { time: "22h", name: "Karaoké" }],
-  vendredi: [{ time: "22h30", name: "Beer Pong — Tournoi 2v2" }],
-  samedi: [{ time: "22h30", name: "Blindtest" }],
-};
 
 interface MergedTask {
   id: string;
@@ -75,6 +66,8 @@ export default function AccueilPage() {
   const [stockAlerts, setStockAlerts] = useState<StockAlert[]>([]);
   const [stockProducts, setStockProducts] = useState<StockProduct[]>([]);
   const [event, setEvent] = useState<Event | null>(null);
+  const [rituals, setRituals] = useState<Ritual[]>([]);
+  const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const [stockSearch, setStockSearch] = useState("");
   const [showStockSignal, setShowStockSignal] = useState(false);
   const [alertsExpanded, setAlertsExpanded] = useState(false);
@@ -87,7 +80,7 @@ export default function AccueilPage() {
   const fetchData = useCallback(async () => {
     if (!profile) return;
 
-    const [msgRes, resaRes, taskRes, oneOffRes, compRes, profRes, alertRes, prodRes, eventRes] =
+    const [msgRes, resaRes, taskRes, oneOffRes, compRes, profRes, alertRes, prodRes, eventRes, ritualRes] =
       await Promise.all([
         supabase.from("messages").select("*").eq("date", shiftDate).order("created_at", { ascending: false }),
         supabase.from("reservations").select("*").eq("date", shiftDate).order("time", { ascending: true }),
@@ -98,6 +91,7 @@ export default function AccueilPage() {
         supabase.from("stock_alerts").select("*").eq("acknowledged", false).order("created_at", { ascending: false }),
         supabase.from("stock_products").select("id, name, category").order("name"),
         supabase.from("events").select("*").eq("date", shiftDate).limit(1).maybeSingle(),
+        supabase.from("rituals").select("*").eq("day", shiftDay).eq("active", true).order("sort_order"),
       ]);
 
     setMessages((msgRes.data as ManagerMessage[]) || []);
@@ -110,6 +104,7 @@ export default function AccueilPage() {
     setStockAlerts((alertRes.data as StockAlert[]) || []);
     setStockProducts((prodRes.data as StockProduct[]) || []);
     setEvent((eventRes.data as Event) || null);
+    setRituals((ritualRes.data as Ritual[]) || []);
 
     const completions = (compRes.data as TaskCompletion[]) || [];
     setRawCompletions(completions);
@@ -217,29 +212,72 @@ export default function AccueilPage() {
       </div>
 
       {/* ── Ce soir (rituels + events) ─────────────────────── */}
-      {(() => {
-        const rituels = RITUELS[shiftDay] || [];
-        const items = [
-          ...rituels.map((r) => `${r.time} · ${r.name}`),
-          ...(event ? [`${event.start_time ? formatTime(event.start_time) + " · " : ""}${event.title}`] : []),
-        ];
-        if (items.length === 0) return null;
-        return (
-          <div style={{
-            marginBottom: 16, padding: "10px 14px", borderRadius: 12,
-            background: "linear-gradient(135deg, rgba(196,120,90,0.06) 0%, rgba(196,120,90,0.02) 100%)",
-            border: "1px solid rgba(196,120,90,0.1)",
-          }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              {items.map((item, i) => (
-                <div key={i} style={{ fontSize: 13, color: "var(--text-primary)", fontWeight: 500 }}>
-                  {item}
+      {(rituals.length > 0 || event) && (
+        <div style={{
+          marginBottom: 16, borderRadius: 14, overflow: "hidden",
+          background: "linear-gradient(135deg, rgba(196,120,90,0.06) 0%, rgba(196,120,90,0.02) 100%)",
+          border: "1px solid rgba(196,120,90,0.1)",
+        }}>
+          {rituals.map((r) => {
+            const isExpanded = expandedEventId === r.id;
+            return (
+              <div key={r.id}>
+                <button
+                  onClick={() => setExpandedEventId(isExpanded ? null : r.id)}
+                  style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: 10,
+                    padding: "10px 14px", background: "none", border: "none", cursor: "pointer",
+                    borderBottom: isExpanded ? "1px solid rgba(196,120,90,0.08)" : "none",
+                  }}
+                >
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--terra-medium)", minWidth: 42 }}>{r.time}</span>
+                  <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)", flex: 1, textAlign: "left" }}>{r.name}</span>
+                  <ChevronDown size={14} style={{
+                    color: "var(--text-tertiary)", transition: "transform 0.2s",
+                    transform: isExpanded ? "rotate(180deg)" : "rotate(0)",
+                  }} />
+                </button>
+                {isExpanded && (
+                  <div style={{ padding: "8px 14px 12px", display: "flex", flexDirection: "column", gap: 4 }}>
+                    {r.description && (
+                      <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>{r.description}</p>
+                    )}
+                    {r.organizer && (
+                      <p style={{ fontSize: 12, color: "var(--terra-medium)", fontWeight: 500 }}>Animé par {r.organizer}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {event && (
+            <div>
+              <button
+                onClick={() => setExpandedEventId(expandedEventId === `event-${event.id}` ? null : `event-${event.id}`)}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 10,
+                  padding: "10px 14px", background: "none", border: "none", cursor: "pointer",
+                  borderTop: rituals.length > 0 ? "1px solid rgba(196,120,90,0.08)" : "none",
+                }}
+              >
+                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--terra-medium)", minWidth: 42 }}>
+                  {event.start_time ? formatTime(event.start_time) : "🎉"}
+                </span>
+                <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)", flex: 1, textAlign: "left" }}>{event.title}</span>
+                <ChevronDown size={14} style={{
+                  color: "var(--text-tertiary)", transition: "transform 0.2s",
+                  transform: expandedEventId === `event-${event.id}` ? "rotate(180deg)" : "rotate(0)",
+                }} />
+              </button>
+              {expandedEventId === `event-${event.id}` && event.description && (
+                <div style={{ padding: "8px 14px 12px" }}>
+                  <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>{event.description}</p>
                 </div>
-              ))}
+              )}
             </div>
-          </div>
-        );
-      })()}
+          )}
+        </div>
+      )}
 
       {/* ── Infos du shift ──────────────────────────────────── */}
       {(activeMessages.length > 0 || (stockAlerts.length > 0 && !showStockSignal)) && (
