@@ -8,7 +8,8 @@ import type { Debrief, Affluence, ClosingState, Profile } from "@/lib/types";
 import { ChevronLeft, ChevronRight, ChevronDown, Send, AlertTriangle, MessageSquare, Lightbulb } from "lucide-react";
 
 // ── Quick-tap configs ──────────────────────────────────────
-const RATING_EMOJIS = ["", "😞", "😐", "🙂", "😊", "🤩"];
+const RATING_COLORS = ["", "#D44", "#D88", "#B89070", "#8B6A50", "#6B4A30"];
+const RATING_LABELS = ["", "Mauvais", "Moyen", "OK", "Bien", "Excellent"];
 
 const AFFLUENCE_OPTIONS: { value: Affluence; label: string; icon: string }[] = [
   { value: "calme", label: "Calme", icon: "🌙" },
@@ -120,7 +121,7 @@ export default function DebriefPage() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
           <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>{label}</span>
           {value > 0 && (
-            <span style={{ fontSize: 20 }}>{RATING_EMOJIS[value]}</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: RATING_COLORS[value] }}>{RATING_LABELS[value]}</span>
           )}
         </div>
         <div style={{ display: "flex", gap: 6 }}>
@@ -129,15 +130,17 @@ export default function DebriefPage() {
               key={n}
               onClick={() => onChange(n)}
               style={{
-                flex: 1, height: 44, borderRadius: 12, border: "none", cursor: "pointer",
-                fontSize: 20, display: "flex", alignItems: "center", justifyContent: "center",
-                background: value === n ? "var(--gradient-primary)" : "var(--secondary-bg)",
-                transform: value === n ? "scale(1.08)" : "scale(1)",
+                flex: 1, height: 48, borderRadius: 12, border: "none", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 18, fontWeight: 700,
+                background: value === n ? RATING_COLORS[n] : "var(--secondary-bg)",
+                color: value === n ? "#fff" : "var(--text-tertiary)",
+                transform: value === n ? "scale(1.06)" : "scale(1)",
+                opacity: value > 0 && value !== n ? 0.4 : 1,
                 transition: "all 0.15s",
-                filter: value > 0 && value !== n ? "grayscale(0.8) opacity(0.5)" : "none",
               }}
             >
-              {RATING_EMOJIS[n]}
+              {n}
             </button>
           ))}
         </div>
@@ -330,18 +333,16 @@ export default function DebriefPage() {
             </p>
 
             <div style={{ display: "flex", gap: 16, marginBottom: 12 }}>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 24 }}>{RATING_EMOJIS[myDebrief.global_rating]}</div>
-                <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginTop: 2 }}>Global</div>
-              </div>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 24 }}>{RATING_EMOJIS[myDebrief.service_rating]}</div>
-                <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginTop: 2 }}>Service</div>
-              </div>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 24 }}>{RATING_EMOJIS[myDebrief.team_rating]}</div>
-                <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginTop: 2 }}>Équipe</div>
-              </div>
+              {[
+                { label: "Global", val: myDebrief.global_rating },
+                { label: "Service", val: myDebrief.service_rating },
+                { label: "Équipe", val: myDebrief.team_rating },
+              ].map((r) => (
+                <div key={r.label} style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: RATING_COLORS[r.val] }}>{r.val}/5</div>
+                  <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginTop: 2 }}>{r.label}</div>
+                </div>
+              ))}
               <div style={{ textAlign: "center" }}>
                 <div style={{ fontSize: 20 }}>{affluenceLabel(myDebrief.affluence)?.icon}</div>
                 <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginTop: 2 }}>{affluenceLabel(myDebrief.affluence)?.label}</div>
@@ -415,18 +416,16 @@ export default function DebriefPage() {
             return (
               <div className="card-medium" style={{ padding: 16, marginBottom: 20 }}>
                 <div style={{ display: "flex", justifyContent: "space-around", textAlign: "center", marginBottom: 12 }}>
-                  <div>
-                    <div style={{ fontSize: 22, fontWeight: 600, color: ratingColor(Math.round(avgGlobal)) }}>{avgGlobal.toFixed(1)}</div>
-                    <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Global</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 22, fontWeight: 600, color: ratingColor(Math.round(avgService)) }}>{avgService.toFixed(1)}</div>
-                    <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Service</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 22, fontWeight: 600, color: ratingColor(Math.round(avgTeam)) }}>{avgTeam.toFixed(1)}</div>
-                    <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Équipe</div>
-                  </div>
+                  {[
+                    { label: "Global", val: avgGlobal },
+                    { label: "Service", val: avgService },
+                    { label: "Équipe", val: avgTeam },
+                  ].map((r) => (
+                    <div key={r.label}>
+                      <div style={{ fontSize: 24, fontWeight: 700, color: RATING_COLORS[Math.round(r.val)] }}>{r.val.toFixed(1)}</div>
+                      <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>{r.label}</div>
+                    </div>
+                  ))}
                   <div>
                     <div style={{ fontSize: 20 }}>{affluenceLabel(topAff)?.icon}</div>
                     <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>{affluenceLabel(topAff)?.label}</div>
@@ -463,7 +462,7 @@ export default function DebriefPage() {
                         <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>
                           {staffMap[d.user_id] || "Staff"}
                         </span>
-                        <span style={{ fontSize: 18 }}>{RATING_EMOJIS[d.global_rating]}</span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: RATING_COLORS[d.global_rating], background: "var(--secondary-bg)", padding: "2px 8px", borderRadius: 6 }}>{d.global_rating}/5</span>
                         {d.incidents && (
                           <AlertTriangle size={13} style={{ color: "var(--warning)" }} />
                         )}
@@ -490,7 +489,7 @@ export default function DebriefPage() {
                             { label: "Équipe", value: d.team_rating },
                           ].map((r) => (
                             <div key={r.label} style={{ textAlign: "center" }}>
-                              <div style={{ fontSize: 20 }}>{RATING_EMOJIS[r.value]}</div>
+                              <div style={{ fontSize: 18, fontWeight: 700, color: RATING_COLORS[r.value] }}>{r.value}/5</div>
                               <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>{r.label}</div>
                             </div>
                           ))}
