@@ -158,7 +158,7 @@ export default function DebriefPage() {
   const affluenceLabel = (a: Affluence) => AFFLUENCE_OPTIONS.find((o) => o.value === a);
   const closingLabel = (c: ClosingState) => CLOSING_OPTIONS.find((o) => o.value === c);
 
-  const loading = authLoading || dataLoading;
+  const loading = authLoading || (!!user && dataLoading);
 
   if (loading) {
     return (
@@ -166,6 +166,16 @@ export default function DebriefPage() {
         {[1, 2, 3].map((i) => (
           <div key={i} className="card-light" style={{ height: 56, borderRadius: 16, marginBottom: 10, opacity: 0.5 }} />
         ))}
+      </div>
+    );
+  }
+
+  if (!user || !profile) {
+    return (
+      <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+        <div className="card-medium" style={{ padding: 24, textAlign: "center" }}>
+          <p style={{ color: "var(--text-secondary)" }}>Connecte-toi pour accéder au debrief</p>
+        </div>
       </div>
     );
   }
