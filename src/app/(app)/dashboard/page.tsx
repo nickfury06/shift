@@ -5,11 +5,9 @@ import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
 import { getShiftDate, getShiftDay, formatDateFr } from "@/lib/shift-utils";
 import { MOMENT_LABELS, MOMENT_ORDER } from "@/lib/constants";
-import { scoreColor } from "@/lib/constants";
-import type { TaskCompletion, Task, Debrief, Profile } from "@/lib/types";
-import ThemeToggle from "@/components/ThemeToggle";
-import Link from "next/link";
-import { ListChecks, Users, ArrowRight, TrendingUp, CheckCircle2, Star } from "lucide-react";
+import type { TaskCompletion, Task, Debrief, Profile, Reservation, StockAlert } from "@/lib/types";
+
+const RATING_COLORS = ["", "#D44", "#D88", "#B89070", "#8B6A50", "#6B4A30"];
 
 export default function DashboardPage() {
   const { profile } = useAuth();
@@ -20,70 +18,50 @@ export default function DashboardPage() {
   const [completions, setCompletions] = useState<TaskCompletion[]>([]);
   const [debriefs, setDebriefs] = useState<Debrief[]>([]);
   const [staffProfiles, setStaffProfiles] = useState<Profile[]>([]);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [stockAlerts, setStockAlerts] = useState<StockAlert[]>([]);
 
   const shiftDate = getShiftDate();
   const shiftDay = getShiftDay();
 
   const fetchData = useCallback(async () => {
-    const [taskRes, compRes, debriefRes, staffRes] = await Promise.all([
+    const [taskRes, compRes, debriefRes, staffRes, resaRes, alertRes] = await Promise.all([
       supabase.from("tasks").select("*").order("priority", { ascending: true }),
       supabase.from("task_completions").select("*").eq("date", shiftDate),
-      supabase
-        .from("debriefs")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(10),
-      supabase
-        .from("profiles")
-        .select("*")
-        .in("role", ["staff", "responsable"]),
+      supabase.from("debriefs").select("*").eq("date", shiftDate).order("created_at"),
+      supabase.from("profiles").select("*").in("role", ["staff", "responsable"]),
+      supabase.from("reservations").select("*").eq("date", shiftDate),
+      supabase.from("stock_alerts").select("*").eq("acknowledged", false),
     ]);
 
-    // Filter tasks client-side for today's day (PG array filter doesn't work)
     const allTasks = (taskRes.data as Task[]) || [];
     setTasks(allTasks.filter((t) => t.days && t.days.includes(shiftDay)));
     setCompletions((compRes.data as TaskCompletion[]) || []);
     setDebriefs((debriefRes.data as Debrief[]) || []);
     setStaffProfiles((staffRes.data as Profile[]) || []);
+    setReservations((resaRes.data as Reservation[]) || []);
+    setStockAlerts((alertRes.data as StockAlert[]) || []);
     setLoading(false);
   }, [supabase, shiftDate, shiftDay]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Realtime: sync task completions + tasks changes
   useEffect(() => {
-    const channel = supabase
-      .channel("dashboard-realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "task_completions", filter: `date=eq.${shiftDate}` },
-        () => fetchData()
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "tasks" },
-        () => fetchData()
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "debriefs" },
-        () => fetchData()
-      )
+    const ch = supabase.channel("dashboard-rt")
+      .on("postgres_changes", { event: "*", schema: "public", table: "task_completions", filter: `date=eq.${shiftDate}` }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "debriefs" }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "reservations", filter: `date=eq.${shiftDate}` }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "stock_alerts" }, () => fetchData())
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(ch); };
   }, [supabase, shiftDate, fetchData]);
 
-  // Guard: patron only
   if (profile && profile.role !== "patron") {
     return (
-      <div style={{ padding: "0 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+      <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
         <div className="card-medium" style={{ padding: 24, textAlign: "center" }}>
-          <p style={{ color: "var(--text-secondary)" }}>Acces reserve au patron</p>
+          <p style={{ color: "var(--text-secondary)" }}>Accès réservé au patron</p>
         </div>
       </div>
     );
@@ -91,161 +69,143 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div style={{ padding: "0 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div className="card-light" style={{ height: 40, width: "75%", borderRadius: 8, opacity: 0.5 }} />
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="card-light" style={{ height: 96, borderRadius: 8, opacity: 0.5 }} />
-            ))}
-          </div>
-          <div className="card-light" style={{ height: 160, borderRadius: 8, opacity: 0.5 }} />
+      <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+          {[1, 2, 3, 4].map((i) => <div key={i} style={{ flex: 1, height: 72, background: "var(--card-bg)", borderRadius: 16, opacity: 0.5 }} />)}
         </div>
+        {[1, 2].map((i) => <div key={i} style={{ height: 80, background: "var(--card-bg)", borderRadius: 16, marginBottom: 10, opacity: 0.5 }} />)}
       </div>
     );
   }
 
-  const totalTasks = tasks.length;
   const completedIds = new Set(completions.map((c) => c.task_id));
+  const totalTasks = tasks.length;
   const doneTasks = tasks.filter((t) => completedIds.has(t.id)).length;
-  const completionRate = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
+  const taskPct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
+  const totalCovers = reservations.reduce((sum, r) => sum + r.covers, 0);
+  const arrivedResas = reservations.filter((r) => r.status === "arrive").length;
 
-  const avgScore =
-    debriefs.length > 0
-      ? (debriefs.reduce((s, d) => s + d.global_rating, 0) / debriefs.length).toFixed(1)
-      : "--";
+  const avgDebrief = debriefs.length > 0
+    ? (debriefs.reduce((s, d) => s + d.global_rating, 0) / debriefs.length)
+    : 0;
+
+  // Staff progress with assigned tasks
+  const staffProgress = staffProfiles.map((sp) => {
+    const assigned = tasks.filter((t) => !t.is_libre && t.assigned_to.includes(sp.id));
+    const done = assigned.filter((t) => completedIds.has(t.id)).length;
+    return { id: sp.id, name: sp.name, total: assigned.length, done };
+  }).filter((s) => s.total > 0);
 
   // Moment progress
   const momentProgress = MOMENT_ORDER.map((m) => {
-    const momentTasks = tasks.filter((t) => t.moment === m);
-    const done = momentTasks.filter((t) => completedIds.has(t.id)).length;
-    const total = momentTasks.length;
-    return { moment: m, done, total, pct: total > 0 ? Math.round((done / total) * 100) : 0 };
-  });
-
-  // Staff progress
-  const staffProgress = staffProfiles.map((sp) => {
-    const userCompletions = completions.filter((c) => c.user_id === sp.id).length;
-    return { name: sp.name, count: userCompletions };
+    const mt = tasks.filter((t) => t.moment === m);
+    const done = mt.filter((t) => completedIds.has(t.id)).length;
+    return { moment: m, done, total: mt.length, pct: mt.length > 0 ? Math.round((done / mt.length) * 100) : 0 };
   });
 
   return (
-    <div style={{ padding: "0 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
-      <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 16 }}>
-          <div>
-            <h1 style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-primary)" }}>Dashboard</h1>
-            <p style={{ fontSize: 14, color: "var(--text-secondary)" }}>{formatDateFr(shiftDate)}</p>
+    <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+
+      {/* Header */}
+      <div style={{ marginBottom: 20 }}>
+        <h1 style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-primary)" }}>Vue d&apos;ensemble</h1>
+        <p style={{ fontSize: 13, color: "var(--text-tertiary)", marginTop: 2 }}>{formatDateFr(shiftDate)}</p>
+      </div>
+
+      {/* ── KPIs ─────────────────────────────────────────── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 20 }}>
+        <div className="card-medium" style={{ padding: "16px" }}>
+          <div style={{ fontSize: 28, fontWeight: 700, color: "var(--text-primary)" }}>{taskPct}%</div>
+          <div style={{ height: 4, background: "var(--secondary-bg)", borderRadius: 2, marginTop: 8, overflow: "hidden" }}>
+            <div style={{ height: "100%", borderRadius: 2, width: `${taskPct}%`, background: taskPct === 100 ? "var(--terra-deep)" : "var(--gradient-primary)", transition: "width 0.6s" }} />
           </div>
-          <ThemeToggle />
+          <p style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 6 }}>{doneTasks}/{totalTasks} tâches</p>
         </div>
 
-        {/* 3 stat cards */}
-        <div>
-          <p className="section-label" style={{ marginBottom: 8 }}>Statistiques</p>
-          <div className="stagger" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-            <div className="card-medium" style={{ padding: 16, textAlign: "center" }}>
-              <CheckCircle2 size={20} style={{ margin: "0 auto 8px", color: "var(--terra-deep)" }} />
-              <p style={{ fontSize: 24, fontWeight: 600, color: "var(--text-primary)" }}>{completionRate}%</p>
-              <p style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Completion</p>
-            </div>
-            <div className="card-medium" style={{ padding: 16, textAlign: "center" }}>
-              <TrendingUp size={20} style={{ margin: "0 auto 8px", color: "var(--terra-deep)" }} />
-              <p style={{ fontSize: 24, fontWeight: 600, color: "var(--text-primary)" }}>{doneTasks}/{totalTasks}</p>
-              <p style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Taches</p>
-            </div>
-            <div className="card-medium" style={{ padding: 16, textAlign: "center" }}>
-              <Star size={20} style={{ margin: "0 auto 8px", color: "var(--terra-deep)" }} />
-              <p style={{ fontSize: 24, fontWeight: 600, color: typeof avgScore === "string" && avgScore !== "--" ? scoreColor(parseFloat(avgScore)) : "var(--text-primary)" }}>
-                {avgScore}
-              </p>
-              <p style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Score moyen</p>
-            </div>
-          </div>
+        <div className="card-medium" style={{ padding: "16px" }}>
+          <div style={{ fontSize: 28, fontWeight: 700, color: "var(--text-primary)" }}>{reservations.length}</div>
+          <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4 }}>
+            {totalCovers} couverts · {arrivedResas} arrivés
+          </p>
+          <p style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>Réservations</p>
         </div>
 
-        {/* Moment progress */}
-        <div>
-          <p className="section-label" style={{ marginBottom: 8 }}>Progression par moment</p>
-          <div className="stagger" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {momentProgress.map((mp) => (
-              <div key={mp.moment} className="card-light" style={{ padding: 16 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                  <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>{MOMENT_LABELS[mp.moment]}</span>
-                  <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{mp.done}/{mp.total}</span>
-                </div>
-                <div style={{ height: 6, width: "100%", overflow: "hidden", borderRadius: 999, background: "var(--secondary-bg)" }}>
-                  <div
-                    style={{
-                      height: "100%",
-                      borderRadius: 999,
-                      transition: "all 500ms",
-                      width: `${mp.pct}%`,
-                      background: "var(--gradient-primary)",
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
+        <div className="card-medium" style={{ padding: "16px" }}>
+          <div style={{ fontSize: 28, fontWeight: 700, color: avgDebrief > 0 ? RATING_COLORS[Math.round(avgDebrief)] : "var(--text-tertiary)" }}>
+            {avgDebrief > 0 ? avgDebrief.toFixed(1) : "—"}
           </div>
+          <p style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 4 }}>
+            {debriefs.length > 0 ? `${debriefs.length} debrief${debriefs.length > 1 ? "s" : ""}` : "Pas encore de debrief"}
+          </p>
         </div>
 
-        {/* Staff progress */}
-        {staffProgress.length > 0 && (
-          <div>
-            <p className="section-label" style={{ marginBottom: 8 }}>Équipe</p>
-            <div className="stagger" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {staffProgress.map((sp) => (
-                <div key={sp.name} className="card-light" style={{ padding: 16, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>{sp.name}</span>
-                  <span className="pill-count">{sp.count} tache{sp.count !== 1 ? "s" : ""}</span>
-                </div>
-              ))}
-            </div>
+        <div className="card-medium" style={{ padding: "16px" }}>
+          <div style={{ fontSize: 28, fontWeight: 700, color: stockAlerts.length > 0 ? "var(--warning)" : "var(--text-primary)" }}>
+            {stockAlerts.length}
           </div>
-        )}
-
-        {/* Recent debriefs */}
-        {debriefs.length > 0 && (
-          <div>
-            <p className="section-label" style={{ marginBottom: 8 }}>Derniers debriefs</p>
-            <div className="stagger" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {debriefs.slice(0, 5).map((d) => (
-                <div key={d.id} className="card-light" style={{ padding: 16, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>
-                      {staffProfiles.find((s) => s.id === d.user_id)?.name || "Staff"}
-                    </span>
-                    {d.suggestions && (
-                      <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.suggestions}</p>
-                    )}
-                  </div>
-                  <span
-                    style={{ fontSize: 18, fontWeight: 600, marginLeft: 16, color: scoreColor(d.global_rating) }}
-                  >
-                    {d.global_rating}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Quick links */}
-        <div className="stagger" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          <Link href="/tasks" className="card-medium" style={{ padding: 16, display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
-            <ListChecks size={18} style={{ color: "var(--terra-deep)" }} />
-            <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>Gerer les taches</span>
-            <ArrowRight size={14} style={{ marginLeft: "auto", color: "var(--text-tertiary)" }} />
-          </Link>
-          <Link href="/staff" className="card-medium" style={{ padding: 16, display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
-            <Users size={18} style={{ color: "var(--terra-deep)" }} />
-            <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>Equipe</span>
-            <ArrowRight size={14} style={{ marginLeft: "auto", color: "var(--text-tertiary)" }} />
-          </Link>
+          <p style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 4 }}>
+            Alertes stock
+          </p>
         </div>
       </div>
+
+      {/* ── Progression par moment ────────────────────────── */}
+      <div style={{ marginBottom: 20 }}>
+        <p className="section-label" style={{ marginBottom: 10 }}>Progression</p>
+        <div style={{ display: "flex", gap: 8 }}>
+          {momentProgress.map((mp) => (
+            <div key={mp.moment} className="card-light" style={{ flex: 1, padding: "12px", textAlign: "center" }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: mp.pct === 100 ? "var(--terra-deep)" : "var(--text-primary)" }}>{mp.pct}%</div>
+              <div style={{ height: 3, background: "var(--secondary-bg)", borderRadius: 2, margin: "6px 0", overflow: "hidden" }}>
+                <div style={{ height: "100%", borderRadius: 2, width: `${mp.pct}%`, background: "var(--gradient-primary)", transition: "width 0.6s" }} />
+              </div>
+              <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>{MOMENT_LABELS[mp.moment]}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Équipe ───────────────────────────────────────── */}
+      {staffProgress.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <p className="section-label" style={{ marginBottom: 10 }}>Équipe</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {staffProgress.map((sp) => {
+              const pct = sp.total > 0 ? Math.round((sp.done / sp.total) * 100) : 0;
+              return (
+                <div key={sp.id} className="card-light" style={{ padding: "10px 14px", display: "flex", alignItems: "center", gap: 12 }}>
+                  <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)", flex: 1 }}>{sp.name}</span>
+                  <div style={{ width: 60, height: 4, background: "var(--secondary-bg)", borderRadius: 2, overflow: "hidden" }}>
+                    <div style={{ height: "100%", borderRadius: 2, width: `${pct}%`, background: pct === 100 ? "var(--terra-deep)" : "var(--gradient-primary)", transition: "width 0.6s" }} />
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", minWidth: 36, textAlign: "right" }}>{sp.done}/{sp.total}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Debriefs du soir ──────────────────────────────── */}
+      {debriefs.length > 0 && (
+        <div>
+          <p className="section-label" style={{ marginBottom: 10 }}>Debriefs</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {debriefs.map((d) => {
+              const name = staffProfiles.find((s) => s.id === d.user_id)?.name || "Staff";
+              return (
+                <div key={d.id} className="card-light" style={{ padding: "10px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)", flex: 1 }}>{name}</span>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: RATING_COLORS[d.global_rating] }}>{d.global_rating}/5</span>
+                  {d.incidents && <span style={{ fontSize: 11, color: "var(--warning)" }}>⚠️</span>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div style={{ height: 20 }} />
     </div>
   );
 }

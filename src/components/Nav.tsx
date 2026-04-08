@@ -17,6 +17,7 @@ import {
   Users,
   ListChecks,
   LogOut,
+  Shield,
 } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useAuth } from "@/components/AuthProvider";
@@ -59,30 +60,15 @@ export default function Nav() {
     }
     // patron main
     return [
-      { href: "/dashboard", label: "Board", icon: <LayoutDashboard size={iconSize} strokeWidth={strokeWidth} /> },
+      { href: "/dashboard", label: "Vue", icon: <LayoutDashboard size={iconSize} strokeWidth={strokeWidth} /> },
       { href: "/accueil", label: "Accueil", icon: <Home size={iconSize} strokeWidth={strokeWidth} /> },
       { href: "/reservations", label: "Résas", icon: <BookOpen size={iconSize} strokeWidth={strokeWidth} /> },
-      { href: "/stocks", label: "Stocks", icon: <Package size={iconSize} strokeWidth={strokeWidth} /> },
+      { href: "/admin", label: "Admin", icon: <Shield size={iconSize} strokeWidth={strokeWidth} /> },
     ];
   }
 
-  // ── "More" menu items (role-based) ─────────────────────────
-  function getMoreItems(): NavItem[] {
-    if (role === "patron") {
-      return [
-        { href: "/messages", label: "Messages", icon: <MessageCircle size={iconSize} strokeWidth={strokeWidth} /> },
-        { href: "/events", label: "Événements", icon: <Calendar size={iconSize} strokeWidth={strokeWidth} /> },
-        { href: "/debrief", label: "Debriefs", icon: <PenLine size={iconSize} strokeWidth={strokeWidth} /> },
-        { href: "/planning", label: "Planning", icon: <Calendar size={iconSize} strokeWidth={strokeWidth} /> },
-        { href: "/tasks", label: "Tâches", icon: <ListChecks size={iconSize} strokeWidth={strokeWidth} /> },
-        { href: "/staff", label: "Équipe", icon: <Users size={iconSize} strokeWidth={strokeWidth} /> },
-        { href: "/settings", label: "Réglages", icon: <ClipboardList size={iconSize} strokeWidth={strokeWidth} /> },
-      ];
-    }
-    // Staff & responsable — fewer items
-    return [];
-  }
-  const moreItems = getMoreItems();
+  // ── "More" menu — all roles just get theme + logout ────────
+  const moreItems: NavItem[] = [];
 
   const mainItems = getMainItems();
   const isActive = (href: string) => pathname === href;
