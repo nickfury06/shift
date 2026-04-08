@@ -392,11 +392,11 @@ export default function DebriefPage() {
       )}
 
       {/* ════════════════════════════════════════════════════ */}
-      {/* PATRON/RESPONSABLE: team debriefs                   */}
+      {/* PATRON/RESPONSABLE: team debriefs (after own submit)*/}
       {/* ════════════════════════════════════════════════════ */}
-      {isPatron && submitted && <div style={{ height: 24 }} />}
-      {isPatron && (
-        <div style={{ marginTop: 8 }}>
+      {isPatron && submitted && (
+        <div style={{ marginTop: 24 }}>
+          <p className="section-label" style={{ marginBottom: 12 }}>Debriefs de l&apos;équipe</p>
           {/* Date nav */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
             <button onClick={() => setDateOffset((o) => o - 1)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
