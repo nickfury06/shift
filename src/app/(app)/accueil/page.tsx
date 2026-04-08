@@ -19,7 +19,7 @@ import type {
 import MessageBanner from "@/components/MessageBanner";
 import MomentSection from "@/components/MomentSection";
 import Link from "next/link";
-import { Users, Bell, Search, X, ArrowRight } from "lucide-react";
+import { Users, Bell, Search, X, ChevronDown } from "lucide-react";
 
 interface MergedTask {
   id: string;
@@ -65,6 +65,7 @@ export default function AccueilPage() {
   const [stockProducts, setStockProducts] = useState<StockProduct[]>([]);
   const [stockSearch, setStockSearch] = useState("");
   const [showStockSignal, setShowStockSignal] = useState(false);
+  const [alertsExpanded, setAlertsExpanded] = useState(false);
 
   const shiftDate = getShiftDate();
   const shiftDay = getShiftDay();
@@ -230,34 +231,55 @@ export default function AccueilPage() {
               );
             })
           )}
-          {/* 3+ alerts → unified card */}
+          {/* 3+ alerts → unified collapsible card */}
           {!showStockSignal && stockAlerts.length >= 3 && (
-            <div
-              onClick={() => setShowStockSignal(true)}
-              style={{
-                display: "flex", alignItems: "center", gap: 12,
-                padding: "12px 16px", borderRadius: 14, cursor: "pointer",
-                background: "rgba(212,160,74,0.08)",
-                border: "1px solid rgba(212,160,74,0.15)",
-              }}
-            >
-              <div style={{
-                width: 32, height: 32, borderRadius: 8,
-                background: "rgba(212,160,74,0.15)",
-                display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-              }}>
-                <Bell size={16} style={{ color: "var(--warning)" }} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
-                  {stockAlerts.length} produits manquants
+            <div style={{ borderRadius: 14, overflow: "hidden", background: "rgba(212,160,74,0.06)", border: "1px solid rgba(212,160,74,0.15)" }}>
+              <button
+                onClick={() => setAlertsExpanded(!alertsExpanded)}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 12,
+                  padding: "12px 16px", cursor: "pointer",
+                  background: "none", border: "none",
+                }}
+              >
+                <div style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  background: "rgba(212,160,74,0.15)",
+                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                }}>
+                  <Bell size={16} style={{ color: "var(--warning)" }} />
                 </div>
-                <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 1 }}>
-                  {stockAlerts.slice(0, 3).map((a) => stockProducts.find((p) => p.id === a.product_id)?.name).filter(Boolean).join(", ")}
-                  {stockAlerts.length > 3 && "..."}
+                <div style={{ flex: 1, textAlign: "left" }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
+                    {stockAlerts.length} produits manquants
+                  </div>
+                  {!alertsExpanded && (
+                    <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 1 }}>
+                      {stockAlerts.slice(0, 3).map((a) => stockProducts.find((p) => p.id === a.product_id)?.name).filter(Boolean).join(", ")}
+                      {stockAlerts.length > 3 && "..."}
+                    </div>
+                  )}
                 </div>
-              </div>
-              <ArrowRight size={16} style={{ color: "var(--text-tertiary)" }} />
+                <ChevronDown size={16} style={{
+                  color: "var(--text-tertiary)", transition: "transform 0.2s",
+                  transform: alertsExpanded ? "rotate(180deg)" : "rotate(0)",
+                }} />
+              </button>
+              {alertsExpanded && (
+                <div style={{ padding: "0 16px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
+                  {stockAlerts.map((a) => {
+                    const prod = stockProducts.find((p) => p.id === a.product_id);
+                    return (
+                      <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0" }}>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{prod?.name}</span>
+                        <span style={{ fontSize: 11, color: "var(--text-tertiary)", marginLeft: "auto" }}>
+                          {profiles[a.created_by] || "Staff"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -290,23 +312,6 @@ export default function AccueilPage() {
             {totalCovers} couverts{pendingResas > 0 && ` · ${pendingResas} en attente`}
           </p>
         </Link>
-
-        {/* Stock alerts */}
-        <div
-          className="card-medium"
-          style={{ padding: "14px 16px", minWidth: 72, cursor: "pointer" }}
-          onClick={() => setShowStockSignal(!showStockSignal)}
-        >
-          <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-            <span style={{ fontSize: 24, fontWeight: 700, color: stockAlerts.length > 0 ? "var(--warning)" : "var(--text-primary)" }}>
-              {stockAlerts.length}
-            </span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
-            <Bell size={11} style={{ color: stockAlerts.length > 0 ? "var(--warning)" : "var(--text-tertiary)" }} />
-            <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>alertes</span>
-          </div>
-        </div>
       </div>
 
       {/* ── Stock signal panel ──────────────────────────────── */}
