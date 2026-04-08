@@ -57,9 +57,14 @@ export default function DebriefPage() {
   })();
 
   const fetchData = useCallback(async () => {
-    if (!user) return;
+    if (!user || !profile) {
+      setLoading(false);
+      return;
+    }
 
-    if (isPatron) {
+    const isP = profile.role === "patron" || profile.role === "responsable";
+
+    if (isP) {
       const [{ data: debriefs }, { data: profiles }] = await Promise.all([
         supabase.from("debriefs").select("*").eq("date", viewDate).order("created_at"),
         supabase.from("profiles").select("id, name").order("name"),
@@ -80,7 +85,7 @@ export default function DebriefPage() {
       setSubmitted(true);
     }
     setLoading(false);
-  }, [user, supabase, shiftDate, viewDate, isPatron]);
+  }, [user, profile, supabase, shiftDate, viewDate]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
