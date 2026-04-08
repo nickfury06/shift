@@ -206,14 +206,33 @@ export default function AccueilPage() {
         </div>
       </div>
 
-      {/* ── Messages (urgent, top of page) ──────────────────── */}
-      {activeMessages.length > 0 && (
+      {/* ── Infos du shift ──────────────────────────────────── */}
+      {(activeMessages.length > 0 || (stockAlerts.length > 0 && !showStockSignal)) && (
         <div style={{ marginBottom: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+          {/* Messages */}
           {activeMessages.map((msg) => (
             <div key={msg.id} onClick={() => dismissMsg(msg.id)} style={{ cursor: "pointer" }}>
               <MessageBanner content={msg.content} author={profiles[msg.created_by] || "Manager"} />
             </div>
           ))}
+          {/* Stock alerts (shown here when panel is closed) */}
+          {!showStockSignal && stockAlerts.map((a) => {
+            const prod = stockProducts.find((p) => p.id === a.product_id);
+            return (
+              <div key={a.id} style={{
+                display: "flex", alignItems: "center", gap: 10,
+                padding: "10px 14px", borderRadius: 14,
+                background: "rgba(212,160,74,0.06)",
+                border: "1px solid rgba(212,160,74,0.15)",
+              }}>
+                <Bell size={15} style={{ color: "var(--warning)", flexShrink: 0 }} />
+                <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{prod?.name}</span>
+                <span style={{ fontSize: 11, color: "var(--text-tertiary)", marginLeft: "auto" }}>
+                  {profiles[a.created_by] || "Staff"}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -263,59 +282,85 @@ export default function AccueilPage() {
         </div>
       </div>
 
-      {/* ── Stock signal (inline, not a separate page) ──────── */}
+      {/* ── Stock signal panel ──────────────────────────────── */}
       {showStockSignal && (
-        <div className="card-medium" style={{ padding: 14, marginBottom: 16 }}>
-          <div style={{ position: "relative", marginBottom: stockSearchResults.length > 0 ? 8 : 0 }}>
-            <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-tertiary)" }} />
-            <input
-              type="text"
-              placeholder="Quel produit manque ?"
-              value={stockSearch}
-              onChange={(e) => setStockSearch(e.target.value)}
-              autoFocus
-              style={{
-                width: "100%", borderRadius: 10, border: "1px solid var(--border-color)",
-                background: "var(--input-bg)", padding: "10px 14px 10px 36px", fontSize: 14,
-                color: "var(--text-primary)", outline: "none",
-              }}
-            />
-            <button onClick={() => { setShowStockSignal(false); setStockSearch(""); }} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", padding: 4 }}>
-              <X size={14} style={{ color: "var(--text-tertiary)" }} />
-            </button>
-          </div>
-          {stockSearchResults.map((p) => {
-            const flagged = alertedProductIds.has(p.id);
-            return (
-              <button
-                key={p.id}
-                onClick={() => !flagged && sendStockAlert(p.id)}
-                disabled={flagged}
+        <div style={{ marginBottom: 16 }}>
+          {/* Search */}
+          <div className="card-medium" style={{ padding: 14, marginBottom: stockAlerts.length > 0 ? 10 : 0 }}>
+            <div style={{ position: "relative", marginBottom: stockSearchResults.length > 0 ? 10 : 0 }}>
+              <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-tertiary)" }} />
+              <input
+                type="text"
+                placeholder="Quel produit manque ?"
+                value={stockSearch}
+                onChange={(e) => setStockSearch(e.target.value)}
+                autoFocus
                 style={{
-                  width: "100%", textAlign: "left", border: "none", cursor: flagged ? "default" : "pointer",
-                  padding: "8px 12px", borderRadius: 8, background: "transparent",
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  opacity: flagged ? 0.4 : 1,
+                  width: "100%", borderRadius: 10, border: "1px solid var(--border-color)",
+                  background: "var(--input-bg)", padding: "10px 14px 10px 36px", fontSize: 14,
+                  color: "var(--text-primary)", outline: "none",
                 }}
-              >
-                <span style={{ fontSize: 14, color: "var(--text-primary)" }}>{p.name}</span>
-                {flagged
-                  ? <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Signalé</span>
-                  : <span style={{ fontSize: 12, fontWeight: 600, color: "var(--warning)" }}>Signaler</span>
-                }
+              />
+              <button onClick={() => { setShowStockSignal(false); setStockSearch(""); }} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+                <X size={14} style={{ color: "var(--text-tertiary)" }} />
               </button>
-            );
-          })}
-          {/* Show active alerts */}
+            </div>
+            {stockSearchResults.map((p) => {
+              const flagged = alertedProductIds.has(p.id);
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => !flagged && sendStockAlert(p.id)}
+                  disabled={flagged}
+                  style={{
+                    width: "100%", textAlign: "left", border: "none", cursor: flagged ? "default" : "pointer",
+                    padding: "10px 12px", borderRadius: 10, marginBottom: 4,
+                    background: flagged ? "transparent" : "rgba(212,160,74,0.06)",
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    opacity: flagged ? 0.35 : 1,
+                  }}
+                >
+                  <span style={{ fontSize: 15, fontWeight: 500, color: "var(--text-primary)" }}>{p.name}</span>
+                  {flagged
+                    ? <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Déjà signalé</span>
+                    : <span style={{
+                        fontSize: 12, fontWeight: 600, color: "#fff", background: "var(--warning)",
+                        padding: "4px 12px", borderRadius: 8,
+                      }}>Signaler</span>
+                  }
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Active alerts — graphic cards */}
           {stockAlerts.length > 0 && (
-            <div style={{ marginTop: 8, borderTop: "1px solid var(--border-color)", paddingTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {stockAlerts.map((a) => {
                 const prod = stockProducts.find((p) => p.id === a.product_id);
+                const time = new Date(a.created_at);
+                const timeStr = `${time.getHours()}h${String(time.getMinutes()).padStart(2, "0")}`;
                 return (
-                  <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-secondary)" }}>
-                    <Bell size={11} style={{ color: "var(--warning)" }} />
-                    <span style={{ fontWeight: 500 }}>{prod?.name}</span>
-                    <span style={{ color: "var(--text-tertiary)" }}>— {profiles[a.created_by] || "Staff"}</span>
+                  <div key={a.id} className="card-medium" style={{
+                    padding: "14px 16px",
+                    borderLeft: "4px solid var(--warning)",
+                    display: "flex", alignItems: "center", gap: 12,
+                  }}>
+                    <div style={{
+                      width: 36, height: 36, borderRadius: 10,
+                      background: "rgba(212,160,74,0.12)",
+                      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                    }}>
+                      <Bell size={18} style={{ color: "var(--warning)" }} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text-primary)" }}>
+                        {prod?.name || "Produit"}
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>
+                        {profiles[a.created_by] || "Staff"} · {timeStr}
+                      </div>
+                    </div>
                   </div>
                 );
               })}
@@ -378,11 +423,14 @@ export default function AccueilPage() {
         );
       })}
 
-      {/* ── Free Tasks ──────────────────────────────────────── */}
+      {/* ── Si c'est calme (free tasks = reminders during service) */}
       {freeTasks.length > 0 && (
         <>
           <div style={{ height: 20 }} />
-          <span className="section-label" style={{ display: "block", marginBottom: 8, opacity: 0.8 }}>Tâches libres</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+            <span style={{ fontSize: 16 }}>🌙</span>
+            <span className="section-label" style={{ opacity: 0.8 }}>Si c&apos;est calme</span>
+          </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {freeTasks.map((task) => (
               <TaskCard
