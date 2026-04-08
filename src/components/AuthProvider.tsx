@@ -43,20 +43,8 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
 
     const supabase = supabaseRef.current;
 
-    async function init() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (session?.user) {
-        setUser(session.user);
-        await fetchProfile(session.user.id);
-      }
-      setLoading(false);
-    }
-
     async function fetchProfile(userId: string) {
-      const { data } = await supabaseRef.current
+      const { data } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", userId)
@@ -65,8 +53,8 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       if (data) setProfile(data as Profile);
     }
 
-    init();
-
+    // Use onAuthStateChange as the single source of truth
+    // This avoids the lock conflict with getSession()
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
