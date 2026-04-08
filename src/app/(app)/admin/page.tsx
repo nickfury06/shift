@@ -3,38 +3,59 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
-import { getShiftDate, formatDateFr } from "@/lib/shift-utils";
-import type { AvailabilityRequest, Reservation, Profile } from "@/lib/types";
+import { getShiftDate, formatDateFr, formatTime } from "@/lib/shift-utils";
+import type { AvailabilityRequest, Reservation, Profile, Debrief, StockAlert, StockProduct, Schedule } from "@/lib/types";
 import Link from "next/link";
 import {
   ThumbsUp, ThumbsDown, Calendar, MessageCircle, ListChecks,
-  Users, Package, Settings, ArrowRight, Repeat, UserX, Heart,
+  Users, Settings, ArrowRight, Repeat, UserX, Heart,
+  Send, Bell, Check, ChevronDown, AlertTriangle, Lightbulb, Clock,
 } from "lucide-react";
 
+const RATING_COLORS = ["", "#D44", "#D88", "#B89070", "#8B6A50", "#6B4A30"];
+
 export default function AdminPage() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const supabase = useRef(createClient()).current;
 
   const [loading, setLoading] = useState(true);
   const [absenceRequests, setAbsenceRequests] = useState<AvailabilityRequest[]>([]);
   const [fnfReservations, setFnfReservations] = useState<Reservation[]>([]);
   const [staffMap, setStaffMap] = useState<Record<string, string>>({});
+  const [debriefs, setDebriefs] = useState<Debrief[]>([]);
+  const [stockAlerts, setStockAlerts] = useState<StockAlert[]>([]);
+  const [stockProducts, setStockProducts] = useState<StockProduct[]>([]);
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [expandedDebrief, setExpandedDebrief] = useState<string | null>(null);
+
+  // Inline message compose
+  const [msgContent, setMsgContent] = useState("");
+  const [msgSending, setMsgSending] = useState(false);
+  const [msgSent, setMsgSent] = useState(false);
 
   const shiftDate = getShiftDate();
 
   const fetchData = useCallback(async () => {
-    const [absRes, resaRes, profRes] = await Promise.all([
+    const [absRes, resaRes, profRes, debRes, alertRes, prodRes, schedRes] = await Promise.all([
       supabase.from("availability_requests").select("*").eq("status", "pending").order("date"),
       supabase.from("reservations").select("*").eq("fnf_status", "pending").order("date"),
-      supabase.from("profiles").select("id, name"),
+      supabase.from("profiles").select("id, name, role"),
+      supabase.from("debriefs").select("*").eq("date", shiftDate).order("created_at"),
+      supabase.from("stock_alerts").select("*").eq("acknowledged", false).order("created_at", { ascending: false }),
+      supabase.from("stock_products").select("id, name"),
+      supabase.from("schedules").select("*").eq("date", shiftDate),
     ]);
     setAbsenceRequests((absRes.data as AvailabilityRequest[]) || []);
     setFnfReservations((resaRes.data as Reservation[]) || []);
     const map: Record<string, string> = {};
-    ((profRes.data as Pick<Profile, "id" | "name">[]) || []).forEach((p) => { map[p.id] = p.name; });
+    ((profRes.data as Pick<Profile, "id" | "name" | "role">[]) || []).forEach((p) => { map[p.id] = p.name; });
     setStaffMap(map);
+    setDebriefs((debRes.data as Debrief[]) || []);
+    setStockAlerts((alertRes.data as StockAlert[]) || []);
+    setStockProducts((prodRes.data as StockProduct[]) || []);
+    setSchedules((schedRes.data as Schedule[]) || []);
     setLoading(false);
-  }, [supabase]);
+  }, [supabase, shiftDate]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -42,6 +63,8 @@ export default function AdminPage() {
     const ch = supabase.channel("admin-rt")
       .on("postgres_changes", { event: "*", schema: "public", table: "availability_requests" }, () => fetchData())
       .on("postgres_changes", { event: "*", schema: "public", table: "reservations" }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "debriefs" }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "stock_alerts" }, () => fetchData())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [supabase, fetchData]);
@@ -72,16 +95,33 @@ export default function AdminPage() {
     fetchData();
   }
 
+  async function sendMessage() {
+    if (!msgContent.trim() || !user || msgSending) return;
+    setMsgSending(true);
+    await supabase.from("messages").insert({
+      content: msgContent.trim(),
+      date: shiftDate,
+      created_by: user.id,
+    });
+    setMsgSending(false);
+    setMsgContent("");
+    setMsgSent(true);
+    setTimeout(() => setMsgSent(false), 2000);
+  }
+
+  async function acknowledgeAlert(id: string) {
+    await supabase.from("stock_alerts").update({ acknowledged: true }).eq("id", id);
+    fetchData();
+  }
+
   const totalPending = absenceRequests.length + fnfReservations.length;
 
   const quickLinks = [
-    { href: "/messages", label: "Messages", icon: <MessageCircle size={18} />, desc: "Communiquer avec l'équipe" },
-    { href: "/events", label: "Événements", icon: <Repeat size={18} />, desc: "Rituels & soirées spéciales" },
-    { href: "/tasks", label: "Tâches", icon: <ListChecks size={18} />, desc: "Gérer les tâches récurrentes" },
+    { href: "/events", label: "Événements", icon: <Repeat size={18} />, desc: "Rituels & soirées" },
+    { href: "/tasks", label: "Tâches", icon: <ListChecks size={18} />, desc: "Tâches récurrentes" },
     { href: "/staff", label: "Équipe", icon: <Users size={18} />, desc: "Comptes & rôles" },
-    { href: "/stocks", label: "Stocks", icon: <Package size={18} />, desc: "Inventaire & signalements" },
-    { href: "/planning", label: "Planning", icon: <Calendar size={18} />, desc: "Horaires de l'équipe" },
-    { href: "/settings", label: "Réglages", icon: <Settings size={18} />, desc: "Configuration de l'app" },
+    { href: "/planning", label: "Planning", icon: <Calendar size={18} />, desc: "Horaires" },
+    { href: "/settings", label: "Réglages", icon: <Settings size={18} />, desc: "Configuration" },
   ];
 
   if (loading) {
@@ -99,15 +139,13 @@ export default function AdminPage() {
         Admin
       </h1>
 
-      {/* ── Pending requests ─────────────────────────────── */}
+      {/* ═══ 1. DEMANDES EN ATTENTE ══════════════════════ */}
       {totalPending > 0 && (
         <div style={{ marginBottom: 24 }}>
           <p className="section-label" style={{ marginBottom: 10 }}>
             En attente ({totalPending})
           </p>
-
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {/* Absence requests */}
             {absenceRequests.map((req) => (
               <div key={req.id} className="card-medium" style={{
                 padding: "14px 16px", display: "flex", alignItems: "center", gap: 12,
@@ -122,35 +160,19 @@ export default function AdminPage() {
                     Absence — {formatDateFr(req.date)}
                   </div>
                   {req.reason && (
-                    <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2, fontStyle: "italic" }}>
-                      {req.reason}
-                    </div>
+                    <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2, fontStyle: "italic" }}>{req.reason}</div>
                   )}
                 </div>
                 <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                  <button
-                    onClick={() => respondAbsence(req.id, "accepted")}
-                    style={{
-                      width: 36, height: 36, borderRadius: 10, border: "none", cursor: "pointer",
-                      background: "rgba(139,90,64,0.1)", display: "flex", alignItems: "center", justifyContent: "center",
-                    }}
-                  >
+                  <button onClick={() => respondAbsence(req.id, "accepted")} style={{ width: 36, height: 36, borderRadius: 10, border: "none", cursor: "pointer", background: "rgba(139,90,64,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <ThumbsUp size={16} style={{ color: "#8B5A40" }} />
                   </button>
-                  <button
-                    onClick={() => respondAbsence(req.id, "refused")}
-                    style={{
-                      width: 36, height: 36, borderRadius: 10, border: "none", cursor: "pointer",
-                      background: "rgba(200,60,60,0.08)", display: "flex", alignItems: "center", justifyContent: "center",
-                    }}
-                  >
+                  <button onClick={() => respondAbsence(req.id, "refused")} style={{ width: 36, height: 36, borderRadius: 10, border: "none", cursor: "pointer", background: "rgba(200,60,60,0.08)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <ThumbsDown size={16} style={{ color: "var(--danger)" }} />
                   </button>
                 </div>
               </div>
             ))}
-
-            {/* F&F requests */}
             {fnfReservations.map((resa) => (
               <div key={resa.id} className="card-medium" style={{
                 padding: "14px 16px", display: "flex", alignItems: "center", gap: 12,
@@ -158,30 +180,16 @@ export default function AdminPage() {
               }}>
                 <Heart size={18} style={{ color: "var(--warning)", flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
-                    F&F — {resa.name}
-                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>F&F — {resa.name}</div>
                   <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
-                    {resa.covers} pers. · {formatDateFr(resa.date)} · demandé par {staffMap[resa.fnf_requested_by!] || "Staff"}
+                    {resa.covers} pers. · {formatDateFr(resa.date)} · {staffMap[resa.fnf_requested_by!] || "Staff"}
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                  <button
-                    onClick={() => respondFnF(resa.id, "accepted")}
-                    style={{
-                      width: 36, height: 36, borderRadius: 10, border: "none", cursor: "pointer",
-                      background: "rgba(139,90,64,0.1)", display: "flex", alignItems: "center", justifyContent: "center",
-                    }}
-                  >
+                  <button onClick={() => respondFnF(resa.id, "accepted")} style={{ width: 36, height: 36, borderRadius: 10, border: "none", cursor: "pointer", background: "rgba(139,90,64,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <ThumbsUp size={16} style={{ color: "#8B5A40" }} />
                   </button>
-                  <button
-                    onClick={() => respondFnF(resa.id, "refused")}
-                    style={{
-                      width: 36, height: 36, borderRadius: 10, border: "none", cursor: "pointer",
-                      background: "rgba(200,60,60,0.08)", display: "flex", alignItems: "center", justifyContent: "center",
-                    }}
-                  >
+                  <button onClick={() => respondFnF(resa.id, "refused")} style={{ width: 36, height: 36, borderRadius: 10, border: "none", cursor: "pointer", background: "rgba(200,60,60,0.08)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <ThumbsDown size={16} style={{ color: "var(--danger)" }} />
                   </button>
                 </div>
@@ -191,24 +199,169 @@ export default function AdminPage() {
         </div>
       )}
 
-      {totalPending === 0 && (
-        <div className="card-light" style={{ padding: "16px 20px", textAlign: "center", marginBottom: 24 }}>
-          <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Aucune demande en attente</p>
+      {/* ═══ 2. MESSAGE RAPIDE ═══════════════════════════ */}
+      <div style={{ marginBottom: 24 }}>
+        <p className="section-label" style={{ marginBottom: 10 }}>
+          <MessageCircle size={12} style={{ display: "inline", marginRight: 4 }} />
+          Message à l&apos;équipe
+        </p>
+        <div className="card-light" style={{ padding: 12, display: "flex", gap: 8, alignItems: "flex-end" }}>
+          <textarea
+            placeholder="Écrire un message pour ce soir..."
+            value={msgContent}
+            onChange={(e) => setMsgContent(e.target.value)}
+            rows={2}
+            style={{
+              flex: 1, borderRadius: 10, border: "1px solid var(--border-color)",
+              background: "var(--input-bg)", padding: "8px 12px", fontSize: 13,
+              color: "var(--text-primary)", outline: "none", resize: "none",
+            }}
+          />
+          <button
+            onClick={sendMessage}
+            disabled={!msgContent.trim() || msgSending}
+            style={{
+              width: 40, height: 40, borderRadius: 10, border: "none", cursor: "pointer",
+              background: msgSent ? "var(--terra-deep)" : "var(--gradient-primary)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              opacity: !msgContent.trim() || msgSending ? 0.4 : 1,
+              transition: "all 0.2s",
+            }}
+          >
+            {msgSent ? <Check size={16} style={{ color: "#fff" }} /> : <Send size={16} style={{ color: "#fff" }} />}
+          </button>
+        </div>
+      </div>
+
+      {/* ═══ 3. ALERTES STOCK ════════════════════════════ */}
+      {stockAlerts.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <p className="section-label" style={{ marginBottom: 10 }}>
+            <Bell size={12} style={{ display: "inline", marginRight: 4 }} />
+            Alertes stock ({stockAlerts.length})
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {stockAlerts.map((a) => {
+              const prod = stockProducts.find((p) => p.id === a.product_id);
+              const time = new Date(a.created_at);
+              const timeStr = `${time.getHours()}h${String(time.getMinutes()).padStart(2, "0")}`;
+              return (
+                <div key={a.id} className="card-light" style={{
+                  padding: "10px 14px", display: "flex", alignItems: "center", gap: 10,
+                  borderLeft: "3px solid var(--warning)",
+                }}>
+                  <div style={{ flex: 1 }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{prod?.name}</span>
+                    <span style={{ fontSize: 11, color: "var(--text-tertiary)", marginLeft: 8 }}>
+                      {staffMap[a.created_by] || "Staff"} · {timeStr}
+                    </span>
+                  </div>
+                  <button onClick={() => acknowledgeAlert(a.id)} style={{
+                    padding: "5px 10px", borderRadius: 8, border: "none", cursor: "pointer",
+                    background: "var(--secondary-bg)", fontSize: 11, fontWeight: 500, color: "var(--text-secondary)",
+                    display: "flex", alignItems: "center", gap: 4,
+                  }}>
+                    <Check size={12} /> OK
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
-      {/* ── Quick links ──────────────────────────────────── */}
+      {/* ═══ 4. DEBRIEFS DU SOIR ═════════════════════════ */}
+      {debriefs.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <p className="section-label" style={{ marginBottom: 10 }}>Debriefs du soir</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {debriefs.map((d) => {
+              const name = staffMap[d.user_id] || "Staff";
+              const isExpanded = expandedDebrief === d.id;
+              const hasText = d.incidents || d.client_feedback || d.suggestions;
+              return (
+                <div key={d.id} className="card-light" style={{ overflow: "hidden" }}>
+                  <button
+                    onClick={() => setExpandedDebrief(isExpanded ? null : d.id)}
+                    style={{
+                      width: "100%", padding: "12px 14px", background: "none", border: "none", cursor: "pointer",
+                      display: "flex", alignItems: "center", gap: 10,
+                    }}
+                  >
+                    <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)", flex: 1, textAlign: "left" }}>{name}</span>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: RATING_COLORS[d.global_rating] }}>{d.global_rating}/5</span>
+                    {d.incidents && <AlertTriangle size={13} style={{ color: "var(--warning)" }} />}
+                    {hasText && <ChevronDown size={14} style={{ color: "var(--text-tertiary)", transform: isExpanded ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.2s" }} />}
+                  </button>
+                  {isExpanded && (
+                    <div style={{ padding: "0 14px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+                      <div style={{ display: "flex", gap: 12, fontSize: 12, color: "var(--text-secondary)" }}>
+                        <span>Service: <b style={{ color: RATING_COLORS[d.service_rating] }}>{d.service_rating}</b></span>
+                        <span>Équipe: <b style={{ color: RATING_COLORS[d.team_rating] }}>{d.team_rating}</b></span>
+                        <span>Affluence: {d.affluence}</span>
+                      </div>
+                      {d.incidents && (
+                        <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+                          <AlertTriangle size={11} style={{ display: "inline", marginRight: 4, color: "var(--warning)" }} />
+                          {d.incidents}
+                        </div>
+                      )}
+                      {d.client_feedback && (
+                        <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+                          <MessageCircle size={11} style={{ display: "inline", marginRight: 4, color: "var(--terra-medium)" }} />
+                          {d.client_feedback}
+                        </div>
+                      )}
+                      {d.suggestions && (
+                        <div style={{ fontSize: 13, color: "var(--text-secondary)", fontStyle: "italic" }}>
+                          <Lightbulb size={11} style={{ display: "inline", marginRight: 4 }} />
+                          {d.suggestions}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ═══ 5. ÉQUIPE CE SOIR ═══════════════════════════ */}
+      {schedules.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <p className="section-label" style={{ marginBottom: 10 }}>
+            <Clock size={12} style={{ display: "inline", marginRight: 4 }} />
+            Équipe ce soir
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {schedules.map((s) => (
+              <div key={s.id} style={{
+                padding: "6px 12px", borderRadius: 10,
+                background: "var(--secondary-bg)", fontSize: 13,
+              }}>
+                <span style={{ fontWeight: 500, color: "var(--text-primary)" }}>{staffMap[s.user_id] || "Staff"}</span>
+                <span style={{ color: "var(--text-tertiary)", marginLeft: 6 }}>
+                  {formatTime(s.start_time)}→{formatTime(s.end_time)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ═══ 6. GÉRER ════════════════════════════════════ */}
       <p className="section-label" style={{ marginBottom: 10 }}>Gérer</p>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {quickLinks.map((link) => (
           <Link key={link.href} href={link.href} className="card-light" style={{
-            padding: "14px 16px", textDecoration: "none",
-            display: "flex", alignItems: "center", gap: 14,
+            padding: "12px 16px", textDecoration: "none",
+            display: "flex", alignItems: "center", gap: 12,
           }}>
             <div style={{ color: "var(--terra-medium)", flexShrink: 0 }}>{link.icon}</div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>{link.label}</div>
-              <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 1 }}>{link.desc}</div>
+              <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>{link.label}</span>
+              <span style={{ fontSize: 12, color: "var(--text-tertiary)", marginLeft: 8 }}>{link.desc}</span>
             </div>
             <ArrowRight size={14} style={{ color: "var(--text-tertiary)" }} />
           </Link>
