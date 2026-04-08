@@ -147,19 +147,20 @@ export interface Event {
 }
 
 // ── Debrief ────────────────────────────────────────────────
+export type Affluence = "calme" | "normal" | "charge" | "rush";
+export type ClosingState = "impeccable" | "correct" | "a_ameliorer";
+
 export interface Debrief {
   id: string;
   user_id: string;
   date: string;
-  global_score: number;
-  service_score: number;
-  coordination_score: number;
-  ambiance_score: number;
-  proprete_score: number;
-  service_comment: string | null;
-  coordination_comment: string | null;
-  ambiance_comment: string | null;
-  proprete_comment: string | null;
+  global_rating: number;
+  service_rating: number;
+  team_rating: number;
+  affluence: Affluence;
+  closing_state: ClosingState;
+  incidents: string | null;
+  client_feedback: string | null;
   suggestions: string | null;
   created_at: string;
 }

@@ -4,19 +4,24 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
 import { getShiftDate, formatDateFr } from "@/lib/shift-utils";
-import type { Debrief, Profile } from "@/lib/types";
-import { ChevronDown, ChevronLeft, ChevronRight, Send } from "lucide-react";
+import type { Debrief, Affluence, ClosingState, Profile } from "@/lib/types";
+import { ChevronLeft, ChevronRight, ChevronDown, Send, AlertTriangle, MessageSquare, Lightbulb } from "lucide-react";
 
-const CATEGORIES = [
-  { key: "global", label: "Global", desc: "Impression générale du shift" },
-  { key: "service", label: "Service", desc: "Qualité du service client" },
-  { key: "coordination", label: "Coordination", desc: "Communication et travail d'équipe" },
-  { key: "ambiance", label: "Ambiance", desc: "Atmosphère du lieu" },
-  { key: "proprete", label: "Propreté", desc: "État des lieux et hygiène" },
-] as const;
+// ── Quick-tap configs ──────────────────────────────────────
+const RATING_EMOJIS = ["", "😞", "😐", "🙂", "😊", "🤩"];
 
-type ScoreKey = "global_score" | "service_score" | "coordination_score" | "ambiance_score" | "proprete_score";
-type CommentKey = "service_comment" | "coordination_comment" | "ambiance_comment" | "proprete_comment";
+const AFFLUENCE_OPTIONS: { value: Affluence; label: string; icon: string }[] = [
+  { value: "calme", label: "Calme", icon: "🌙" },
+  { value: "normal", label: "Normal", icon: "👍" },
+  { value: "charge", label: "Chargé", icon: "🔥" },
+  { value: "rush", label: "Rush", icon: "💥" },
+];
+
+const CLOSING_OPTIONS: { value: ClosingState; label: string; icon: string }[] = [
+  { value: "impeccable", label: "Impeccable", icon: "✨" },
+  { value: "correct", label: "Correct", icon: "👌" },
+  { value: "a_ameliorer", label: "À améliorer", icon: "⚠️" },
+];
 
 export default function DebriefPage() {
   const { profile, user } = useAuth();
@@ -26,37 +31,30 @@ export default function DebriefPage() {
   const [loading, setLoading] = useState(true);
   const [submitted, setSubmitted] = useState(false);
   const [myDebrief, setMyDebrief] = useState<Debrief | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  // Patron view
+  // Patron
   const [allDebriefs, setAllDebriefs] = useState<Debrief[]>([]);
   const [staffMap, setStaffMap] = useState<Record<string, string>>({});
-  const [expandedDebrief, setExpandedDebrief] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [dateOffset, setDateOffset] = useState(0);
 
-  // Form state
-  const [scores, setScores] = useState<Record<ScoreKey, number>>({
-    global_score: 0,
-    service_score: 0,
-    coordination_score: 0,
-    ambiance_score: 0,
-    proprete_score: 0,
-  });
-  const [comments, setComments] = useState<Record<CommentKey | "suggestions", string>>({
-    service_comment: "",
-    coordination_comment: "",
-    ambiance_comment: "",
-    proprete_comment: "",
-    suggestions: "",
-  });
+  // Form
+  const [globalRating, setGlobalRating] = useState(0);
+  const [serviceRating, setServiceRating] = useState(0);
+  const [teamRating, setTeamRating] = useState(0);
+  const [affluence, setAffluence] = useState<Affluence | null>(null);
+  const [closingState, setClosingState] = useState<ClosingState | null>(null);
+  const [incidents, setIncidents] = useState("");
+  const [clientFeedback, setClientFeedback] = useState("");
+  const [suggestions, setSuggestions] = useState("");
 
   const shiftDate = getShiftDate();
-  // Navigate dates for patron view
   const viewDate = (() => {
     const d = new Date(shiftDate);
     d.setDate(d.getDate() + dateOffset);
     return d.toISOString().split("T")[0];
   })();
-  const viewDateLabel = formatDateFr(viewDate);
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -72,151 +70,223 @@ export default function DebriefPage() {
       setStaffMap(map);
     }
 
-    // Also check if current user already submitted
     const { data: mine } = await supabase
-      .from("debriefs")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("date", shiftDate)
+      .from("debriefs").select("*")
+      .eq("user_id", user.id).eq("date", shiftDate)
       .maybeSingle();
 
     if (mine) {
       setMyDebrief(mine as Debrief);
       setSubmitted(true);
     }
-
     setLoading(false);
   }, [user, supabase, shiftDate, viewDate, isPatron]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const canSubmit = globalRating > 0 && serviceRating > 0 && teamRating > 0 && affluence && closingState;
 
   async function handleSubmit() {
-    if (!user) return;
-    // Validate all scores filled
-    const allFilled = Object.values(scores).every((s) => s >= 1);
-    if (!allFilled) return;
+    if (!user || !canSubmit || saving) return;
+    setSaving(true);
 
-    const payload = {
+    await supabase.from("debriefs").insert({
       user_id: user.id,
       date: shiftDate,
-      ...scores,
-      service_comment: comments.service_comment.trim() || null,
-      coordination_comment: comments.coordination_comment.trim() || null,
-      ambiance_comment: comments.ambiance_comment.trim() || null,
-      proprete_comment: comments.proprete_comment.trim() || null,
-      suggestions: comments.suggestions.trim() || null,
-    };
+      global_rating: globalRating,
+      service_rating: serviceRating,
+      team_rating: teamRating,
+      affluence,
+      closing_state: closingState,
+      incidents: incidents.trim() || null,
+      client_feedback: clientFeedback.trim() || null,
+      suggestions: suggestions.trim() || null,
+    });
 
-    const { error } = await supabase.from("debriefs").insert(payload);
-    if (!error) {
-      setSubmitted(true);
-      fetchData();
-    }
+    setSaving(false);
+    setSubmitted(true);
+    fetchData();
   }
 
-  function scoreColor(score: number): string {
-    if (score >= 4) return "var(--terra-deep)";
-    if (score >= 3) return "var(--terra-medium)";
-    if (score >= 2) return "var(--warning)";
-    return "var(--danger)";
-  }
-
-  if (loading) {
+  // ── Rating selector component ────────────────────────────
+  function RatingRow({ label, value, onChange }: { label: string; value: number; onChange: (n: number) => void }) {
     return (
-      <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="card-light" style={{ height: 64, borderRadius: 16, opacity: 0.5 }} />
+      <div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>{label}</span>
+          {value > 0 && (
+            <span style={{ fontSize: 20 }}>{RATING_EMOJIS[value]}</span>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {[1, 2, 3, 4, 5].map((n) => (
+            <button
+              key={n}
+              onClick={() => onChange(n)}
+              style={{
+                flex: 1, height: 44, borderRadius: 12, border: "none", cursor: "pointer",
+                fontSize: 20, display: "flex", alignItems: "center", justifyContent: "center",
+                background: value === n ? "var(--gradient-primary)" : "var(--secondary-bg)",
+                transform: value === n ? "scale(1.08)" : "scale(1)",
+                transition: "all 0.15s",
+                filter: value > 0 && value !== n ? "grayscale(0.8) opacity(0.5)" : "none",
+              }}
+            >
+              {RATING_EMOJIS[n]}
+            </button>
           ))}
         </div>
       </div>
     );
   }
 
+  // ── Helpers ──────────────────────────────────────────────
+  function ratingColor(r: number): string {
+    if (r >= 4) return "#8B5A40";
+    if (r >= 3) return "var(--text-secondary)";
+    return "var(--danger)";
+  }
+
+  const affluenceLabel = (a: Affluence) => AFFLUENCE_OPTIONS.find((o) => o.value === a);
+  const closingLabel = (c: ClosingState) => CLOSING_OPTIONS.find((o) => o.value === c);
+
+  if (loading) {
+    return (
+      <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="card-light" style={{ height: 56, borderRadius: 16, marginBottom: 10, opacity: 0.5 }} />
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
-      <h1 style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-primary)", marginBottom: 24 }}>
+      <h1 style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-primary)", marginBottom: 4 }}>
         Debrief
       </h1>
 
-      {/* ── Staff: Fill debrief form ──────────────────────── */}
+      {/* ════════════════════════════════════════════════════ */}
+      {/* STAFF FORM                                          */}
+      {/* ════════════════════════════════════════════════════ */}
       {!isPatron && !submitted && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-            Comment s&apos;est passé le shift ? Note chaque catégorie de 1 à 5.
+        <div style={{ display: "flex", flexDirection: "column", gap: 20, marginTop: 16 }}>
+          <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
+            30 secondes pour résumer ton shift.
           </p>
 
-          {CATEGORIES.map((cat) => {
-            const scoreKey = `${cat.key}_score` as ScoreKey;
-            return (
-              <div key={cat.key}>
-                <div style={{ marginBottom: 8 }}>
-                  <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>
-                    {cat.label}
-                  </span>
-                  <span style={{ fontSize: 12, color: "var(--text-tertiary)", marginLeft: 8 }}>
-                    {cat.desc}
-                  </span>
-                </div>
+          {/* Ratings */}
+          <RatingRow label="Comment c'était ?" value={globalRating} onChange={setGlobalRating} />
+          <RatingRow label="Le service client" value={serviceRating} onChange={setServiceRating} />
+          <RatingRow label="L'équipe" value={teamRating} onChange={setTeamRating} />
 
-                {/* Score buttons */}
-                <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <button
-                      key={n}
-                      onClick={() => setScores((prev) => ({ ...prev, [scoreKey]: n }))}
-                      style={{
-                        width: 44, height: 44, borderRadius: 12,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 16, fontWeight: 600, border: "none", cursor: "pointer",
-                        background: scores[scoreKey] === n
-                          ? "var(--gradient-primary)"
-                          : "var(--secondary-bg)",
-                        color: scores[scoreKey] === n ? "#fff" : "var(--text-secondary)",
-                        transition: "all 0.2s ease",
-                        transform: scores[scoreKey] === n ? "scale(1.05)" : "scale(1)",
-                      }}
-                    >
-                      {n}
-                    </button>
-                  ))}
-                </div>
+          {/* Affluence */}
+          <div>
+            <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)", display: "block", marginBottom: 8 }}>
+              Affluence
+            </span>
+            <div style={{ display: "flex", gap: 6 }}>
+              {AFFLUENCE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setAffluence(opt.value)}
+                  style={{
+                    flex: 1, borderRadius: 12, padding: "10px 0", border: "none", cursor: "pointer",
+                    textAlign: "center",
+                    background: affluence === opt.value ? "var(--gradient-primary)" : "var(--secondary-bg)",
+                    color: affluence === opt.value ? "#fff" : "var(--text-secondary)",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  <div style={{ fontSize: 18 }}>{opt.icon}</div>
+                  <div style={{ fontSize: 11, fontWeight: 500, marginTop: 2 }}>{opt.label}</div>
+                </button>
+              ))}
+            </div>
+          </div>
 
-                {/* Comment field (not for global) */}
-                {cat.key !== "global" && (
-                  <textarea
-                    placeholder="Commentaire (optionnel)"
-                    value={comments[`${cat.key}_comment` as CommentKey]}
-                    onChange={(e) =>
-                      setComments((prev) => ({
-                        ...prev,
-                        [`${cat.key}_comment`]: e.target.value,
-                      }))
-                    }
-                    rows={2}
-                    style={{
-                      width: "100%", borderRadius: 12, border: "1px solid var(--border-color)",
-                      background: "var(--input-bg)", padding: "10px 12px", fontSize: 13,
-                      color: "var(--text-primary)", outline: "none", resize: "none",
-                    }}
-                  />
-                )}
-              </div>
-            );
-          })}
+          {/* Closing state */}
+          <div>
+            <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)", display: "block", marginBottom: 8 }}>
+              État à la fermeture
+            </span>
+            <div style={{ display: "flex", gap: 6 }}>
+              {CLOSING_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setClosingState(opt.value)}
+                  style={{
+                    flex: 1, borderRadius: 12, padding: "10px 0", border: "none", cursor: "pointer",
+                    textAlign: "center",
+                    background: closingState === opt.value ? "var(--gradient-primary)" : "var(--secondary-bg)",
+                    color: closingState === opt.value ? "#fff" : "var(--text-secondary)",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  <div style={{ fontSize: 18 }}>{opt.icon}</div>
+                  <div style={{ fontSize: 11, fontWeight: 500, marginTop: 2 }}>{opt.label}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Separator */}
+          <div style={{ height: 1, background: "var(--border-color)" }} />
+
+          {/* Optional text fields */}
+          <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: -8 }}>
+            Optionnel — remplis ce qui est pertinent
+          </p>
+
+          {/* Incidents */}
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+              <AlertTriangle size={14} style={{ color: "var(--warning)" }} />
+              <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>Incidents / Problèmes</span>
+            </div>
+            <textarea
+              placeholder="Machine en panne, plainte client, stock manquant..."
+              value={incidents}
+              onChange={(e) => setIncidents(e.target.value)}
+              rows={2}
+              style={{
+                width: "100%", borderRadius: 12, border: "1px solid var(--border-color)",
+                background: "var(--input-bg)", padding: "10px 12px", fontSize: 13,
+                color: "var(--text-primary)", outline: "none", resize: "none",
+              }}
+            />
+          </div>
+
+          {/* Client feedback */}
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+              <MessageSquare size={14} style={{ color: "#8B5A40" }} />
+              <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>Retours clients</span>
+            </div>
+            <textarea
+              placeholder="Compliments, plaintes, remarques..."
+              value={clientFeedback}
+              onChange={(e) => setClientFeedback(e.target.value)}
+              rows={2}
+              style={{
+                width: "100%", borderRadius: 12, border: "1px solid var(--border-color)",
+                background: "var(--input-bg)", padding: "10px 12px", fontSize: 13,
+                color: "var(--text-primary)", outline: "none", resize: "none",
+              }}
+            />
+          </div>
 
           {/* Suggestions */}
           <div>
-            <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)", display: "block", marginBottom: 8 }}>
-              Suggestions
-            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+              <Lightbulb size={14} style={{ color: "var(--text-tertiary)" }} />
+              <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>Suggestions</span>
+            </div>
             <textarea
-              placeholder="Des idées pour améliorer le service ?"
-              value={comments.suggestions}
-              onChange={(e) => setComments((prev) => ({ ...prev, suggestions: e.target.value }))}
-              rows={3}
+              placeholder="Comment on pourrait s'améliorer ?"
+              value={suggestions}
+              onChange={(e) => setSuggestions(e.target.value)}
+              rows={2}
               style={{
                 width: "100%", borderRadius: 12, border: "1px solid var(--border-color)",
                 background: "var(--input-bg)", padding: "10px 12px", fontSize: 13,
@@ -228,184 +298,234 @@ export default function DebriefPage() {
           {/* Submit */}
           <button
             onClick={handleSubmit}
-            disabled={!Object.values(scores).every((s) => s >= 1)}
+            disabled={!canSubmit || saving}
             style={{
               display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-              width: "100%", borderRadius: 12, padding: "12px 0", fontSize: 14, fontWeight: 500,
-              color: "#fff", background: "var(--gradient-primary)", border: "none", cursor: "pointer",
-              opacity: Object.values(scores).every((s) => s >= 1) ? 1 : 0.5,
+              width: "100%", borderRadius: 14, padding: "14px 0",
+              fontSize: 15, fontWeight: 600, color: "#fff",
+              background: "var(--gradient-primary)", border: "none", cursor: "pointer",
+              opacity: canSubmit && !saving ? 1 : 0.4,
               transition: "opacity 0.2s",
             }}
           >
             <Send size={16} />
-            Envoyer le debrief
+            {saving ? "..." : "Envoyer"}
           </button>
         </div>
       )}
 
-      {/* ── Staff: Already submitted ─────────────────────── */}
+      {/* ════════════════════════════════════════════════════ */}
+      {/* STAFF: ALREADY SUBMITTED                            */}
+      {/* ════════════════════════════════════════════════════ */}
       {!isPatron && submitted && myDebrief && (
-        <div className="card-medium" style={{ padding: 20 }}>
-          <p style={{ fontSize: 14, fontWeight: 500, color: "var(--terra-deep)", marginBottom: 16 }}>
-            Debrief envoyé pour aujourd&apos;hui
-          </p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-            {CATEGORIES.map((cat) => {
-              const score = myDebrief[`${cat.key}_score` as keyof Debrief] as number;
-              return (
-                <div key={cat.key} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{cat.label}</span>
-                  <span style={{
-                    fontSize: 14, fontWeight: 600, color: scoreColor(score),
-                    background: "var(--secondary-bg)", padding: "2px 8px", borderRadius: 6,
-                  }}>
-                    {score}/5
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-          {myDebrief.suggestions && (
-            <p style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 12, fontStyle: "italic" }}>
-              &ldquo;{myDebrief.suggestions}&rdquo;
+        <div style={{ marginTop: 16 }}>
+          <div className="card-medium" style={{ padding: 20 }}>
+            <p style={{ fontSize: 14, fontWeight: 500, color: "#8B5A40", marginBottom: 16 }}>
+              Debrief envoyé ✓
             </p>
-          )}
+
+            <div style={{ display: "flex", gap: 16, marginBottom: 12 }}>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 24 }}>{RATING_EMOJIS[myDebrief.global_rating]}</div>
+                <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginTop: 2 }}>Global</div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 24 }}>{RATING_EMOJIS[myDebrief.service_rating]}</div>
+                <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginTop: 2 }}>Service</div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 24 }}>{RATING_EMOJIS[myDebrief.team_rating]}</div>
+                <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginTop: 2 }}>Équipe</div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 20 }}>{affluenceLabel(myDebrief.affluence)?.icon}</div>
+                <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginTop: 2 }}>{affluenceLabel(myDebrief.affluence)?.label}</div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 20 }}>{closingLabel(myDebrief.closing_state)?.icon}</div>
+                <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginTop: 2 }}>{closingLabel(myDebrief.closing_state)?.label}</div>
+              </div>
+            </div>
+
+            {(myDebrief.incidents || myDebrief.client_feedback || myDebrief.suggestions) && (
+              <div style={{ borderTop: "1px solid var(--border-color)", paddingTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                {myDebrief.incidents && (
+                  <p style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                    <AlertTriangle size={11} style={{ display: "inline", marginRight: 4, color: "var(--warning)" }} />
+                    {myDebrief.incidents}
+                  </p>
+                )}
+                {myDebrief.client_feedback && (
+                  <p style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                    <MessageSquare size={11} style={{ display: "inline", marginRight: 4, color: "#8B5A40" }} />
+                    {myDebrief.client_feedback}
+                  </p>
+                )}
+                {myDebrief.suggestions && (
+                  <p style={{ fontSize: 12, color: "var(--text-secondary)", fontStyle: "italic" }}>
+                    <Lightbulb size={11} style={{ display: "inline", marginRight: 4 }} />
+                    {myDebrief.suggestions}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      {/* ── Patron: View all debriefs ────────────────────── */}
+      {/* ════════════════════════════════════════════════════ */}
+      {/* PATRON VIEW                                         */}
+      {/* ════════════════════════════════════════════════════ */}
       {isPatron && (
-        <>
+        <div style={{ marginTop: 8 }}>
           {/* Date nav */}
-          <div style={{
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            marginBottom: 20,
-          }}>
-            <button
-              onClick={() => setDateOffset((o) => o - 1)}
-              style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}
-            >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+            <button onClick={() => setDateOffset((o) => o - 1)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
               <ChevronLeft size={20} style={{ color: "var(--text-secondary)" }} />
             </button>
             <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>
-              {viewDateLabel}
+              {dateOffset === 0 ? "Ce soir" : formatDateFr(viewDate)}
             </span>
-            <button
-              onClick={() => setDateOffset((o) => Math.min(o + 1, 0))}
-              disabled={dateOffset >= 0}
-              style={{ background: "none", border: "none", cursor: "pointer", padding: 4, opacity: dateOffset >= 0 ? 0.3 : 1 }}
-            >
+            <button onClick={() => setDateOffset((o) => Math.min(o + 1, 0))} disabled={dateOffset >= 0} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, opacity: dateOffset >= 0 ? 0.3 : 1 }}>
               <ChevronRight size={20} style={{ color: "var(--text-secondary)" }} />
             </button>
           </div>
 
-          {/* Averages summary */}
-          {allDebriefs.length > 0 && (
-            <div className="card-medium" style={{ padding: 16, marginBottom: 20 }}>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 16, justifyContent: "space-between" }}>
-                {CATEGORIES.map((cat) => {
-                  const avg =
-                    allDebriefs.reduce((sum, d) => sum + (d[`${cat.key}_score` as keyof Debrief] as number), 0) /
-                    allDebriefs.length;
-                  return (
-                    <div key={cat.key} style={{ textAlign: "center" }}>
-                      <div style={{ fontSize: 20, fontWeight: 600, color: scoreColor(Math.round(avg)) }}>
-                        {avg.toFixed(1)}
-                      </div>
-                      <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>
-                        {cat.label}
-                      </div>
-                    </div>
-                  );
-                })}
+          {/* Averages */}
+          {allDebriefs.length > 0 && (() => {
+            const avg = (key: "global_rating" | "service_rating" | "team_rating") =>
+              allDebriefs.reduce((s, d) => s + d[key], 0) / allDebriefs.length;
+            const avgGlobal = avg("global_rating");
+            const avgService = avg("service_rating");
+            const avgTeam = avg("team_rating");
+
+            // Most common affluence
+            const affCounts: Record<string, number> = {};
+            allDebriefs.forEach((d) => { affCounts[d.affluence] = (affCounts[d.affluence] || 0) + 1; });
+            const topAff = Object.entries(affCounts).sort((a, b) => b[1] - a[1])[0]?.[0] as Affluence;
+
+            // Incidents count
+            const incidentCount = allDebriefs.filter((d) => d.incidents).length;
+
+            return (
+              <div className="card-medium" style={{ padding: 16, marginBottom: 20 }}>
+                <div style={{ display: "flex", justifyContent: "space-around", textAlign: "center", marginBottom: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 22, fontWeight: 600, color: ratingColor(Math.round(avgGlobal)) }}>{avgGlobal.toFixed(1)}</div>
+                    <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Global</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 22, fontWeight: 600, color: ratingColor(Math.round(avgService)) }}>{avgService.toFixed(1)}</div>
+                    <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Service</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 22, fontWeight: 600, color: ratingColor(Math.round(avgTeam)) }}>{avgTeam.toFixed(1)}</div>
+                    <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Équipe</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 20 }}>{affluenceLabel(topAff)?.icon}</div>
+                    <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>{affluenceLabel(topAff)?.label}</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", justifyContent: "center", gap: 16, fontSize: 12, color: "var(--text-tertiary)" }}>
+                  <span>{allDebriefs.length} debrief{allDebriefs.length > 1 ? "s" : ""}</span>
+                  {incidentCount > 0 && (
+                    <span style={{ color: "var(--warning)" }}>
+                      ⚠️ {incidentCount} incident{incidentCount > 1 ? "s" : ""}
+                    </span>
+                  )}
+                </div>
               </div>
-              <div style={{ fontSize: 11, color: "var(--text-tertiary)", textAlign: "center", marginTop: 12 }}>
-                {allDebriefs.length} debrief{allDebriefs.length > 1 ? "s" : ""}
-              </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Individual debriefs */}
           {allDebriefs.length > 0 ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {allDebriefs.map((d) => {
-                const isExpanded = expandedDebrief === d.id;
-                const globalScore = d.global_score;
+                const expanded = expandedId === d.id;
+                const hasText = d.incidents || d.client_feedback || d.suggestions;
                 return (
                   <div key={d.id} className="card-light" style={{ overflow: "hidden" }}>
                     <button
-                      onClick={() => setExpandedDebrief(isExpanded ? null : d.id)}
+                      onClick={() => setExpandedId(expanded ? null : d.id)}
                       style={{
-                        width: "100%", padding: "14px 16px", background: "none", border: "none",
-                        cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between",
+                        width: "100%", padding: "14px 16px", background: "none", border: "none", cursor: "pointer",
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
                       }}
                     >
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>
-                          {staffMap[d.user_id] || "Inconnu"}
+                          {staffMap[d.user_id] || "Staff"}
                         </span>
-                        <span style={{
-                          fontSize: 13, fontWeight: 600, color: scoreColor(globalScore),
-                          background: "var(--secondary-bg)", padding: "2px 8px", borderRadius: 6,
-                        }}>
-                          {globalScore}/5
-                        </span>
+                        <span style={{ fontSize: 18 }}>{RATING_EMOJIS[d.global_rating]}</span>
+                        {d.incidents && (
+                          <AlertTriangle size={13} style={{ color: "var(--warning)" }} />
+                        )}
                       </div>
-                      <ChevronDown
-                        size={16}
-                        style={{
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                          {affluenceLabel(d.affluence)?.icon}
+                        </span>
+                        <ChevronDown size={16} style={{
                           color: "var(--text-tertiary)",
-                          transform: isExpanded ? "rotate(180deg)" : "rotate(0)",
-                          transition: "transform 0.2s ease",
-                        }}
-                      />
+                          transform: expanded ? "rotate(180deg)" : "rotate(0)",
+                          transition: "transform 0.2s",
+                        }} />
+                      </div>
                     </button>
 
-                    {isExpanded && (
+                    {expanded && (
                       <div style={{ padding: "0 16px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
-                        {/* Scores */}
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-                          {CATEGORIES.filter((c) => c.key !== "global").map((cat) => {
-                            const score = d[`${cat.key}_score` as keyof Debrief] as number;
-                            return (
-                              <div key={cat.key} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{cat.label}</span>
-                                <span style={{
-                                  fontSize: 13, fontWeight: 600, color: scoreColor(score),
-                                  background: "var(--secondary-bg)", padding: "2px 6px", borderRadius: 4,
-                                }}>
-                                  {score}
-                                </span>
-                              </div>
-                            );
-                          })}
+                        {/* Ratings row */}
+                        <div style={{ display: "flex", gap: 16 }}>
+                          {[
+                            { label: "Global", value: d.global_rating },
+                            { label: "Service", value: d.service_rating },
+                            { label: "Équipe", value: d.team_rating },
+                          ].map((r) => (
+                            <div key={r.label} style={{ textAlign: "center" }}>
+                              <div style={{ fontSize: 20 }}>{RATING_EMOJIS[r.value]}</div>
+                              <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>{r.label}</div>
+                            </div>
+                          ))}
+                          <div style={{ textAlign: "center" }}>
+                            <div style={{ fontSize: 18 }}>{affluenceLabel(d.affluence)?.icon}</div>
+                            <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>{affluenceLabel(d.affluence)?.label}</div>
+                          </div>
+                          <div style={{ textAlign: "center" }}>
+                            <div style={{ fontSize: 18 }}>{closingLabel(d.closing_state)?.icon}</div>
+                            <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>{closingLabel(d.closing_state)?.label}</div>
+                          </div>
                         </div>
 
-                        {/* Comments */}
-                        {(["service", "coordination", "ambiance", "proprete"] as const).map((key) => {
-                          const comment = d[`${key}_comment` as keyof Debrief] as string | null;
-                          if (!comment) return null;
-                          const label = CATEGORIES.find((c) => c.key === key)?.label;
-                          return (
-                            <div key={key}>
-                              <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                                {label}
-                              </span>
-                              <p style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2 }}>
-                                {comment}
-                              </p>
-                            </div>
-                          );
-                        })}
-
-                        {d.suggestions && (
-                          <div>
-                            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                              Suggestions
-                            </span>
-                            <p style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2, fontStyle: "italic" }}>
-                              {d.suggestions}
-                            </p>
+                        {/* Text fields */}
+                        {hasText && (
+                          <div style={{ borderTop: "1px solid var(--border-color)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+                            {d.incidents && (
+                              <div>
+                                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--warning)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 2, display: "flex", alignItems: "center", gap: 4 }}>
+                                  <AlertTriangle size={11} /> Incidents
+                                </div>
+                                <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>{d.incidents}</p>
+                              </div>
+                            )}
+                            {d.client_feedback && (
+                              <div>
+                                <div style={{ fontSize: 11, fontWeight: 600, color: "#8B5A40", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 2, display: "flex", alignItems: "center", gap: 4 }}>
+                                  <MessageSquare size={11} /> Retours clients
+                                </div>
+                                <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>{d.client_feedback}</p>
+                              </div>
+                            )}
+                            {d.suggestions && (
+                              <div>
+                                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 2, display: "flex", alignItems: "center", gap: 4 }}>
+                                  <Lightbulb size={11} /> Suggestions
+                                </div>
+                                <p style={{ fontSize: 13, color: "var(--text-secondary)", fontStyle: "italic" }}>{d.suggestions}</p>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -415,13 +535,11 @@ export default function DebriefPage() {
               })}
             </div>
           ) : (
-            <div className="card-light" style={{ padding: 24, textAlign: "center" }}>
-              <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-                Aucun debrief pour cette date
-              </p>
+            <div className="card-light" style={{ padding: 32, textAlign: "center" }}>
+              <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>Aucun debrief pour cette date</p>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );

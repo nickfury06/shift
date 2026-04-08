@@ -112,7 +112,7 @@ export default function DashboardPage() {
 
   const avgScore =
     debriefs.length > 0
-      ? (debriefs.reduce((s, d) => s + d.global_score, 0) / debriefs.length).toFixed(1)
+      ? (debriefs.reduce((s, d) => s + d.global_rating, 0) / debriefs.length).toFixed(1)
       : "--";
 
   // Moment progress
@@ -222,9 +222,9 @@ export default function DashboardPage() {
                     )}
                   </div>
                   <span
-                    style={{ fontSize: 18, fontWeight: 600, marginLeft: 16, color: scoreColor(d.global_score) }}
+                    style={{ fontSize: 18, fontWeight: 600, marginLeft: 16, color: scoreColor(d.global_rating) }}
                   >
-                    {d.global_score}
+                    {d.global_rating}
                   </span>
                 </div>
               ))}
