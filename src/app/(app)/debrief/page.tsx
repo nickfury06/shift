@@ -58,10 +58,7 @@ export default function DebriefPage() {
   })();
 
   const fetchData = useCallback(async () => {
-    if (!user || !profile) {
-      setLoading(false);
-      return;
-    }
+    if (!user || !profile) return;
 
     const isP = profile.role === "patron" || profile.role === "responsable";
 
