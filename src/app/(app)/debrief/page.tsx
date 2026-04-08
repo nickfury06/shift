@@ -187,9 +187,9 @@ export default function DebriefPage() {
       </h1>
 
       {/* ════════════════════════════════════════════════════ */}
-      {/* STAFF FORM                                          */}
+      {/* DEBRIEF FORM (everyone fills their own)             */}
       {/* ════════════════════════════════════════════════════ */}
-      {!isPatron && !submitted && (
+      {!submitted && (
         <div style={{ display: "flex", flexDirection: "column", gap: 20, marginTop: 16 }}>
           <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
             30 secondes pour résumer ton shift.
@@ -335,9 +335,9 @@ export default function DebriefPage() {
       )}
 
       {/* ════════════════════════════════════════════════════ */}
-      {/* STAFF: ALREADY SUBMITTED                            */}
+      {/* ALREADY SUBMITTED                                   */}
       {/* ════════════════════════════════════════════════════ */}
-      {!isPatron && submitted && myDebrief && (
+      {submitted && myDebrief && (
         <div style={{ marginTop: 16 }}>
           <div className="card-medium" style={{ padding: 20 }}>
             <p style={{ fontSize: 14, fontWeight: 500, color: "#8B5A40", marginBottom: 16 }}>
@@ -392,8 +392,9 @@ export default function DebriefPage() {
       )}
 
       {/* ════════════════════════════════════════════════════ */}
-      {/* PATRON VIEW                                         */}
+      {/* PATRON/RESPONSABLE: team debriefs                   */}
       {/* ════════════════════════════════════════════════════ */}
+      {isPatron && submitted && <div style={{ height: 24 }} />}
       {isPatron && (
         <div style={{ marginTop: 8 }}>
           {/* Date nav */}
