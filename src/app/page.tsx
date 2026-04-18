@@ -28,9 +28,7 @@ export default function Home() {
         return;
       }
 
-      if (profile.role === "patron") {
-        router.replace("/dashboard");
-      } else if (!profile.onboarding_completed) {
+      if (!profile.onboarding_completed && profile.role !== "patron") {
         router.replace("/onboarding");
       } else {
         router.replace("/accueil");

@@ -3,13 +3,13 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
-import { getShiftDate, formatDateFr, formatTime } from "@/lib/shift-utils";
-import type { AvailabilityRequest, Reservation, Profile, Debrief, StockAlert, StockProduct, Schedule } from "@/lib/types";
+import { getShiftDate, formatDateFr } from "@/lib/shift-utils";
+import type { AvailabilityRequest, Profile, Debrief } from "@/lib/types";
 import Link from "next/link";
 import {
   ThumbsUp, ThumbsDown, Calendar, MessageCircle, ListChecks,
-  Users, Settings, ArrowRight, Repeat, UserX, Heart,
-  Send, Bell, Check, ChevronDown, AlertTriangle, Lightbulb, Clock,
+  Users, Settings, ArrowRight, Repeat, UserX,
+  Send, Check, ChevronDown, AlertTriangle, Lightbulb,
 } from "lucide-react";
 
 const RATING_COLORS = ["", "#D44", "#D88", "#B89070", "#8B6A50", "#6B4A30"];
@@ -20,12 +20,8 @@ export default function AdminPage() {
 
   const [loading, setLoading] = useState(true);
   const [absenceRequests, setAbsenceRequests] = useState<AvailabilityRequest[]>([]);
-  const [fnfReservations, setFnfReservations] = useState<Reservation[]>([]);
   const [staffMap, setStaffMap] = useState<Record<string, string>>({});
   const [debriefs, setDebriefs] = useState<Debrief[]>([]);
-  const [stockAlerts, setStockAlerts] = useState<StockAlert[]>([]);
-  const [stockProducts, setStockProducts] = useState<StockProduct[]>([]);
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [expandedDebrief, setExpandedDebrief] = useState<string | null>(null);
 
   // Inline message compose
@@ -36,24 +32,16 @@ export default function AdminPage() {
   const shiftDate = getShiftDate();
 
   const fetchData = useCallback(async () => {
-    const [absRes, resaRes, profRes, debRes, alertRes, prodRes, schedRes] = await Promise.all([
+    const [absRes, profRes, debRes] = await Promise.all([
       supabase.from("availability_requests").select("*").eq("status", "pending").order("date"),
-      supabase.from("reservations").select("*").eq("fnf_status", "pending").order("date"),
       supabase.from("profiles").select("id, name, role"),
       supabase.from("debriefs").select("*").eq("date", shiftDate).order("created_at"),
-      supabase.from("stock_alerts").select("*").eq("acknowledged", false).order("created_at", { ascending: false }),
-      supabase.from("stock_products").select("id, name"),
-      supabase.from("schedules").select("*").eq("date", shiftDate),
     ]);
     setAbsenceRequests((absRes.data as AvailabilityRequest[]) || []);
-    setFnfReservations((resaRes.data as Reservation[]) || []);
     const map: Record<string, string> = {};
     ((profRes.data as Pick<Profile, "id" | "name" | "role">[]) || []).forEach((p) => { map[p.id] = p.name; });
     setStaffMap(map);
     setDebriefs((debRes.data as Debrief[]) || []);
-    setStockAlerts((alertRes.data as StockAlert[]) || []);
-    setStockProducts((prodRes.data as StockProduct[]) || []);
-    setSchedules((schedRes.data as Schedule[]) || []);
     setLoading(false);
   }, [supabase, shiftDate]);
 
@@ -62,9 +50,7 @@ export default function AdminPage() {
   useEffect(() => {
     const ch = supabase.channel("admin-rt")
       .on("postgres_changes", { event: "*", schema: "public", table: "availability_requests" }, () => fetchData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "reservations" }, () => fetchData())
       .on("postgres_changes", { event: "*", schema: "public", table: "debriefs" }, () => fetchData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "stock_alerts" }, () => fetchData())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [supabase, fetchData]);
@@ -90,11 +76,6 @@ export default function AdminPage() {
     fetchData();
   }
 
-  async function respondFnF(resaId: string, status: "accepted" | "refused") {
-    await supabase.from("reservations").update({ fnf_status: status }).eq("id", resaId);
-    fetchData();
-  }
-
   async function sendMessage() {
     if (!msgContent.trim() || !user || msgSending) return;
     setMsgSending(true);
@@ -108,13 +89,6 @@ export default function AdminPage() {
     setMsgSent(true);
     setTimeout(() => setMsgSent(false), 2000);
   }
-
-  async function acknowledgeAlert(id: string) {
-    await supabase.from("stock_alerts").update({ acknowledged: true }).eq("id", id);
-    fetchData();
-  }
-
-  const totalPending = absenceRequests.length + fnfReservations.length;
 
   const quickLinks = [
     { href: "/events", label: "Événements", icon: <Repeat size={18} />, desc: "Rituels & soirées" },
@@ -139,11 +113,11 @@ export default function AdminPage() {
         Admin
       </h1>
 
-      {/* ═══ 1. DEMANDES EN ATTENTE ══════════════════════ */}
-      {totalPending > 0 && (
+      {/* ═══ 1. ABSENCES EN ATTENTE ═══════════════════════ */}
+      {absenceRequests.length > 0 && (
         <div style={{ marginBottom: 24 }}>
           <p className="section-label" style={{ marginBottom: 10 }}>
-            En attente ({totalPending})
+            Demandes d&apos;absence ({absenceRequests.length})
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {absenceRequests.map((req) => (
@@ -157,7 +131,7 @@ export default function AdminPage() {
                     {staffMap[req.user_id] || "Staff"}
                   </div>
                   <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
-                    Absence — {formatDateFr(req.date)}
+                    {formatDateFr(req.date)}
                   </div>
                   {req.reason && (
                     <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2, fontStyle: "italic" }}>{req.reason}</div>
@@ -168,28 +142,6 @@ export default function AdminPage() {
                     <ThumbsUp size={16} style={{ color: "#8B5A40" }} />
                   </button>
                   <button onClick={() => respondAbsence(req.id, "refused")} style={{ width: 36, height: 36, borderRadius: 10, border: "none", cursor: "pointer", background: "rgba(200,60,60,0.08)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <ThumbsDown size={16} style={{ color: "var(--danger)" }} />
-                  </button>
-                </div>
-              </div>
-            ))}
-            {fnfReservations.map((resa) => (
-              <div key={resa.id} className="card-medium" style={{
-                padding: "14px 16px", display: "flex", alignItems: "center", gap: 12,
-                borderLeft: "3px solid var(--warning)",
-              }}>
-                <Heart size={18} style={{ color: "var(--warning)", flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>F&F — {resa.name}</div>
-                  <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
-                    {resa.covers} pers. · {formatDateFr(resa.date)} · {staffMap[resa.fnf_requested_by!] || "Staff"}
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                  <button onClick={() => respondFnF(resa.id, "accepted")} style={{ width: 36, height: 36, borderRadius: 10, border: "none", cursor: "pointer", background: "rgba(139,90,64,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <ThumbsUp size={16} style={{ color: "#8B5A40" }} />
-                  </button>
-                  <button onClick={() => respondFnF(resa.id, "refused")} style={{ width: 36, height: 36, borderRadius: 10, border: "none", cursor: "pointer", background: "rgba(200,60,60,0.08)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <ThumbsDown size={16} style={{ color: "var(--danger)" }} />
                   </button>
                 </div>
@@ -233,44 +185,7 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* ═══ 3. ALERTES STOCK ════════════════════════════ */}
-      {stockAlerts.length > 0 && (
-        <div style={{ marginBottom: 24 }}>
-          <p className="section-label" style={{ marginBottom: 10 }}>
-            <Bell size={12} style={{ display: "inline", marginRight: 4 }} />
-            Alertes stock ({stockAlerts.length})
-          </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {stockAlerts.map((a) => {
-              const prod = stockProducts.find((p) => p.id === a.product_id);
-              const time = new Date(a.created_at);
-              const timeStr = `${time.getHours()}h${String(time.getMinutes()).padStart(2, "0")}`;
-              return (
-                <div key={a.id} className="card-light" style={{
-                  padding: "10px 14px", display: "flex", alignItems: "center", gap: 10,
-                  borderLeft: "3px solid var(--warning)",
-                }}>
-                  <div style={{ flex: 1 }}>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{prod?.name}</span>
-                    <span style={{ fontSize: 11, color: "var(--text-tertiary)", marginLeft: 8 }}>
-                      {staffMap[a.created_by] || "Staff"} · {timeStr}
-                    </span>
-                  </div>
-                  <button onClick={() => acknowledgeAlert(a.id)} style={{
-                    padding: "5px 10px", borderRadius: 8, border: "none", cursor: "pointer",
-                    background: "var(--secondary-bg)", fontSize: 11, fontWeight: 500, color: "var(--text-secondary)",
-                    display: "flex", alignItems: "center", gap: 4,
-                  }}>
-                    <Check size={12} /> OK
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ═══ 4. DEBRIEFS DU SOIR ═════════════════════════ */}
+      {/* ═══ 3. DEBRIEFS DU SOIR ═════════════════════════ */}
       {debriefs.length > 0 && (
         <div style={{ marginBottom: 24 }}>
           <p className="section-label" style={{ marginBottom: 10 }}>Debriefs du soir</p>
@@ -327,30 +242,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ═══ 5. ÉQUIPE CE SOIR ═══════════════════════════ */}
-      {schedules.length > 0 && (
-        <div style={{ marginBottom: 24 }}>
-          <p className="section-label" style={{ marginBottom: 10 }}>
-            <Clock size={12} style={{ display: "inline", marginRight: 4 }} />
-            Équipe ce soir
-          </p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {schedules.map((s) => (
-              <div key={s.id} style={{
-                padding: "6px 12px", borderRadius: 10,
-                background: "var(--secondary-bg)", fontSize: 13,
-              }}>
-                <span style={{ fontWeight: 500, color: "var(--text-primary)" }}>{staffMap[s.user_id] || "Staff"}</span>
-                <span style={{ color: "var(--text-tertiary)", marginLeft: 6 }}>
-                  {formatTime(s.start_time)}→{formatTime(s.end_time)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ═══ 6. GÉRER ════════════════════════════════════ */}
+      {/* ═══ 4. GÉRER ════════════════════════════════════ */}
       <p className="section-label" style={{ marginBottom: 10 }}>Gérer</p>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {quickLinks.map((link) => (

@@ -478,6 +478,34 @@ export default function AccueilPage() {
         </div>
       )}
 
+      {/* ── Patron: Moment progression (absorbed from Vue) ──── */}
+      {profile?.role === "patron" && tasks.length > 0 && (() => {
+        const momentProgress = MOMENT_ORDER.map((m) => {
+          const mt = tasks.filter((t) => t.moment === m);
+          const done = mt.filter((t) => t.completed).length;
+          return { moment: m, done, total: mt.length, pct: mt.length > 0 ? Math.round((done / mt.length) * 100) : 0 };
+        }).filter((m) => m.total > 0);
+
+        if (momentProgress.length === 0) return null;
+
+        return (
+          <div style={{ marginBottom: 20 }}>
+            <span className="section-label" style={{ display: "block", marginBottom: 10 }}>Progression</span>
+            <div style={{ display: "flex", gap: 8 }}>
+              {momentProgress.map((mp) => (
+                <div key={mp.moment} className="card-light" style={{ flex: 1, padding: "10px 12px", textAlign: "center" }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: mp.pct === 100 ? "var(--terra-deep)" : "var(--text-primary)" }}>{mp.pct}%</div>
+                  <div style={{ height: 3, background: "var(--secondary-bg)", borderRadius: 2, margin: "6px 0", overflow: "hidden" }}>
+                    <div style={{ height: "100%", borderRadius: 2, width: `${mp.pct}%`, background: "var(--gradient-primary)", transition: "width 0.6s" }} />
+                  </div>
+                  <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>{MOMENT_LABELS[mp.moment]}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── Patron: Staff Progress ──────────────────────────── */}
       {profile?.role === "patron" && staffProfiles.length > 0 && (() => {
         const staffProgress = staffProfiles

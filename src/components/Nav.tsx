@@ -60,7 +60,6 @@ export default function Nav() {
     }
     // patron main
     return [
-      { href: "/dashboard", label: "Vue", icon: <LayoutDashboard size={iconSize} strokeWidth={strokeWidth} /> },
       { href: "/accueil", label: "Accueil", icon: <Home size={iconSize} strokeWidth={strokeWidth} /> },
       { href: "/reservations", label: "Résas", icon: <BookOpen size={iconSize} strokeWidth={strokeWidth} /> },
       { href: "/admin", label: "Admin", icon: <Shield size={iconSize} strokeWidth={strokeWidth} /> },
