@@ -90,12 +90,27 @@ export default function AdminPage() {
     setTimeout(() => setMsgSent(false), 2000);
   }
 
-  const quickLinks = [
-    { href: "/events", label: "Événements", icon: <Repeat size={18} />, desc: "Rituels & soirées" },
-    { href: "/tasks", label: "Tâches", icon: <ListChecks size={18} />, desc: "Tâches récurrentes" },
-    { href: "/staff", label: "Équipe", icon: <Users size={18} />, desc: "Comptes & rôles" },
-    { href: "/planning", label: "Planning", icon: <Calendar size={18} />, desc: "Horaires" },
-    { href: "/settings", label: "Réglages", icon: <Settings size={18} />, desc: "Configuration" },
+  const manageGroups = [
+    {
+      label: "Contenu",
+      items: [
+        { href: "/events", label: "Événements", icon: <Repeat size={20} />, tint: "rgba(196,120,90,0.1)", iconColor: "var(--terra-medium)" },
+        { href: "/tasks", label: "Tâches", icon: <ListChecks size={20} />, tint: "rgba(196,120,90,0.1)", iconColor: "var(--terra-medium)" },
+      ],
+    },
+    {
+      label: "Équipe",
+      items: [
+        { href: "/staff", label: "Comptes", icon: <Users size={20} />, tint: "rgba(139,90,64,0.1)", iconColor: "var(--terra-deep)" },
+        { href: "/planning", label: "Planning", icon: <Calendar size={20} />, tint: "rgba(139,90,64,0.1)", iconColor: "var(--terra-deep)" },
+      ],
+    },
+    {
+      label: "Système",
+      items: [
+        { href: "/settings", label: "Réglages", icon: <Settings size={20} />, tint: "rgba(181,176,168,0.15)", iconColor: "var(--text-secondary)" },
+      ],
+    },
   ];
 
   if (loading) {
@@ -243,20 +258,48 @@ export default function AdminPage() {
       )}
 
       {/* ═══ 4. GÉRER ════════════════════════════════════ */}
-      <p className="section-label" style={{ marginBottom: 10 }}>Gérer</p>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {quickLinks.map((link) => (
-          <Link key={link.href} href={link.href} className="card-light" style={{
-            padding: "12px 16px", textDecoration: "none",
-            display: "flex", alignItems: "center", gap: 12,
-          }}>
-            <div style={{ color: "var(--terra-medium)", flexShrink: 0 }}>{link.icon}</div>
-            <div style={{ flex: 1 }}>
-              <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>{link.label}</span>
-              <span style={{ fontSize: 12, color: "var(--text-tertiary)", marginLeft: 8 }}>{link.desc}</span>
+      <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        {manageGroups.map((group) => (
+          <div key={group.label}>
+            <p className="section-label" style={{ marginBottom: 10 }}>{group.label}</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              {group.items.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="card-light"
+                  style={{
+                    padding: "18px 16px",
+                    textDecoration: "none",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 12,
+                    minHeight: 96,
+                    transition: "transform 0.2s ease, box-shadow 0.2s ease",
+                  }}
+                >
+                  <div style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 12,
+                    background: link.tint,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: link.iconColor,
+                  }}>
+                    {link.icon}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", letterSpacing: "-0.01em" }}>
+                      {link.label}
+                    </span>
+                    <ArrowRight size={14} style={{ color: "var(--text-tertiary)" }} />
+                  </div>
+                </Link>
+              ))}
             </div>
-            <ArrowRight size={14} style={{ color: "var(--text-tertiary)" }} />
-          </Link>
+          </div>
         ))}
       </div>
 
