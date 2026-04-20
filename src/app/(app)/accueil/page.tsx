@@ -22,7 +22,7 @@ import type {
 import MessageBanner from "@/components/MessageBanner";
 import MomentSection from "@/components/MomentSection";
 import Link from "next/link";
-import { Users, Bell, Search, X, ChevronDown } from "lucide-react";
+import { Users, Bell, Search, X, ChevronDown, BookOpen } from "lucide-react";
 
 interface MergedTask {
   id: string;
@@ -246,7 +246,46 @@ export default function AccueilPage() {
           </h1>
           <p style={{ fontSize: 13, color: "var(--text-tertiary)", marginTop: 2 }}>{dateLabelShort}</p>
         </div>
+        <a
+          href="/guide"
+          style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "8px 12px", borderRadius: 10,
+            background: "var(--secondary-bg)",
+            textDecoration: "none",
+            fontSize: 12, fontWeight: 500, color: "var(--text-secondary)",
+          }}
+        >
+          <BookOpen size={14} /> Guide
+        </a>
       </div>
+
+      {/* ── Extra welcome banner (only for extras) ─────────── */}
+      {profile?.employment_type === "extra" && (
+        <a
+          href="/guide"
+          style={{
+            display: "flex", alignItems: "center", gap: 12,
+            padding: "12px 14px", marginBottom: 16, borderRadius: 14,
+            background: "linear-gradient(135deg, rgba(196,120,90,0.1) 0%, rgba(196,120,90,0.04) 100%)",
+            border: "1px solid rgba(196,120,90,0.15)",
+            textDecoration: "none",
+          }}
+        >
+          <div style={{
+            width: 36, height: 36, borderRadius: 10,
+            background: "var(--gradient-primary)",
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>
+            <BookOpen size={18} style={{ color: "#fff" }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>Nouveau ici ?</div>
+            <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Consulte le guide : équipe, vestiaire, plan des tables...</div>
+          </div>
+          <ChevronDown size={14} style={{ color: "var(--text-tertiary)", transform: "rotate(-90deg)" }} />
+        </a>
+      )}
 
       {/* ── Ce soir (rituels + events) ─────────────────────── */}
       {(rituals.length > 0 || event) && (
