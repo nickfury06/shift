@@ -49,7 +49,43 @@ export default function StocksPage() {
   const { profile, user } = useAuth();
   const toast = useToast();
   const supabase = useRef(createClient()).current;
-  const [orderQuantities, setOrderQuantities] = useState<Record<string, number>>({});
+  const [orderQuantities, setOrderQuantities] = useState<Record<string, number>>(() => {
+    if (typeof window === "undefined") return {};
+    try { return JSON.parse(localStorage.getItem("shift-order-qtys") || "{}"); }
+    catch { return {}; }
+  });
+  const [manualProductIds, setManualProductIds] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try { return new Set(JSON.parse(localStorage.getItem("shift-manual-order") || "[]")); }
+    catch { return new Set(); }
+  });
+  const [showAddProduct, setShowAddProduct] = useState(false);
+
+  function updateQty(id: string, qty: number) {
+    const next = { ...orderQuantities, [id]: qty };
+    setOrderQuantities(next);
+    localStorage.setItem("shift-order-qtys", JSON.stringify(next));
+  }
+  function addManual(id: string) {
+    const next = new Set(manualProductIds); next.add(id);
+    setManualProductIds(next);
+    localStorage.setItem("shift-manual-order", JSON.stringify([...next]));
+    setShowAddProduct(false);
+  }
+  function removeManual(id: string) {
+    const next = new Set(manualProductIds); next.delete(id);
+    setManualProductIds(next);
+    localStorage.setItem("shift-manual-order", JSON.stringify([...next]));
+    const nextQty = { ...orderQuantities }; delete nextQty[id];
+    setOrderQuantities(nextQty);
+    localStorage.setItem("shift-order-qtys", JSON.stringify(nextQty));
+  }
+  function clearOrder() {
+    setOrderQuantities({});
+    setManualProductIds(new Set());
+    localStorage.removeItem("shift-order-qtys");
+    localStorage.removeItem("shift-manual-order");
+  }
   const isManager = profile?.role === "patron" || profile?.role === "responsable";
 
   const [loading, setLoading] = useState(true);
@@ -64,6 +100,7 @@ export default function StocksPage() {
   const [countingId, setCountingId] = useState<string | null>(null);
   const [countValue, setCountValue] = useState("");
   const [saving, setSaving] = useState(false);
+  const [invSearch, setInvSearch] = useState("");
 
   const fetchData = useCallback(async () => {
     const [prodRes, orderRes, alertRes, profRes] = await Promise.all([
@@ -335,18 +372,53 @@ export default function StocksPage() {
       {/* ═══════════════════════════════════════════════════ */}
       {/* INVENTAIRE (manager only)                          */}
       {/* ═══════════════════════════════════════════════════ */}
-      {view === "inventaire" && isManager && (
+      {view === "inventaire" && isManager && (() => {
+        const alertedInv = new Set(alerts.map((a) => a.product_id));
+        const q = invSearch.toLowerCase();
+        const filteredGrouped = q
+          ? grouped.map((g) => ({
+              ...g,
+              items: g.items.filter((p) => p.name.toLowerCase().includes(q)),
+            })).filter((g) => g.items.length > 0)
+          : grouped;
+
+        return (
         <div>
-          <p style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 16 }}>
-            Tap un produit, ajuste le stock.
-          </p>
-          {grouped.map((g) => (
+          {/* Search */}
+          <div style={{ position: "relative", marginBottom: 16 }}>
+            <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-tertiary)" }} />
+            <input
+              type="text"
+              placeholder="Rechercher un produit..."
+              value={invSearch}
+              onChange={(e) => setInvSearch(e.target.value)}
+              style={{
+                width: "100%", borderRadius: 12, border: "1px solid var(--border-color)",
+                background: "var(--input-bg)", padding: "10px 14px 10px 36px", fontSize: 14,
+                color: "var(--text-primary)", outline: "none",
+              }}
+            />
+            {invSearch && (
+              <button onClick={() => setInvSearch("")} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+                <X size={14} style={{ color: "var(--text-tertiary)" }} />
+              </button>
+            )}
+          </div>
+
+          {filteredGrouped.length === 0 && (
+            <div className="card-light" style={{ padding: 24, textAlign: "center" }}>
+              <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>Aucun produit trouvé</p>
+            </div>
+          )}
+
+          {filteredGrouped.map((g) => (
             <div key={g.cat} style={{ marginBottom: 20 }}>
               <p className="section-label" style={{ marginBottom: 8 }}>{g.label}</p>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 {g.items.map((p) => {
                   const isCounting = countingId === p.id;
                   const status = stockStatus(p);
+                  const isFlagged = alertedInv.has(p.id);
                   return (
                     <div key={p.id}>
                       <button
@@ -361,10 +433,12 @@ export default function StocksPage() {
                           padding: "10px 14px", border: "none",
                           display: "flex", alignItems: "center", gap: 10,
                           borderRadius: isCounting ? "14px 14px 0 0" : 14,
+                          borderLeft: isFlagged ? "3px solid var(--warning)" : undefined,
                         }}
                       >
                         <div style={{ width: 8, height: 8, borderRadius: 4, background: statusDot[status], flexShrink: 0 }} />
                         <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>{p.name}</span>
+                        {isFlagged && <Bell size={12} style={{ color: "var(--warning)" }} />}
                         <span style={{ fontSize: 15, fontWeight: 700, color: statusDot[status] }}>{p.current_stock}</span>
                       </button>
 
@@ -414,15 +488,21 @@ export default function StocksPage() {
             </div>
           ))}
         </div>
-      )}
+        );
+      })()}
 
       {/* ═══ COMMANDE ═══════════════════════════════════ */}
       {view === "commande" && isManager && (() => {
-        // Products to order: below min_stock OR flagged
+        // Products to order: below min_stock OR flagged OR manually added
         const alertedIds = new Set(alerts.map((a) => a.product_id));
-        const toOrder = visibleProducts.filter((p) => stockStatus(p) !== "ok" || alertedIds.has(p.id));
+        const toOrder = visibleProducts.filter((p) =>
+          stockStatus(p) !== "ok" || alertedIds.has(p.id) || manualProductIds.has(p.id)
+        );
         // Ensure quantity defaults
         const getQty = (p: StockProduct) => orderQuantities[p.id] ?? Math.max(p.min_stock - p.current_stock, p.min_stock);
+        // Products that can be added manually (not already in order)
+        const orderIds = new Set(toOrder.map((p) => p.id));
+        const availableToAdd = visibleProducts.filter((p) => !orderIds.has(p.id));
 
         const byCategory = CATEGORY_ORDER
           .map((cat) => ({ cat, label: CATEGORY_LABELS[cat], items: toOrder.filter((p) => p.category === cat) }))
@@ -504,11 +584,16 @@ export default function StocksPage() {
                       {g.items.map((p) => {
                         const qty = getQty(p);
                         const isAlerted = alertedIds.has(p.id);
+                        const isManual = manualProductIds.has(p.id);
                         return (
                           <div key={p.id} className="card-light" style={{ padding: "10px 14px", display: "flex", alignItems: "center", gap: 10 }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>
-                                {p.name} {isAlerted && <Bell size={11} style={{ display: "inline", color: "var(--warning)" }} />}
+                              <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)", display: "flex", alignItems: "center", gap: 6 }}>
+                                {p.name}
+                                {isAlerted && <Bell size={11} style={{ color: "var(--warning)" }} />}
+                                {isManual && !isAlerted && stockStatus(p) === "ok" && (
+                                  <span style={{ fontSize: 9, fontWeight: 600, color: "var(--terra-medium)", background: "rgba(196,120,90,0.1)", padding: "1px 6px", borderRadius: 4 }}>AJOUTÉ</span>
+                                )}
                               </div>
                               <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
                                 Stock: {p.current_stock} · min. {p.min_stock}
@@ -516,13 +601,13 @@ export default function StocksPage() {
                             </div>
                             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                               <button
-                                onClick={() => setOrderQuantities({ ...orderQuantities, [p.id]: Math.max(1, qty - 1) })}
+                                onClick={() => updateQty(p.id, Math.max(1, qty - 1))}
                                 style={{ width: 28, height: 28, borderRadius: 8, border: "none", cursor: "pointer", background: "var(--secondary-bg)", fontSize: 16 }}
                               >−</button>
                               <input
                                 type="number"
                                 value={qty}
-                                onChange={(e) => setOrderQuantities({ ...orderQuantities, [p.id]: Math.max(1, parseInt(e.target.value) || 1) })}
+                                onChange={(e) => updateQty(p.id, Math.max(1, parseInt(e.target.value) || 1))}
                                 style={{
                                   width: 44, textAlign: "center", fontSize: 14, fontWeight: 600,
                                   borderRadius: 8, border: "1px solid var(--border-color)",
@@ -530,9 +615,18 @@ export default function StocksPage() {
                                 }}
                               />
                               <button
-                                onClick={() => setOrderQuantities({ ...orderQuantities, [p.id]: qty + 1 })}
+                                onClick={() => updateQty(p.id, qty + 1)}
                                 style={{ width: 28, height: 28, borderRadius: 8, border: "none", cursor: "pointer", background: "var(--secondary-bg)", fontSize: 16 }}
                               >+</button>
+                              {isManual && stockStatus(p) === "ok" && !isAlerted && (
+                                <button
+                                  onClick={() => removeManual(p.id)}
+                                  style={{ width: 28, height: 28, borderRadius: 8, border: "none", cursor: "pointer", background: "none", display: "flex", alignItems: "center", justifyContent: "center" }}
+                                  title="Retirer de la commande"
+                                >
+                                  <X size={14} style={{ color: "var(--text-tertiary)" }} />
+                                </button>
+                              )}
                             </div>
                           </div>
                         );
@@ -540,6 +634,49 @@ export default function StocksPage() {
                     </div>
                   </div>
                 ))}
+
+                {/* Add a product manually */}
+                <div>
+                  {!showAddProduct ? (
+                    <button
+                      onClick={() => setShowAddProduct(true)}
+                      style={{
+                        width: "100%", padding: "12px 0", borderRadius: 12,
+                        border: "1px dashed var(--border-color)", background: "transparent",
+                        color: "var(--text-secondary)", fontSize: 13, fontWeight: 500,
+                        cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                      }}
+                    >
+                      <Plus size={14} /> Ajouter un produit
+                    </button>
+                  ) : (
+                    <div className="card-light" style={{ padding: 12 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                        <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>Ajouter à la commande</span>
+                        <button onClick={() => setShowAddProduct(false)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2 }}>
+                          <X size={14} style={{ color: "var(--text-tertiary)" }} />
+                        </button>
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxHeight: 200, overflowY: "auto" }}>
+                        {availableToAdd.length === 0 ? (
+                          <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Tous les produits sont déjà dans la commande</span>
+                        ) : (
+                          availableToAdd.map((p) => (
+                            <button
+                              key={p.id}
+                              onClick={() => addManual(p.id)}
+                              style={{
+                                padding: "6px 10px", borderRadius: 8, border: "none", cursor: "pointer",
+                                background: "var(--secondary-bg)", fontSize: 12, fontWeight: 500,
+                                color: "var(--text-secondary)",
+                              }}
+                            >+ {p.name}</button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {/* Actions */}
                 <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
@@ -566,6 +703,18 @@ export default function StocksPage() {
                     ✉️ Mail
                   </button>
                 </div>
+
+                {/* Clear order */}
+                <button
+                  onClick={() => { if (confirm("Réinitialiser la commande ?")) clearOrder(); }}
+                  style={{
+                    padding: "10px 0", background: "none", border: "none",
+                    fontSize: 12, color: "var(--text-tertiary)", cursor: "pointer",
+                    textAlign: "center",
+                  }}
+                >
+                  Réinitialiser la liste
+                </button>
               </>
             )}
           </div>
