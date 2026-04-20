@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Reservation, VenueTable } from "@/lib/types";
-import { Users, Home, Sun, Leaf, Wine, Trees } from "lucide-react";
+import { Users, Home, Sun, Leaf, Wine } from "lucide-react";
 
 interface FloorPlanProps {
   tables: VenueTable[];
@@ -64,38 +64,44 @@ const ZONES: ZoneDef[] = [
     icon: <Sun size={14} />,
     tint: "rgba(212,160,74,0.06)",
     dbZone: "terrasse",
-    aspect: 0.5,
+    aspect: 0.6,
     tables: [
       // Right column (200-220)
-      { id: "200", x: 72, y: 15, size: "md" },
-      { id: "210", x: 72, y: 38, size: "md" },
-      { id: "220", x: 72, y: 61, size: "md" },
-      // Big round table (230)
-      { id: "230", x: 70, y: 85, size: "xl" },
+      { id: "200", x: 82, y: 12, size: "md" },
+      { id: "210", x: 82, y: 30, size: "md" },
+      { id: "220", x: 82, y: 48, size: "md" },
+      // Big round table (230) bottom right
+      { id: "230", x: 80, y: 72, size: "xl" },
       // Center pair (240, 250)
-      { id: "250", x: 30, y: 78, size: "sm" },
-      { id: "240", x: 50, y: 78, size: "sm" },
+      { id: "250", x: 45, y: 60, size: "sm" },
+      { id: "240", x: 60, y: 60, size: "sm" },
+      // Front row along the wall (150, 160)
+      { id: "150", x: 25, y: 55, size: "sm" },
+      { id: "160", x: 35, y: 55, size: "sm" },
+      // Front sidewalk row (100-140)
+      { id: "140", x: 8, y: 88, size: "sm" },
+      { id: "130", x: 20, y: 88, size: "sm" },
+      { id: "120", x: 32, y: 88, size: "sm" },
+      { id: "110", x: 44, y: 88, size: "sm" },
+      { id: "100", x: 56, y: 88, size: "sm" },
     ],
   },
   {
-    key: "terrasse_couverte",
+    key: "non_fumeur",
     label: "Non-fumeur",
-    hint: "Terrasse abritée",
+    hint: "Salle couverte, ouverte sur la terrasse",
     icon: <Leaf size={14} />,
     tint: "rgba(139,176,150,0.06)",
     dbZone: "terrasse_couverte",
-    aspect: 0.35,
-    tables: [],  // placeholder — filled below with what maps to this zone
-  },
-  {
-    key: "pergola",
-    label: "Pergola",
-    hint: "Espace extérieur couvert",
-    icon: <Trees size={14} />,
-    tint: "rgba(181,176,168,0.08)",
-    dbZone: "terrasse_couverte_pergola", // see note below
-    aspect: 0.35,
-    tables: [],
+    aspect: 0.4,
+    tables: [
+      // Covered open salle (300-340)
+      { id: "340", x: 20, y: 35, size: "sm" },
+      { id: "320", x: 40, y: 35, size: "sm" },
+      { id: "330", x: 60, y: 35, size: "sm" },
+      { id: "310", x: 40, y: 70, size: "sm" },
+      { id: "300", x: 60, y: 70, size: "sm" },
+    ],
   },
   {
     key: "bar",
@@ -121,27 +127,6 @@ const ZONES: ZoneDef[] = [
   },
 ];
 
-// The 100-160 tables are non-fumeur (indoor abritée),
-// 300s are pergola (outdoor covered). In DB they share "terrasse_couverte".
-// We split them based on ID prefix for visual purposes.
-ZONES[2].tables = [
-  // Non-fumeur (100-160 range)
-  { id: "150", x: 35, y: 25, size: "sm" },
-  { id: "160", x: 55, y: 25, size: "sm" },
-  { id: "140", x: 10, y: 65, size: "sm" },
-  { id: "130", x: 25, y: 65, size: "sm" },
-  { id: "120", x: 40, y: 65, size: "sm" },
-  { id: "110", x: 55, y: 65, size: "sm" },
-  { id: "100", x: 70, y: 65, size: "sm" },
-];
-ZONES[3].tables = [
-  // Pergola (300s)
-  { id: "340", x: 20, y: 30, size: "sm" },
-  { id: "320", x: 40, y: 30, size: "sm" },
-  { id: "330", x: 60, y: 30, size: "sm" },
-  { id: "310", x: 40, y: 70, size: "sm" },
-  { id: "300", x: 60, y: 70, size: "sm" },
-];
 
 // ── Size definitions ────────────────────────────────────────
 const SIZE_DIM: Record<"sm" | "md" | "lg" | "xl", { w: number; h: number; fs: number; shape: "rect" | "circle" }> = {
