@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -17,18 +17,43 @@ import {
 } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useAuth } from "@/components/AuthProvider";
+import { createClient } from "@/lib/supabase/client";
 
 interface NavItem {
   href: string;
   label: string;
   icon: React.ReactNode;
+  badge?: number;
 }
 
 export default function Nav() {
   const { profile, signOut } = useAuth();
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
+  const [pendingAbsences, setPendingAbsences] = useState(0);
+  const [pendingFnF, setPendingFnF] = useState(0);
+  const supabase = useRef(createClient()).current;
   const role = profile?.role;
+
+  useEffect(() => {
+    if (role !== "patron") return;
+
+    async function fetchCounts() {
+      const [abs, fnf] = await Promise.all([
+        supabase.from("availability_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
+        supabase.from("reservations").select("id", { count: "exact", head: true }).eq("fnf_status", "pending"),
+      ]);
+      setPendingAbsences(abs.count || 0);
+      setPendingFnF(fnf.count || 0);
+    }
+    fetchCounts();
+
+    const ch = supabase.channel("nav-badges")
+      .on("postgres_changes", { event: "*", schema: "public", table: "availability_requests" }, fetchCounts)
+      .on("postgres_changes", { event: "*", schema: "public", table: "reservations" }, fetchCounts)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [role, supabase]);
 
   if (!role) return null;
 
@@ -57,8 +82,8 @@ export default function Nav() {
     // patron main
     return [
       { href: "/accueil", label: "Accueil", icon: <Home size={iconSize} strokeWidth={strokeWidth} /> },
-      { href: "/reservations", label: "Résas", icon: <BookOpen size={iconSize} strokeWidth={strokeWidth} /> },
-      { href: "/admin", label: "Admin", icon: <Shield size={iconSize} strokeWidth={strokeWidth} /> },
+      { href: "/reservations", label: "Résas", icon: <BookOpen size={iconSize} strokeWidth={strokeWidth} />, badge: pendingFnF },
+      { href: "/admin", label: "Admin", icon: <Shield size={iconSize} strokeWidth={strokeWidth} />, badge: pendingAbsences },
     ];
   }
 
@@ -236,9 +261,24 @@ export default function Nav() {
                     ? "drop-shadow(0 0 8px rgba(196,120,90,0.3))"
                     : "none",
                   transition: "all 0.2s ease",
+                  position: "relative",
                 }}
               >
-                {item.icon}
+                <div style={{ position: "relative" }}>
+                  {item.icon}
+                  {item.badge && item.badge > 0 ? (
+                    <span style={{
+                      position: "absolute", top: -4, right: -8,
+                      minWidth: 16, height: 16, borderRadius: 8,
+                      background: "var(--warning)",
+                      color: "#fff",
+                      fontSize: 10, fontWeight: 700,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      padding: "0 4px",
+                      boxShadow: "0 0 0 2px var(--nav-bg)",
+                    }}>{item.badge}</span>
+                  ) : null}
+                </div>
                 <span
                   style={{
                     fontSize: 10,

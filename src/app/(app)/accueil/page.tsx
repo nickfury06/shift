@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { useToast } from "@/components/Toast";
 import { createClient } from "@/lib/supabase/client";
 import { getShiftDate, getShiftDay, getNow, formatDateFr, formatTime } from "@/lib/shift-utils";
 import { MOMENT_LABELS, MOMENT_ORDER } from "@/lib/constants";
@@ -36,7 +37,8 @@ interface MergedTask {
 }
 
 export default function AccueilPage() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const toast = useToast();
   const supabase = useRef(createClient()).current;
 
   const [loading, setLoading] = useState(true);
@@ -132,6 +134,41 @@ export default function AccueilPage() {
   }, [profile, supabase, shiftDate, shiftDay]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Check for responded requests and notify staff once
+  useEffect(() => {
+    if (!user || profile?.role === "patron") return;
+
+    async function checkResponses() {
+      const seenRaw = localStorage.getItem("shift-seen-responses");
+      const seen = new Set<string>(seenRaw ? JSON.parse(seenRaw) : []);
+
+      const [absRes, resaRes] = await Promise.all([
+        supabase.from("availability_requests").select("id, status, date")
+          .eq("user_id", user!.id).in("status", ["accepted", "refused"]),
+        supabase.from("reservations").select("id, name, fnf_status")
+          .eq("fnf_requested_by", user!.id).in("fnf_status", ["accepted", "refused"]),
+      ]);
+
+      const newSeen = new Set(seen);
+      (absRes.data || []).forEach((a) => {
+        if (!seen.has(a.id)) {
+          const msg = `Absence du ${a.date} ${a.status === "accepted" ? "acceptée ✓" : "refusée"}`;
+          if (a.status === "accepted") toast.success(msg); else toast.error(msg);
+          newSeen.add(a.id);
+        }
+      });
+      (resaRes.data || []).forEach((r) => {
+        if (!seen.has(r.id)) {
+          const msg = `F&F pour ${r.name} ${r.fnf_status === "accepted" ? "accepté ✓" : "refusé"}`;
+          if (r.fnf_status === "accepted") toast.success(msg); else toast.error(msg);
+          newSeen.add(r.id);
+        }
+      });
+      localStorage.setItem("shift-seen-responses", JSON.stringify([...newSeen]));
+    }
+    checkResponses();
+  }, [user, profile?.role, supabase, toast]);
 
   useEffect(() => {
     const ch = supabase.channel("accueil-realtime")

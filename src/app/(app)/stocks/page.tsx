@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { useToast } from "@/components/Toast";
 import { createClient } from "@/lib/supabase/client";
 import { getNow } from "@/lib/shift-utils";
 import type { StockProduct, StockOrder, StockAlert, StockCategory } from "@/lib/types";
@@ -40,9 +41,15 @@ function getNextDeadline(): { label: string; urgent: boolean } {
 
 type View = "signal" | "inventaire" | "commande";
 
+function getDomainLabel(domain: string): string {
+  return domain === "vins" ? "Vins" : "Boissons";
+}
+
 export default function StocksPage() {
   const { profile, user } = useAuth();
+  const toast = useToast();
   const supabase = useRef(createClient()).current;
+  const [orderQuantities, setOrderQuantities] = useState<Record<string, number>>({});
   const isManager = profile?.role === "patron" || profile?.role === "responsable";
 
   const [loading, setLoading] = useState(true);
@@ -186,6 +193,7 @@ export default function StocksPage() {
           {([
             { key: "signal" as View, label: "Signaler", icon: <Bell size={14} /> },
             { key: "inventaire" as View, label: "Inventaire", icon: <ClipboardList size={14} /> },
+            { key: "commande" as View, label: "Commande", icon: <ShoppingCart size={14} /> },
           ]).map((t) => (
             <button
               key={t.key}
@@ -407,6 +415,162 @@ export default function StocksPage() {
           ))}
         </div>
       )}
+
+      {/* ═══ COMMANDE ═══════════════════════════════════ */}
+      {view === "commande" && isManager && (() => {
+        // Products to order: below min_stock OR flagged
+        const alertedIds = new Set(alerts.map((a) => a.product_id));
+        const toOrder = visibleProducts.filter((p) => stockStatus(p) !== "ok" || alertedIds.has(p.id));
+        // Ensure quantity defaults
+        const getQty = (p: StockProduct) => orderQuantities[p.id] ?? Math.max(p.min_stock - p.current_stock, p.min_stock);
+
+        const byCategory = CATEGORY_ORDER
+          .map((cat) => ({ cat, label: CATEGORY_LABELS[cat], items: toOrder.filter((p) => p.category === cat) }))
+          .filter((g) => g.items.length > 0);
+
+        function buildOrderText(): string {
+          const today = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+          const domainLabel = profile?.role === "responsable" && profile.stock_domain
+            ? getDomainLabel(profile.stock_domain)
+            : "Boissons & Vins";
+          let txt = `Commande Le Hive — ${domainLabel}\n${today}\n\n`;
+          byCategory.forEach((g) => {
+            txt += `${g.label.toUpperCase()}\n`;
+            g.items.forEach((p) => {
+              const qty = getQty(p);
+              txt += `- ${p.name}: ${qty} ${p.unit}${qty > 1 ? "s" : ""}`;
+              if (p.bottle_size) txt += ` (${p.bottle_size})`;
+              txt += `\n`;
+            });
+            txt += "\n";
+          });
+          txt += `Total: ${toOrder.length} référence${toOrder.length > 1 ? "s" : ""}\n`;
+          return txt;
+        }
+
+        async function copyOrder() {
+          const text = buildOrderText();
+          try {
+            await navigator.clipboard.writeText(text);
+            toast.success("Liste copiée — prête à coller dans un mail");
+          } catch {
+            toast.error("Impossible de copier");
+          }
+        }
+
+        function sendByEmail() {
+          const text = buildOrderText();
+          const subject = encodeURIComponent(`Commande Le Hive — ${new Date().toLocaleDateString("fr-FR")}`);
+          const body = encodeURIComponent(text);
+          window.location.href = `mailto:?subject=${subject}&body=${body}`;
+        }
+
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+            {/* FB deadline */}
+            <div className="card-medium" style={{
+              padding: "12px 16px", display: "flex", alignItems: "center", gap: 10,
+              borderLeft: deadline.urgent ? "3px solid var(--danger)" : "3px solid var(--terra-medium)",
+            }}>
+              <Clock size={16} style={{ color: deadline.urgent ? "var(--danger)" : "var(--terra-medium)", flexShrink: 0 }} />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: deadline.urgent ? "var(--danger)" : "var(--text-primary)" }}>
+                  Prochaine commande FB
+                </div>
+                <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{deadline.label}</div>
+              </div>
+            </div>
+
+            {toOrder.length === 0 ? (
+              <div className="card-light" style={{ padding: 32, textAlign: "center" }}>
+                <Package size={28} style={{ color: "var(--text-tertiary)", margin: "0 auto 12px" }} />
+                <p style={{ fontSize: 14, color: "var(--text-secondary)" }}>Rien à commander</p>
+                <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 4 }}>Tout est en stock</p>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <p className="section-label">À commander ({toOrder.length})</p>
+                  <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Ajuste les quantités</span>
+                </div>
+
+                {byCategory.map((g) => (
+                  <div key={g.cat}>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+                      {g.label}
+                    </p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {g.items.map((p) => {
+                        const qty = getQty(p);
+                        const isAlerted = alertedIds.has(p.id);
+                        return (
+                          <div key={p.id} className="card-light" style={{ padding: "10px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>
+                                {p.name} {isAlerted && <Bell size={11} style={{ display: "inline", color: "var(--warning)" }} />}
+                              </div>
+                              <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                                Stock: {p.current_stock} · min. {p.min_stock}
+                              </div>
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <button
+                                onClick={() => setOrderQuantities({ ...orderQuantities, [p.id]: Math.max(1, qty - 1) })}
+                                style={{ width: 28, height: 28, borderRadius: 8, border: "none", cursor: "pointer", background: "var(--secondary-bg)", fontSize: 16 }}
+                              >−</button>
+                              <input
+                                type="number"
+                                value={qty}
+                                onChange={(e) => setOrderQuantities({ ...orderQuantities, [p.id]: Math.max(1, parseInt(e.target.value) || 1) })}
+                                style={{
+                                  width: 44, textAlign: "center", fontSize: 14, fontWeight: 600,
+                                  borderRadius: 8, border: "1px solid var(--border-color)",
+                                  background: "var(--card-bg)", padding: "4px 0", color: "var(--text-primary)", outline: "none",
+                                }}
+                              />
+                              <button
+                                onClick={() => setOrderQuantities({ ...orderQuantities, [p.id]: qty + 1 })}
+                                style={{ width: 28, height: 28, borderRadius: 8, border: "none", cursor: "pointer", background: "var(--secondary-bg)", fontSize: 16 }}
+                              >+</button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Actions */}
+                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                  <button
+                    onClick={copyOrder}
+                    style={{
+                      flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                      padding: "14px 0", borderRadius: 14, border: "none", cursor: "pointer",
+                      background: "var(--gradient-primary)", color: "#fff",
+                      fontSize: 14, fontWeight: 600,
+                    }}
+                  >
+                    <ClipboardList size={16} /> Copier la liste
+                  </button>
+                  <button
+                    onClick={sendByEmail}
+                    style={{
+                      padding: "14px 18px", borderRadius: 14, border: "1px solid var(--border-color)", cursor: "pointer",
+                      background: "var(--card-bg)", color: "var(--text-primary)",
+                      fontSize: 14, fontWeight: 500,
+                      display: "flex", alignItems: "center", gap: 8,
+                    }}
+                  >
+                    ✉️ Mail
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        );
+      })()}
 
     </div>
   );
