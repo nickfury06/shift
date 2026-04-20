@@ -20,8 +20,8 @@ interface ZoneConfig {
 
 const ZONES: ZoneConfig[] = [
   { key: "restaurant", label: "Restaurant", description: "Salle intérieure", icon: "🏠", dbZones: ["restaurant"] },
-  { key: "terrasse", label: "Terrasse", description: "Extérieur", icon: "☀️", dbZones: ["terrasse"] },
-  { key: "terrasse_couverte", label: "Terrasse couverte", description: "Pergola", icon: "🌿", dbZones: ["terrasse_couverte"] },
+  { key: "terrasse", label: "Terrasse", description: "Fumeur", icon: "☀️", dbZones: ["terrasse"] },
+  { key: "terrasse_couverte", label: "Terrasse non-fumeur", description: "Abritée", icon: "🚭", dbZones: ["terrasse_couverte"] },
   { key: "bar", label: "Bar", description: "Sous-sol", icon: "🍸", dbZones: ["bar"] },
 ];
 
