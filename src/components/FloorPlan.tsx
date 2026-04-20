@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Reservation, VenueTable } from "@/lib/types";
-import { Users } from "lucide-react";
+import { Users, Home, Sun, Leaf, Wine, Trees } from "lucide-react";
 
 interface FloorPlanProps {
   tables: VenueTable[];
@@ -10,224 +10,311 @@ interface FloorPlanProps {
   onTableClick?: (tableId: string) => void;
 }
 
-type Floor = "rdc" | "r1";
-
-// Marker positions as % of the plan image (x, y from top-left)
-// Tuned against the architectural plans provided
-interface Marker {
+// Table position within its zone card (% coordinates)
+interface TablePos {
   id: string;
-  x: number;  // % left
-  y: number;  // % top
-  size?: "sm" | "md" | "lg"; // button size
+  x: number; // % from left
+  y: number; // % from top
+  size: "sm" | "md" | "lg" | "xl"; // visual scale
 }
 
-const RDC_MARKERS: Marker[] = [
-  // Restaurant interior
-  { id: "480", x: 27,  y: 37 },
-  { id: "470", x: 12,  y: 47 },
-  { id: "490", x: 28,  y: 46 },
-  { id: "420", x: 41,  y: 46 },
-  { id: "400", x: 53,  y: 52 },
-  { id: "430", x: 38,  y: 52 },
-  { id: "460", x: 12,  y: 55 },
-  { id: "450", x: 27,  y: 54 },
-  { id: "440", x: 37,  y: 57 },
-  { id: "410", x: 45,  y: 55 },
-  // Terrasse avant (building wall mini-row)
-  { id: "150", x: 27,  y: 63, size: "sm" },
-  { id: "160", x: 33,  y: 63, size: "sm" },
-  // Front street row
-  { id: "140", x: 13,  y: 70, size: "sm" },
-  { id: "130", x: 19,  y: 70, size: "sm" },
-  { id: "120", x: 25,  y: 70, size: "sm" },
-  { id: "110", x: 30,  y: 70, size: "sm" },
-  { id: "100", x: 36,  y: 70, size: "sm" },
-  // Terrasse middle
-  { id: "250", x: 44,  y: 70, size: "sm" },
-  { id: "240", x: 51,  y: 70, size: "sm" },
-  // Terrasse right column
-  { id: "200", x: 61,  y: 47 },
-  { id: "210", x: 61,  y: 54 },
-  { id: "220", x: 61,  y: 62 },
-  { id: "230", x: 63,  y: 71, size: "lg" },
-  // Non-fumeur (covered salle, bottom right)
-  { id: "340", x: 55,  y: 77, size: "sm" },
-  { id: "300", x: 64,  y: 77, size: "sm" },
-  { id: "330", x: 55,  y: 82, size: "sm" },
-  { id: "320", x: 55,  y: 87, size: "sm" },
-  { id: "310", x: 64,  y: 82, size: "sm" },
+interface ZoneDef {
+  key: string;
+  label: string;
+  hint: string;
+  icon: React.ReactNode;
+  tint: string; // subtle bg
+  dbZone: string;
+  // card aspect ratio (height = aspect × width)
+  aspect: number;
+  // tables in this zone with positions
+  tables: TablePos[];
+}
+
+const ZONES: ZoneDef[] = [
+  {
+    key: "restaurant",
+    label: "Restaurant",
+    hint: "Salle intérieure",
+    icon: <Home size={14} />,
+    tint: "rgba(196,120,90,0.05)",
+    dbZone: "restaurant",
+    aspect: 0.55,
+    tables: [
+      // Row 1 (top)
+      { id: "480", x: 22, y: 18, size: "md" },
+      // Row 2
+      { id: "470", x: 8, y: 40, size: "md" },
+      { id: "490", x: 30, y: 38, size: "md" },
+      { id: "420", x: 52, y: 38, size: "md" },
+      { id: "400", x: 75, y: 38, size: "md" },
+      // Row 3
+      { id: "430", x: 42, y: 60, size: "sm" },
+      // Row 4 (bottom)
+      { id: "460", x: 8, y: 72, size: "md" },
+      { id: "450", x: 30, y: 70, size: "md" },
+      { id: "440", x: 52, y: 74, size: "sm" },
+      { id: "410", x: 75, y: 70, size: "md" },
+    ],
+  },
+  {
+    key: "terrasse",
+    label: "Terrasse",
+    hint: "Extérieur · Fumeur",
+    icon: <Sun size={14} />,
+    tint: "rgba(212,160,74,0.06)",
+    dbZone: "terrasse",
+    aspect: 0.5,
+    tables: [
+      // Right column (200-220)
+      { id: "200", x: 72, y: 15, size: "md" },
+      { id: "210", x: 72, y: 38, size: "md" },
+      { id: "220", x: 72, y: 61, size: "md" },
+      // Big round table (230)
+      { id: "230", x: 70, y: 85, size: "xl" },
+      // Center pair (240, 250)
+      { id: "250", x: 30, y: 78, size: "sm" },
+      { id: "240", x: 50, y: 78, size: "sm" },
+    ],
+  },
+  {
+    key: "terrasse_couverte",
+    label: "Non-fumeur",
+    hint: "Terrasse abritée",
+    icon: <Leaf size={14} />,
+    tint: "rgba(139,176,150,0.06)",
+    dbZone: "terrasse_couverte",
+    aspect: 0.35,
+    tables: [],  // placeholder — filled below with what maps to this zone
+  },
+  {
+    key: "pergola",
+    label: "Pergola",
+    hint: "Espace extérieur couvert",
+    icon: <Trees size={14} />,
+    tint: "rgba(181,176,168,0.08)",
+    dbZone: "terrasse_couverte_pergola", // see note below
+    aspect: 0.35,
+    tables: [],
+  },
+  {
+    key: "bar",
+    label: "Bar",
+    hint: "Sous-sol",
+    icon: <Wine size={14} />,
+    tint: "rgba(139,90,64,0.06)",
+    dbZone: "bar",
+    aspect: 0.45,
+    tables: [
+      // Bar stools in a column (10-40)
+      { id: "10", x: 50, y: 15, size: "sm" },
+      { id: "20", x: 50, y: 33, size: "sm" },
+      { id: "30", x: 50, y: 51, size: "sm" },
+      { id: "40", x: 50, y: 69, size: "sm" },
+      // Tables along bottom
+      { id: "90", x: 10, y: 85, size: "md" },
+      { id: "80", x: 26, y: 85, size: "md" },
+      { id: "70", x: 44, y: 85, size: "md" },
+      { id: "60", x: 62, y: 85, size: "md" },
+      { id: "50", x: 80, y: 85, size: "md" },
+    ],
+  },
 ];
 
-const R1_MARKERS: Marker[] = [
-  // Bar stools (vertical column, right of bar counter)
-  { id: "10", x: 63, y: 50, size: "sm" },
-  { id: "20", x: 63, y: 58, size: "sm" },
-  { id: "30", x: 63, y: 66, size: "sm" },
-  { id: "40", x: 63, y: 74, size: "sm" },
-  // Tables along bottom wall
-  { id: "90", x: 22, y: 82 },
-  { id: "80", x: 37, y: 82, size: "sm" },
-  { id: "70", x: 51, y: 82 },
-  { id: "60", x: 64, y: 88 },
-  { id: "50", x: 79, y: 88 },
+// The 100-160 tables are non-fumeur (indoor abritée),
+// 300s are pergola (outdoor covered). In DB they share "terrasse_couverte".
+// We split them based on ID prefix for visual purposes.
+ZONES[2].tables = [
+  // Non-fumeur (100-160 range)
+  { id: "150", x: 35, y: 25, size: "sm" },
+  { id: "160", x: 55, y: 25, size: "sm" },
+  { id: "140", x: 10, y: 65, size: "sm" },
+  { id: "130", x: 25, y: 65, size: "sm" },
+  { id: "120", x: 40, y: 65, size: "sm" },
+  { id: "110", x: 55, y: 65, size: "sm" },
+  { id: "100", x: 70, y: 65, size: "sm" },
+];
+ZONES[3].tables = [
+  // Pergola (300s)
+  { id: "340", x: 20, y: 30, size: "sm" },
+  { id: "320", x: 40, y: 30, size: "sm" },
+  { id: "330", x: 60, y: 30, size: "sm" },
+  { id: "310", x: 40, y: 70, size: "sm" },
+  { id: "300", x: 60, y: 70, size: "sm" },
 ];
 
-const SIZE_MAP = {
-  sm: 32,
-  md: 40,
-  lg: 52,
+// ── Size definitions ────────────────────────────────────────
+const SIZE_DIM: Record<"sm" | "md" | "lg" | "xl", { w: number; h: number; fs: number; shape: "rect" | "circle" }> = {
+  sm: { w: 40, h: 40, fs: 13, shape: "rect" },
+  md: { w: 52, h: 44, fs: 14, shape: "rect" },
+  lg: { w: 64, h: 52, fs: 15, shape: "rect" },
+  xl: { w: 64, h: 64, fs: 15, shape: "circle" },
 };
 
+// Override shapes for specific tables (round ones)
+const ROUND_IDS = new Set(["480", "470", "460", "430", "230", "10", "20", "30", "40"]);
+
 export default function FloorPlan({ tables, reservations, onTableClick }: FloorPlanProps) {
-  const [floor, setFloor] = useState<Floor>("rdc");
   const [selected, setSelected] = useState<string | null>(null);
 
   const resaByTable: Record<string, Reservation> = {};
   reservations.forEach((r) => { if (r.table_id) resaByTable[r.table_id] = r; });
 
-  function getStatus(id: string): "free" | "attendu" | "arrive" {
-    const r = resaByTable[id];
+  function getStatus(tableId: string): "free" | "attendu" | "arrive" {
+    const r = resaByTable[tableId];
     if (!r) return "free";
     return r.status === "arrive" ? "arrive" : "attendu";
   }
 
-  const markers = floor === "rdc" ? RDC_MARKERS : R1_MARKERS;
-  const planSrc = floor === "rdc" ? "/plans/plan-rdc.jpg" : "/plans/plan-r1.jpg";
-
   const selectedResa = selected ? resaByTable[selected] : null;
   const selectedTable = selected ? tables.find((t) => t.id === selected) : null;
 
-  const totalTables = markers.length;
-  const bookedTables = markers.filter((m) => getStatus(m.id) !== "free").length;
-
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {/* Floor switcher + count */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <div style={{ display: "flex", gap: 4, background: "var(--secondary-bg)", borderRadius: 10, padding: 3, flex: 1 }}>
-          {([
-            { key: "rdc" as Floor, label: "Rez-de-chaussée" },
-            { key: "r1" as Floor, label: "Sous-sol" },
-          ]).map((f) => (
-            <button
-              key={f.key}
-              onClick={() => { setFloor(f.key); setSelected(null); }}
-              style={{
-                flex: 1, padding: "9px 0", borderRadius: 8, border: "none", cursor: "pointer",
-                fontSize: 12, fontWeight: 500,
-                background: floor === f.key ? "var(--card-bg)" : "transparent",
-                color: floor === f.key ? "var(--text-primary)" : "var(--text-tertiary)",
-                boxShadow: floor === f.key ? "var(--shadow-light)" : "none",
-                transition: "all 0.2s",
-              }}
-            >{f.label}</button>
-          ))}
-        </div>
-        <div style={{
-          fontSize: 11, fontWeight: 600,
-          background: "var(--secondary-bg)",
-          padding: "7px 10px", borderRadius: 8,
-          color: "var(--text-secondary)",
-          minWidth: 52, textAlign: "center",
-        }}>
-          {bookedTables}/{totalTables}
-        </div>
-      </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {ZONES.map((zone) => {
+        if (zone.tables.length === 0) return null;
+        const zoneTableIds = zone.tables.map((t) => t.id);
+        const booked = zoneTableIds.filter((id) => getStatus(id) !== "free").length;
+        const total = zone.tables.length;
+        const totalCapacity = zoneTableIds
+          .map((id) => tables.find((t) => t.id === id)?.capacity || 0)
+          .reduce((s, c) => s + c, 0);
+        const bookedCovers = zoneTableIds
+          .filter((id) => resaByTable[id])
+          .map((id) => resaByTable[id]!.covers)
+          .reduce((s, c) => s + c, 0);
 
-      {/* Plan container */}
-      <div className="card-light" style={{ padding: 6, overflow: "hidden", position: "relative" }}>
-        <div style={{ position: "relative", width: "100%", borderRadius: 10, overflow: "hidden" }}>
-          {/* Actual architectural plan as background */}
-          <img
-            src={planSrc}
-            alt={floor === "rdc" ? "Plan RDC" : "Plan sous-sol"}
-            style={{
-              width: "100%", height: "auto", display: "block",
-              userSelect: "none",
-              pointerEvents: "none",
-            }}
-            draggable={false}
-          />
+        return (
+          <div
+            key={zone.key}
+            className="card-light"
+            style={{ padding: 14, overflow: "hidden" }}
+          >
+            {/* Zone header */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 10,
+                  background: zone.tint,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "var(--terra-medium)",
+                }}>
+                  {zone.icon}
+                </div>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", letterSpacing: "-0.01em" }}>
+                    {zone.label}
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{zone.hint}</div>
+                </div>
+              </div>
+              <div style={{
+                fontSize: 11, fontWeight: 600,
+                background: "var(--secondary-bg)",
+                color: "var(--text-secondary)",
+                padding: "4px 10px", borderRadius: 8,
+                textAlign: "right",
+                lineHeight: 1.3,
+              }}>
+                <div>{booked}/{total} <span style={{ opacity: 0.6, fontWeight: 500 }}>tables</span></div>
+                <div style={{ fontSize: 10, opacity: 0.7 }}>{bookedCovers}/{totalCapacity} pers.</div>
+              </div>
+            </div>
 
-          {/* Clickable markers overlaid on the plan */}
-          {markers.map((m) => {
-            const status = getStatus(m.id);
-            const isSel = selected === m.id;
-            const size = SIZE_MAP[m.size || "md"];
+            {/* Plan area */}
+            <div style={{
+              position: "relative",
+              width: "100%",
+              paddingBottom: `${zone.aspect * 100}%`,
+              background: zone.tint,
+              borderRadius: 10,
+              border: "1px dashed var(--border-color)",
+            }}>
+              {zone.tables.map((pos) => {
+                const dbTable = tables.find((t) => t.id === pos.id);
+                if (!dbTable) return null;
+                const status = getStatus(pos.id);
+                const isSel = selected === pos.id;
+                const isRound = ROUND_IDS.has(pos.id);
+                const baseSize = SIZE_DIM[pos.size];
+                const w = baseSize.w;
+                const h = isRound ? w : baseSize.h;
 
-            const fill =
-              status === "arrive" ? "rgba(139,90,64,0.95)"
-              : status === "attendu" ? "rgba(212,160,74,0.95)"
-              : "rgba(255,255,255,0.95)";
-            const stroke =
-              isSel ? "var(--terra-medium)"
-              : status === "arrive" ? "#6B4A30"
-              : status === "attendu" ? "#B88835"
-              : "#6B6560";
-            const textColor = status === "free" ? "var(--text-primary)" : "#fff";
+                const fill =
+                  status === "arrive" ? "#8B5A40"
+                  : status === "attendu" ? "#D4A04A"
+                  : "var(--card-bg)";
+                const border =
+                  isSel ? "var(--terra-medium)"
+                  : status === "arrive" ? "#6B4A30"
+                  : status === "attendu" ? "#B88835"
+                  : "var(--border-color)";
+                const textColor = status === "free" ? "var(--text-primary)" : "#fff";
 
-            return (
-              <button
-                key={m.id}
-                onClick={() => {
-                  const next = isSel ? null : m.id;
-                  setSelected(next);
-                  if (next) onTableClick?.(next);
-                }}
-                style={{
-                  position: "absolute",
-                  left: `${m.x}%`,
-                  top: `${m.y}%`,
-                  transform: "translate(-50%, -50%)",
-                  width: size, height: size,
-                  borderRadius: "50%",
-                  background: fill,
-                  border: `${isSel ? 3 : 2}px solid ${stroke}`,
-                  color: textColor,
-                  fontSize: size <= 32 ? 11 : size <= 40 ? 13 : 15,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: 0,
-                  boxShadow: isSel
-                    ? "0 0 0 4px rgba(196,120,90,0.25), 0 4px 12px rgba(0,0,0,0.2)"
-                    : "0 2px 8px rgba(0,0,0,0.15)",
-                  transition: "all 0.15s ease",
-                  backdropFilter: "blur(4px)",
-                  WebkitBackdropFilter: "blur(4px)",
-                }}
-              >
-                {m.id}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+                return (
+                  <button
+                    key={pos.id}
+                    onClick={() => {
+                      const next = isSel ? null : pos.id;
+                      setSelected(next);
+                      if (next) onTableClick?.(next);
+                    }}
+                    style={{
+                      position: "absolute",
+                      left: `${pos.x}%`,
+                      top: `${pos.y}%`,
+                      transform: "translate(-50%, -50%)",
+                      width: w,
+                      height: h,
+                      borderRadius: isRound ? "50%" : 10,
+                      background: fill,
+                      border: `${isSel ? 2.5 : 1.5}px solid ${border}`,
+                      color: textColor,
+                      fontSize: baseSize.fs,
+                      fontWeight: 700,
+                      letterSpacing: "-0.01em",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: 0,
+                      boxShadow: isSel
+                        ? "0 0 0 3px rgba(196,120,90,0.2), 0 4px 12px rgba(196,120,90,0.25)"
+                        : status !== "free" ? "0 2px 6px rgba(0,0,0,0.08)" : "0 1px 2px rgba(0,0,0,0.03)",
+                      transition: "all 0.18s ease",
+                    }}
+                  >
+                    {pos.id}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
 
       {/* Legend */}
       <div style={{
-        display: "flex", gap: 14, fontSize: 11, color: "var(--text-secondary)",
-        padding: "9px 14px", borderRadius: 10,
+        display: "flex", gap: 16, fontSize: 11, color: "var(--text-secondary)",
+        padding: "10px 14px", borderRadius: 12,
         background: "var(--secondary-bg)",
         justifyContent: "center", flexWrap: "wrap",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 13, height: 13, borderRadius: "50%", border: "2px solid #6B6560", background: "rgba(255,255,255,0.95)" }} />
+          <div style={{ width: 14, height: 14, borderRadius: 3, border: "1.5px solid var(--border-color)", background: "var(--card-bg)" }} />
           Libre
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 13, height: 13, borderRadius: "50%", background: "#D4A04A" }} />
+          <div style={{ width: 14, height: 14, borderRadius: 3, background: "#D4A04A" }} />
           Réservée
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 13, height: 13, borderRadius: "50%", background: "#8B5A40" }} />
+          <div style={{ width: 14, height: 14, borderRadius: 3, background: "#8B5A40" }} />
           Arrivée
         </div>
       </div>
 
-      {/* Selected table detail */}
+      {/* Selected table details */}
       {selected && selectedTable && (
         <div className="card-medium" style={{ padding: "14px 16px", animation: "fadeInUp 0.2s ease-out" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
