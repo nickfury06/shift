@@ -31,6 +31,8 @@ export type ReservationStatus = "attendu" | "arrive";
 export type TableZone = "restaurant" | "terrasse" | "terrasse_couverte" | "bar";
 
 // ── Profile ────────────────────────────────────────────────
+export type EmploymentType = "permanent" | "extra";
+
 export interface Profile {
   id: string;
   name: string;
@@ -39,6 +41,8 @@ export interface Profile {
   stock_domain: StockDomain | null;
   must_change_password: boolean;
   onboarding_completed: boolean;
+  employment_type: EmploymentType;
+  active: boolean;
   created_at: string;
 }
 

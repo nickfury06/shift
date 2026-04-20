@@ -1,11 +1,12 @@
 import type { Day } from "./types";
 
 // ── SIMULATION MODE ───────────────────────────────────────
-// Set to a date string to simulate a different day/time
-// Set to null for real time
-// Example: "2026-04-07T21:00:00" = mardi 21h
-// Mardi 7 avril 18h — pendant l'ouverture
-export const SIMULATE_DATE: string | null = "2026-04-07T18:00:00+02:00";
+// Only active in development if NEXT_PUBLIC_SIMULATE_DATE is set.
+// In production, always uses real time.
+export const SIMULATE_DATE: string | null =
+  process.env.NODE_ENV === "development"
+    ? (process.env.NEXT_PUBLIC_SIMULATE_DATE || null)
+    : null;
 
 export function getNow(): Date {
   if (SIMULATE_DATE) return new Date(SIMULATE_DATE);
