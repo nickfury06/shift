@@ -262,6 +262,7 @@ export interface OnboardingDoc {
   category: string;
   sort_order: number;
   required: boolean;
+  for_extras: boolean;
   created_at: string;
 }
 

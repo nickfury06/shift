@@ -8,7 +8,8 @@ import { getShiftDate, formatDateFr, formatTime, getNow } from "@/lib/shift-util
 import { SEATING_LABELS, SEATING_ICONS, TYPE_LABELS, SOURCE_LABELS, SOURCE_ICONS } from "@/lib/constants";
 import type { Reservation, VenueTable, ReservationSeating, ReservationType, ReservationSource } from "@/lib/types";
 import type { Profile } from "@/lib/types";
-import { Plus, ChevronLeft, ChevronRight, Check, Trash2, X, Armchair, Phone, ChevronDown, Heart, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Check, Trash2, X, Armchair, Phone, ChevronDown, Heart, ThumbsUp, ThumbsDown, List, Map } from "lucide-react";
+import FloorPlan from "@/components/FloorPlan";
 
 export default function ReservationsPage() {
   const { profile, user } = useAuth();
@@ -23,6 +24,7 @@ export default function ReservationsPage() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [view, setView] = useState<"list" | "plan">("list");
   const [profileMap, setProfileMap] = useState<Record<string, string>>({});
   const isPatron = profile?.role === "patron";
 
@@ -256,8 +258,37 @@ export default function ReservationsPage() {
         </div>
       </div>
 
+      {/* View toggle: Liste / Plan */}
+      <div style={{ display: "flex", gap: 4, background: "var(--secondary-bg)", borderRadius: 10, padding: 3, marginBottom: 16 }}>
+        {([
+          { key: "list" as const, label: "Liste", icon: <List size={13} /> },
+          { key: "plan" as const, label: "Plan", icon: <Map size={13} /> },
+        ]).map((v) => (
+          <button
+            key={v.key}
+            onClick={() => setView(v.key)}
+            style={{
+              flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+              padding: "8px 0", borderRadius: 8, border: "none", cursor: "pointer",
+              fontSize: 12, fontWeight: 500,
+              background: view === v.key ? "var(--card-bg)" : "transparent",
+              color: view === v.key ? "var(--text-primary)" : "var(--text-tertiary)",
+              boxShadow: view === v.key ? "var(--shadow-light)" : "none",
+              transition: "all 0.2s",
+            }}
+          >
+            {v.icon} {v.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Plan view */}
+      {view === "plan" && (
+        <FloorPlan tables={tables} reservations={reservations} />
+      )}
+
       {/* Reservation list — attendu */}
-      {attendu.length > 0 && (
+      {view === "list" && attendu.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: arrived.length > 0 ? 24 : 0 }}>
           {attendu.map((resa) => {
             const overdue = getOverdueMin(resa.time);
@@ -392,7 +423,7 @@ export default function ReservationsPage() {
       )}
 
       {/* Arrived */}
-      {arrived.length > 0 && (
+      {view === "list" && arrived.length > 0 && (
         <>
           <div style={{ fontSize: 12, fontWeight: 500, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
             Arrivés ({arrived.length})
@@ -414,7 +445,7 @@ export default function ReservationsPage() {
         </>
       )}
 
-      {reservations.length === 0 && (
+      {view === "list" && reservations.length === 0 && (
         <div className="card-light" style={{ padding: 32, textAlign: "center" }}>
           <Armchair size={28} style={{ color: "var(--text-tertiary)", margin: "0 auto 12px" }} />
           <p style={{ fontSize: 14, color: "var(--text-secondary)" }}>Aucune réservation</p>

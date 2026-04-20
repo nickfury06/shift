@@ -26,8 +26,12 @@ export default function OnboardingPage() {
     }
 
     async function load() {
+      const isExtra = profile?.employment_type === "extra";
+      // Extras only see the essential docs (for_extras = true)
+      let docsQuery = supabase.from("onboarding_docs").select("*").order("sort_order");
+      if (isExtra) docsQuery = docsQuery.eq("for_extras", true);
       const [{ data: docsData }, { data: compData }] = await Promise.all([
-        supabase.from("onboarding_docs").select("*").order("sort_order"),
+        docsQuery,
         supabase.from("onboarding_completions").select("*").eq("user_id", user!.id),
       ]);
       setDocs(docsData || []);
