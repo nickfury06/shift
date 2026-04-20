@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { useToast } from "@/components/Toast";
 import { createClient } from "@/lib/supabase/client";
 import { getShiftDate, formatDateFr } from "@/lib/shift-utils";
 import type { AvailabilityRequest, Profile, Debrief } from "@/lib/types";
@@ -9,13 +10,14 @@ import Link from "next/link";
 import {
   ThumbsUp, ThumbsDown, Calendar, MessageCircle, ListChecks,
   Users, Settings, ArrowRight, Repeat, UserX,
-  Send, Check, ChevronDown, AlertTriangle, Lightbulb,
+  Send, Check, ChevronDown, AlertTriangle, Lightbulb, TrendingUp,
 } from "lucide-react";
 
 const RATING_COLORS = ["", "#D44", "#D88", "#B89070", "#8B6A50", "#6B4A30"];
 
 export default function AdminPage() {
   const { profile, user } = useAuth();
+  const toast = useToast();
   const supabase = useRef(createClient()).current;
 
   const [loading, setLoading] = useState(true);
@@ -66,27 +68,31 @@ export default function AdminPage() {
   }
 
   async function respondAbsence(id: string, status: "accepted" | "refused") {
-    await supabase.from("availability_requests").update({ status }).eq("id", id);
+    const { error } = await supabase.from("availability_requests").update({ status }).eq("id", id);
+    if (error) { toast.error("Erreur, réessaie"); return; }
     if (status === "accepted") {
       const req = absenceRequests.find((r) => r.id === id);
       if (req) {
         await supabase.from("schedules").delete().eq("user_id", req.user_id).eq("date", req.date);
       }
     }
+    toast.success(status === "accepted" ? "Absence acceptée" : "Absence refusée");
     fetchData();
   }
 
   async function sendMessage() {
     if (!msgContent.trim() || !user || msgSending) return;
     setMsgSending(true);
-    await supabase.from("messages").insert({
+    const { error } = await supabase.from("messages").insert({
       content: msgContent.trim(),
       date: shiftDate,
       created_by: user.id,
     });
     setMsgSending(false);
+    if (error) { toast.error("Erreur, réessaie"); return; }
     setMsgContent("");
     setMsgSent(true);
+    toast.success("Message envoyé");
     setTimeout(() => setMsgSent(false), 2000);
   }
 
@@ -106,6 +112,12 @@ export default function AdminPage() {
       ],
     },
     {
+      label: "Insights",
+      items: [
+        { href: "/analytics", label: "Analytics", icon: <TrendingUp size={20} />, tint: "rgba(196,120,90,0.08)", iconColor: "var(--terra-medium)" },
+      ],
+    },
+    {
       label: "Système",
       items: [
         { href: "/settings", label: "Réglages", icon: <Settings size={20} />, tint: "rgba(181,176,168,0.15)", iconColor: "var(--text-secondary)" },
@@ -116,7 +128,7 @@ export default function AdminPage() {
   if (loading) {
     return (
       <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
-        {[1, 2, 3].map((i) => <div key={i} className="card-light" style={{ height: 56, borderRadius: 16, marginBottom: 10, opacity: 0.5 }} />)}
+        {[1, 2, 3].map((i) => <div key={i} className="card-light pulse" style={{ height: 56, borderRadius: 16, marginBottom: 10, opacity: 0.5 }} />)}
       </div>
     );
   }

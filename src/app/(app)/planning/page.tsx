@@ -105,7 +105,7 @@ export default function PlanningPage() {
       <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="card-light" style={{ height: 48, borderRadius: 16, opacity: 0.5 }} />
+            <div key={i} className="card-light pulse" style={{ height: 48, borderRadius: 16, opacity: 0.5 }} />
           ))}
         </div>
       </div>

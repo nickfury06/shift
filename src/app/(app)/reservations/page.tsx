@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { useToast } from "@/components/Toast";
 import { createClient } from "@/lib/supabase/client";
 import { getShiftDate, formatDateFr, formatTime, getNow } from "@/lib/shift-utils";
 import { SEATING_LABELS, SEATING_ICONS, TYPE_LABELS, SOURCE_LABELS, SOURCE_ICONS } from "@/lib/constants";
@@ -11,6 +12,7 @@ import { Plus, ChevronLeft, ChevronRight, Check, Trash2, X, Armchair, Phone, Che
 
 export default function ReservationsPage() {
   const { profile, user } = useAuth();
+  const toast = useToast();
   const supabase = useRef(createClient()).current;
 
   const [loading, setLoading] = useState(true);
@@ -117,7 +119,7 @@ export default function ReservationsPage() {
   async function handleSave() {
     if (!name.trim() || !user || saving) return;
     setSaving(true);
-    await supabase.from("reservations").insert({
+    const { error } = await supabase.from("reservations").insert({
       name: name.trim(),
       phone: phone.trim() || null,
       covers,
@@ -133,6 +135,8 @@ export default function ReservationsPage() {
       fnf_status: isFnF ? "pending" : null,
     });
     setSaving(false);
+    if (error) { toast.error("Erreur, réessaie"); return; }
+    toast.success(isFnF ? "Réservation créée, F&F en attente" : "Réservation créée");
     setShowForm(false);
     fetchData();
   }
@@ -195,7 +199,7 @@ export default function ReservationsPage() {
     return (
       <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="card-light" style={{ height: 72, borderRadius: 16, marginBottom: 10, opacity: 0.5 }} />
+          <div key={i} className="card-light pulse" style={{ height: 72, borderRadius: 16, marginBottom: 10, opacity: 0.5 }} />
         ))}
       </div>
     );

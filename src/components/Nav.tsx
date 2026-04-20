@@ -5,19 +5,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home,
-  Calendar,
   BookOpen,
-  PenLine,
-  LayoutDashboard,
   Package,
   MoreHorizontal,
   X,
-  MessageCircle,
-  ClipboardList,
-  Users,
-  ListChecks,
+  User,
   LogOut,
   Shield,
+  Calendar,
+  PenLine,
 } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useAuth } from "@/components/AuthProvider";
@@ -66,8 +62,10 @@ export default function Nav() {
     ];
   }
 
-  // ── "More" menu — all roles just get theme + logout ────────
-  const moreItems: NavItem[] = [];
+  // ── "More" menu — profile link for everyone ───────────────
+  const moreItems: NavItem[] = [
+    { href: "/profile", label: "Mon profil", icon: <User size={iconSize} strokeWidth={strokeWidth} /> },
+  ];
 
   const mainItems = getMainItems();
   const isActive = (href: string) => pathname === href;

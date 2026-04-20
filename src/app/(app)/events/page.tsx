@@ -137,7 +137,7 @@ export default function EventsPage() {
     return (
       <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="card-light" style={{ height: 56, borderRadius: 16, marginBottom: 10, opacity: 0.5 }} />
+          <div key={i} className="card-light pulse" style={{ height: 56, borderRadius: 16, marginBottom: 10, opacity: 0.5 }} />
         ))}
       </div>
     );
