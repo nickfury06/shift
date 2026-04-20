@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Reservation, VenueTable } from "@/lib/types";
-import { Users, Home, Sun, Leaf, Wine, ChevronRight } from "lucide-react";
+import { Users } from "lucide-react";
 
 interface FloorPlanProps {
   tables: VenueTable[];
@@ -10,165 +10,161 @@ interface FloorPlanProps {
   onTableClick?: (tableId: string) => void;
 }
 
+type Floor = "rdc" | "r1";
 type TShape = "rect" | "circle";
-type TSize = "xs" | "sm" | "md" | "lg" | "xl";
 
-interface TablePos {
+interface T {
   id: string;
-  x: number;  // % from left of zone canvas
-  y: number;  // % from top of zone canvas
-  size: TSize;
+  x: number; y: number;
+  w: number; h: number;
   shape: TShape;
-  seats: number;
 }
 
-interface ZoneDef {
-  key: string;
-  label: string;
-  hint: string;
-  icon: React.ReactNode;
-  tint: string;
-  border: string;
-  aspect: number;
-  tables: TablePos[];
-}
+// ═══════════════════════════════════════════════════════════════
+// RDC — faithful recreation of the architectural survey plan
+// ═══════════════════════════════════════════════════════════════
+const RDC_VIEW = { w: 1200, h: 800 };
 
-// ── Zone definitions with faithful layouts ────────────────────
-const ZONES: ZoneDef[] = [
-  {
-    key: "restaurant",
-    label: "Restaurant",
-    hint: "Salle intérieure",
-    icon: <Home size={13} />,
-    tint: "rgba(196,120,90,0.05)",
-    border: "rgba(196,120,90,0.15)",
-    aspect: 0.62,
-    tables: [
-      // Top row near kitchen wall
-      { id: "480", x: 22, y: 18, size: "md", shape: "circle", seats: 4 },
-      // Left wall
-      { id: "470", x: 8, y: 40, size: "md", shape: "circle", seats: 4 },
-      { id: "460", x: 8, y: 72, size: "md", shape: "circle", seats: 4 },
-      // Middle rows
-      { id: "490", x: 30, y: 38, size: "md", shape: "rect", seats: 4 },
-      { id: "420", x: 52, y: 38, size: "md", shape: "rect", seats: 4 },
-      { id: "400", x: 78, y: 42, size: "md", shape: "rect", seats: 4 },
-      // Center pivot
-      { id: "430", x: 42, y: 58, size: "sm", shape: "circle", seats: 2 },
-      // Lower row
-      { id: "450", x: 30, y: 72, size: "md", shape: "rect", seats: 4 },
-      { id: "440", x: 52, y: 76, size: "sm", shape: "rect", seats: 2 },
-      { id: "410", x: 78, y: 72, size: "md", shape: "rect", seats: 4 },
-    ],
-  },
-  {
-    key: "terrasse",
-    label: "Terrasse",
-    hint: "Extérieur · Fumeur",
-    icon: <Sun size={13} />,
-    tint: "rgba(212,160,74,0.06)",
-    border: "rgba(212,160,74,0.18)",
-    aspect: 0.85,
-    tables: [
-      // Vertical column on right (200-220)
-      { id: "200", x: 80, y: 10, size: "md", shape: "rect", seats: 6 },
-      { id: "210", x: 80, y: 25, size: "md", shape: "rect", seats: 6 },
-      { id: "220", x: 80, y: 40, size: "md", shape: "rect", seats: 6 },
-      // Big round
-      { id: "230", x: 78, y: 58, size: "xl", shape: "circle", seats: 8 },
-      // Middle pair
-      { id: "240", x: 58, y: 55, size: "sm", shape: "rect", seats: 2 },
-      { id: "250", x: 43, y: 55, size: "sm", shape: "rect", seats: 2 },
-      // Mini pair against building
-      { id: "150", x: 22, y: 55, size: "sm", shape: "rect", seats: 2 },
-      { id: "160", x: 32, y: 55, size: "sm", shape: "rect", seats: 2 },
-      // Front street row
-      { id: "140", x: 8, y: 88, size: "sm", shape: "rect", seats: 2 },
-      { id: "130", x: 20, y: 88, size: "sm", shape: "rect", seats: 2 },
-      { id: "120", x: 32, y: 88, size: "sm", shape: "rect", seats: 2 },
-      { id: "110", x: 44, y: 88, size: "sm", shape: "rect", seats: 2 },
-      { id: "100", x: 56, y: 88, size: "sm", shape: "rect", seats: 2 },
-    ],
-  },
-  {
-    key: "non_fumeur",
-    label: "Non-fumeur",
-    hint: "Salle couverte ouverte",
-    icon: <Leaf size={13} />,
-    tint: "rgba(139,176,150,0.06)",
-    border: "rgba(139,176,150,0.2)",
-    aspect: 0.42,
-    tables: [
-      // 340 | 300   top row
-      //    330      middle
-      // 320 | 310   bottom row
-      { id: "340", x: 30, y: 22, size: "sm", shape: "rect", seats: 2 },
-      { id: "300", x: 70, y: 22, size: "sm", shape: "rect", seats: 2 },
-      { id: "330", x: 50, y: 52, size: "sm", shape: "rect", seats: 2 },
-      { id: "320", x: 30, y: 82, size: "sm", shape: "rect", seats: 2 },
-      { id: "310", x: 70, y: 82, size: "sm", shape: "rect", seats: 2 },
-    ],
-  },
-  {
-    key: "bar",
-    label: "Bar",
-    hint: "Sous-sol",
-    icon: <Wine size={13} />,
-    tint: "rgba(139,90,64,0.06)",
-    border: "rgba(139,90,64,0.2)",
-    aspect: 0.55,
-    tables: [
-      // Bar stools in column
-      { id: "10", x: 58, y: 15, size: "xs", shape: "circle", seats: 1 },
-      { id: "20", x: 58, y: 32, size: "xs", shape: "circle", seats: 1 },
-      { id: "30", x: 58, y: 49, size: "xs", shape: "circle", seats: 1 },
-      { id: "40", x: 58, y: 66, size: "xs", shape: "circle", seats: 1 },
-      // Tables along bottom
-      { id: "90", x: 10, y: 88, size: "md", shape: "rect", seats: 4 },
-      { id: "80", x: 25, y: 88, size: "sm", shape: "rect", seats: 4 },
-      { id: "70", x: 43, y: 88, size: "md", shape: "rect", seats: 6 },
-      { id: "60", x: 62, y: 88, size: "md", shape: "rect", seats: 6 },
-      { id: "80", x: 80, y: 88, size: "md", shape: "rect", seats: 6 },
-    ],
-  },
+// Building walls — recreated from the architectural plan
+// Outer shell with its characteristic angular top-left corner
+const RDC_OUTER_WALL = "M 100 120 L 430 120 L 460 80 L 840 80 L 870 160 L 1050 160 L 1090 260 L 1110 370 L 1090 500 L 1050 620 L 780 620 L 780 660 L 100 660 Z";
+
+// Interior dividing walls (between rooms)
+const RDC_INTERIOR_WALLS = [
+  // Kitchen dividers
+  "M 280 120 L 280 290",
+  "M 280 290 L 560 290",
+  "M 560 120 L 560 290",
+  // WC block
+  "M 560 160 L 560 290",
+  "M 620 160 L 620 230",
+  "M 680 160 L 680 230",
+  "M 740 160 L 740 230",
+  "M 560 230 L 780 230",
+  // Escalier / pièce boundaries
+  "M 780 230 L 870 230",
+  "M 780 280 L 870 280",
+  "M 870 160 L 870 620",
+  // Local
+  "M 560 230 L 560 290",
+  // Main floor division between restaurant and terrasse
+  "M 780 290 L 780 620",
+  // Non-fumeur zone boundary
+  "M 780 550 L 870 550",
 ];
 
-const SIZE_DIM: Record<TSize, { w: number; h: number; fs: number }> = {
-  xs: { w: 36, h: 36, fs: 11 },
-  sm: { w: 48, h: 42, fs: 12 },
-  md: { w: 62, h: 50, fs: 14 },
-  lg: { w: 76, h: 60, fs: 15 },
-  xl: { w: 84, h: 84, fs: 16 },
-};
+// Labels for non-service rooms/zones
+interface RoomLabel { x: number; y: number; text: string; }
+const RDC_ROOM_LABELS: RoomLabel[] = [
+  { x: 420, y: 210, text: "Cuisine" },
+  { x: 590, y: 200, text: "WC" },
+  { x: 650, y: 200, text: "WC" },
+  { x: 710, y: 200, text: "WC" },
+  { x: 770, y: 200, text: "WC" },
+  { x: 970, y: 200, text: "Pièce" },
+  { x: 822, y: 260, text: "Local" },
+  { x: 823, y: 330, text: "Escalier" },
+  { x: 970, y: 400, text: "Pièce" },
+  { x: 970, y: 590, text: "Pièce" },
+];
 
-// Draw chair dots around a table
-function chairPositions(cx: number, cy: number, w: number, h: number, count: number, shape: TShape) {
-  const pad = 9;
-  const pos: { x: number; y: number }[] = [];
-  if (shape === "rect") {
-    const top = Math.ceil(count / 2);
-    const bot = count - top;
-    for (let i = 0; i < top; i++) {
-      const t = top === 1 ? 0 : (i / (top - 1)) * 0.7 - 0.35;
-      pos.push({ x: cx + t * w, y: cy - h / 2 - pad });
-    }
-    for (let i = 0; i < bot; i++) {
-      const t = bot === 1 ? 0 : (i / (bot - 1)) * 0.7 - 0.35;
-      pos.push({ x: cx + t * w, y: cy + h / 2 + pad });
-    }
-  } else {
-    const r = Math.max(w, h) / 2 + pad;
-    for (let i = 0; i < count; i++) {
-      const a = (i / Math.max(count, 1)) * Math.PI * 2 - Math.PI / 2;
-      pos.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r });
-    }
-  }
-  return pos;
-}
+// Zone labels (for the service areas)
+interface ZoneLabel { x: number; y: number; text: string; }
+const RDC_ZONE_LABELS: ZoneLabel[] = [
+  { x: 150, y: 370, text: "RESTAURANT" },
+  { x: 940, y: 360, text: "TERRASSE" },
+  { x: 300, y: 690, text: "TERRASSE AVANT" },
+  { x: 925, y: 590, text: "NON-FUMEUR" },
+];
 
+// Tables — positions matching the architectural survey
+const RDC_TABLES: T[] = [
+  // Restaurant interior — tables 480, 470, 490, 420, 400, 430, 460, 450, 440, 410
+  { id: "480", x: 370, y: 320, w: 70, h: 70, shape: "circle" },
+  { id: "470", x: 140, y: 380, w: 70, h: 70, shape: "circle" },
+  { id: "490", x: 370, y: 405, w: 105, h: 55, shape: "rect" },
+  { id: "420", x: 510, y: 405, w: 105, h: 55, shape: "rect" },
+  { id: "400", x: 650, y: 435, w: 90, h: 70, shape: "rect" },
+  { id: "430", x: 445, y: 455, w: 60, h: 60, shape: "circle" },
+  { id: "460", x: 140, y: 470, w: 70, h: 70, shape: "circle" },
+  { id: "450", x: 330, y: 470, w: 110, h: 55, shape: "rect" },
+  { id: "440", x: 470, y: 505, w: 85, h: 55, shape: "rect" },
+  { id: "410", x: 610, y: 485, w: 100, h: 55, shape: "rect" },
+
+  // Terrasse (right side, between the main wall and the exterior)
+  { id: "200", x: 970, y: 270, w: 100, h: 55, shape: "rect" },
+  { id: "210", x: 970, y: 340, w: 100, h: 55, shape: "rect" },
+  { id: "220", x: 970, y: 410, w: 100, h: 55, shape: "rect" },
+  { id: "230", x: 975, y: 495, w: 80, h: 80, shape: "circle" },
+  { id: "240", x: 895, y: 490, w: 65, h: 50, shape: "rect" },
+  { id: "250", x: 820, y: 490, w: 65, h: 50, shape: "rect" },
+
+  // Terrasse avant (street-facing row)
+  // Upper mini-row near building exit
+  { id: "150", x: 400, y: 585, w: 55, h: 45, shape: "rect" },
+  { id: "160", x: 460, y: 585, w: 55, h: 45, shape: "rect" },
+  // Front street row
+  { id: "140", x: 130, y: 700, w: 55, h: 45, shape: "rect" },
+  { id: "130", x: 195, y: 700, w: 55, h: 45, shape: "rect" },
+  { id: "120", x: 260, y: 700, w: 55, h: 45, shape: "rect" },
+  { id: "110", x: 325, y: 700, w: 55, h: 45, shape: "rect" },
+  { id: "100", x: 390, y: 700, w: 55, h: 45, shape: "rect" },
+
+  // Non-fumeur (covered open salle, bottom-right)
+  { id: "340", x: 800, y: 580, w: 55, h: 45, shape: "rect" },
+  { id: "300", x: 870, y: 580, w: 55, h: 45, shape: "rect" },
+  { id: "330", x: 835, y: 620, w: 55, h: 45, shape: "rect" },
+  { id: "320", x: 800, y: 720, w: 55, h: 45, shape: "rect" },
+  { id: "310", x: 870, y: 720, w: 55, h: 45, shape: "rect" },
+];
+
+// ═══════════════════════════════════════════════════════════════
+// R-1 — Sous-sol bar
+// ═══════════════════════════════════════════════════════════════
+const R1_VIEW = { w: 1200, h: 700 };
+
+const R1_OUTER_WALL = "M 120 100 L 600 100 L 630 150 L 1080 150 L 1080 620 L 120 620 Z";
+
+const R1_INTERIOR_WALLS = [
+  // Bar counter boundary
+  "M 180 260 L 620 260",
+  "M 180 340 L 620 340",
+  "M 180 260 L 180 340",
+  "M 620 260 L 620 340",
+  // Stairs
+  "M 900 240 L 1040 240",
+  "M 900 240 L 900 400",
+  "M 1040 240 L 1040 400",
+  "M 900 400 L 1040 400",
+];
+
+const R1_ROOM_LABELS: RoomLabel[] = [
+  { x: 400, y: 305, text: "Comptoir" },
+  { x: 970, y: 325, text: "Escalier ↑" },
+];
+
+const R1_ZONE_LABELS: ZoneLabel[] = [
+  { x: 220, y: 160, text: "BAR · SOUS-SOL" },
+];
+
+const R1_TABLES: T[] = [
+  // Bar stools right of counter
+  { id: "10", x: 730, y: 230, w: 58, h: 58, shape: "circle" },
+  { id: "20", x: 730, y: 305, w: 58, h: 58, shape: "circle" },
+  { id: "30", x: 730, y: 380, w: 58, h: 58, shape: "circle" },
+  { id: "40", x: 730, y: 455, w: 58, h: 58, shape: "circle" },
+  // Tables along the bottom wall
+  { id: "90", x: 200, y: 540, w: 120, h: 70, shape: "rect" },
+  { id: "80", x: 360, y: 540, w: 100, h: 70, shape: "rect" },
+  { id: "70", x: 520, y: 540, w: 110, h: 70, shape: "rect" },
+  { id: "60", x: 680, y: 540, w: 110, h: 70, shape: "rect" },
+  { id: "50", x: 840, y: 540, w: 120, h: 70, shape: "rect" },
+];
+
+// ── Component ──────────────────────────────────────────────────
 export default function FloorPlan({ tables, reservations, onTableClick }: FloorPlanProps) {
+  const [floor, setFloor] = useState<Floor>("rdc");
   const [selected, setSelected] = useState<string | null>(null);
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const resaByTable: Record<string, Reservation> = {};
   reservations.forEach((r) => { if (r.table_id) resaByTable[r.table_id] = r; });
@@ -179,211 +175,201 @@ export default function FloorPlan({ tables, reservations, onTableClick }: FloorP
     return r.status === "arrive" ? "arrive" : "attendu";
   }
 
-  function toggleZone(key: string) {
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
-      return next;
-    });
-  }
+  const view = floor === "rdc" ? RDC_VIEW : R1_VIEW;
+  const outerWall = floor === "rdc" ? RDC_OUTER_WALL : R1_OUTER_WALL;
+  const interiorWalls = floor === "rdc" ? RDC_INTERIOR_WALLS : R1_INTERIOR_WALLS;
+  const roomLabels = floor === "rdc" ? RDC_ROOM_LABELS : R1_ROOM_LABELS;
+  const zoneLabels = floor === "rdc" ? RDC_ZONE_LABELS : R1_ZONE_LABELS;
+  const layout = floor === "rdc" ? RDC_TABLES : R1_TABLES;
 
   const selectedResa = selected ? resaByTable[selected] : null;
   const selectedTable = selected ? tables.find((t) => t.id === selected) : null;
 
+  const totalTables = layout.length;
+  const bookedTables = layout.filter((t) => getStatus(t.id) !== "free").length;
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      {ZONES.map((zone) => {
-        const zoneTables = zone.tables;
-        if (zoneTables.length === 0) return null;
-
-        const booked = zoneTables.filter((t) => getStatus(t.id) !== "free").length;
-        const total = zoneTables.length;
-        const capacity = zoneTables
-          .map((pos) => tables.find((x) => x.id === pos.id)?.capacity || 0)
-          .reduce((s, c) => s + c, 0);
-        const bookedCovers = zoneTables
-          .map((pos) => resaByTable[pos.id])
-          .filter(Boolean)
-          .reduce((s, r) => s + (r?.covers || 0), 0);
-
-        const isCollapsed = collapsed.has(zone.key);
-
-        return (
-          <div key={zone.key} className="card-light" style={{ padding: 0, overflow: "hidden" }}>
-            {/* Zone header (tappable) */}
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {/* Floor switcher + count */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", gap: 4, background: "var(--secondary-bg)", borderRadius: 10, padding: 3, flex: 1 }}>
+          {([
+            { key: "rdc" as Floor, label: "Rez-de-chaussée" },
+            { key: "r1" as Floor, label: "Sous-sol" },
+          ]).map((f) => (
             <button
-              onClick={() => toggleZone(zone.key)}
+              key={f.key}
+              onClick={() => { setFloor(f.key); setSelected(null); }}
               style={{
-                width: "100%", padding: "12px 14px", background: "none", border: "none", cursor: "pointer",
-                display: "flex", alignItems: "center", gap: 10,
-                borderBottom: isCollapsed ? "none" : "1px solid var(--border-color)",
+                flex: 1, padding: "9px 0", borderRadius: 8, border: "none", cursor: "pointer",
+                fontSize: 12, fontWeight: 500,
+                background: floor === f.key ? "var(--card-bg)" : "transparent",
+                color: floor === f.key ? "var(--text-primary)" : "var(--text-tertiary)",
+                boxShadow: floor === f.key ? "var(--shadow-light)" : "none",
+                transition: "all 0.2s",
               }}
+            >{f.label}</button>
+          ))}
+        </div>
+        <div style={{
+          fontSize: 11, fontWeight: 600,
+          background: "var(--secondary-bg)",
+          padding: "7px 10px", borderRadius: 8,
+          color: "var(--text-secondary)",
+          minWidth: 52, textAlign: "center",
+        }}>
+          {bookedTables}/{totalTables}
+        </div>
+      </div>
+
+      {/* Blueprint-style plan */}
+      <div className="card-light" style={{ padding: 8, overflow: "hidden" }}>
+        <svg
+          viewBox={`0 0 ${view.w} ${view.h}`}
+          style={{ width: "100%", height: "auto", display: "block", borderRadius: 10, background: "#FAFAF8" }}
+        >
+          {/* Building shadow/floor tint */}
+          <path d={outerWall} fill="#F7F5F0" />
+
+          {/* Outer walls (thick, architect style) */}
+          <path d={outerWall} fill="none" stroke="#2C2520" strokeWidth={6} strokeLinejoin="round" />
+
+          {/* Interior dividing walls */}
+          {interiorWalls.map((d, i) => (
+            <path key={i} d={d} fill="none" stroke="#2C2520" strokeWidth={4} strokeLinecap="round" />
+          ))}
+
+          {/* Zone labels (light, in the middle of service areas) */}
+          {zoneLabels.map((z, i) => (
+            <text
+              key={i}
+              x={z.x} y={z.y}
+              fontSize={12} fontWeight={700}
+              fill="#8A857E" letterSpacing={2.5}
+              style={{ pointerEvents: "none", userSelect: "none" }}
             >
-              <div style={{
-                width: 34, height: 34, borderRadius: 10,
-                background: zone.tint,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                color: "var(--terra-medium)", flexShrink: 0,
-              }}>
-                {zone.icon}
-              </div>
-              <div style={{ flex: 1, textAlign: "left", minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", letterSpacing: "-0.01em" }}>
-                  {zone.label}
-                </div>
-                <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-                  {zone.hint} · {booked}/{total} tables · {bookedCovers}/{capacity} pers.
-                </div>
-              </div>
-              <ChevronRight size={16} style={{
-                color: "var(--text-tertiary)",
-                transform: isCollapsed ? "rotate(0deg)" : "rotate(90deg)",
-                transition: "transform 0.2s",
-                flexShrink: 0,
-              }} />
-            </button>
+              {z.text}
+            </text>
+          ))}
 
-            {/* Plan canvas */}
-            {!isCollapsed && (
-              <div style={{
-                position: "relative",
-                width: "100%",
-                paddingBottom: `${zone.aspect * 100}%`,
-                background: zone.tint,
-                borderTop: `1px solid ${zone.border}`,
-              }}>
-                {/* Subtle grid pattern */}
-                <svg
-                  style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", opacity: 0.4 }}
-                  preserveAspectRatio="none"
+          {/* Room labels (Cuisine, WC, etc.) */}
+          {roomLabels.map((l, i) => (
+            <text
+              key={i}
+              x={l.x} y={l.y}
+              fontSize={13} fontWeight={500}
+              fill="#5C564F"
+              textAnchor="middle"
+              style={{ pointerEvents: "none", userSelect: "none" }}
+            >
+              {l.text}
+            </text>
+          ))}
+
+          {/* Entrance marker */}
+          {floor === "rdc" && (
+            <text
+              x={400} y={780}
+              fontSize={11} fontWeight={700}
+              fill="#C4785A" letterSpacing={2}
+              textAnchor="middle"
+              style={{ pointerEvents: "none", userSelect: "none" }}
+            >
+              ▲ RUE DE METZ · ENTRÉE
+            </text>
+          )}
+
+          {/* Tables */}
+          {layout.map((t) => {
+            const status = getStatus(t.id);
+            const isSel = selected === t.id;
+
+            const fill =
+              status === "arrive" ? "#8B5A40"
+              : status === "attendu" ? "#D4A04A"
+              : "#FFFFFF";
+            const stroke =
+              isSel ? "#C4785A"
+              : status === "arrive" ? "#6B4A30"
+              : status === "attendu" ? "#B88835"
+              : "#2C2520";
+            const textFill = status === "free" ? "#2C2520" : "#FFFFFF";
+
+            const onClick = () => {
+              const next = isSel ? null : t.id;
+              setSelected(next);
+              if (next) onTableClick?.(next);
+            };
+
+            if (t.shape === "circle") {
+              const r = Math.max(t.w, t.h) / 2;
+              return (
+                <g key={t.id} onClick={onClick} style={{ cursor: "pointer" }}>
+                  {isSel && (
+                    <circle cx={t.x} cy={t.y} r={r + 7} fill="none" stroke="#C4785A" strokeWidth={2.5} strokeDasharray="6 4" opacity={0.7} />
+                  )}
+                  <circle
+                    cx={t.x} cy={t.y} r={r}
+                    fill={fill} stroke={stroke} strokeWidth={isSel ? 3 : 2}
+                  />
+                  <text
+                    x={t.x} y={t.y + 6}
+                    fontSize={16} fontWeight={700}
+                    fill={textFill} textAnchor="middle"
+                    style={{ pointerEvents: "none", userSelect: "none" }}
+                  >
+                    {t.id}
+                  </text>
+                </g>
+              );
+            }
+            return (
+              <g key={t.id} onClick={onClick} style={{ cursor: "pointer" }}>
+                {isSel && (
+                  <rect
+                    x={t.x - t.w/2 - 6} y={t.y - t.h/2 - 6}
+                    width={t.w + 12} height={t.h + 12}
+                    fill="none" stroke="#C4785A" strokeWidth={2.5}
+                    strokeDasharray="6 4" rx={10} opacity={0.7}
+                  />
+                )}
+                <rect
+                  x={t.x - t.w/2} y={t.y - t.h/2}
+                  width={t.w} height={t.h}
+                  fill={fill} stroke={stroke} strokeWidth={isSel ? 3 : 2}
+                  rx={4}
+                />
+                <text
+                  x={t.x} y={t.y + 6}
+                  fontSize={16} fontWeight={700}
+                  fill={textFill} textAnchor="middle"
+                  style={{ pointerEvents: "none", userSelect: "none" }}
                 >
-                  <defs>
-                    <pattern id={`grid-${zone.key}`} width="24" height="24" patternUnits="userSpaceOnUse">
-                      <circle cx="1" cy="1" r="0.7" fill="var(--text-tertiary)" opacity="0.3" />
-                    </pattern>
-                  </defs>
-                  <rect width="100%" height="100%" fill={`url(#grid-${zone.key})`} />
-                </svg>
-
-                {/* Tables */}
-                {zoneTables.map((pos) => {
-                  const dbTable = tables.find((t) => t.id === pos.id);
-                  if (!dbTable) return null;
-                  const status = getStatus(pos.id);
-                  const resa = resaByTable[pos.id];
-                  const isSel = selected === pos.id;
-                  const dim = SIZE_DIM[pos.size];
-                  const w = dim.w;
-                  const h = pos.shape === "circle" ? w : dim.h;
-
-                  const fill =
-                    status === "arrive" ? "#8B5A40"
-                    : status === "attendu" ? "#D4A04A"
-                    : "var(--card-bg)";
-                  const border =
-                    isSel ? "var(--terra-medium)"
-                    : status === "arrive" ? "#6B4A30"
-                    : status === "attendu" ? "#B88835"
-                    : "#8A857E";
-                  const textColor = status === "free" ? "var(--text-primary)" : "#fff";
-                  const seatColor = status === "free" ? "var(--text-tertiary)" : border;
-
-                  // Chair dots (absolute positioning relative to zone canvas)
-                  const chairs = chairPositions(0, 0, w, h, pos.seats, pos.shape);
-
-                  return (
-                    <div
-                      key={pos.id}
-                      style={{
-                        position: "absolute",
-                        left: `${pos.x}%`,
-                        top: `${pos.y}%`,
-                        transform: "translate(-50%, -50%)",
-                        pointerEvents: "none",
-                      }}
-                    >
-                      {/* Chair dots */}
-                      {chairs.map((c, i) => (
-                        <div
-                          key={i}
-                          style={{
-                            position: "absolute",
-                            left: c.x, top: c.y,
-                            width: 5, height: 5, borderRadius: 3,
-                            background: seatColor,
-                            opacity: 0.45,
-                            transform: "translate(-50%, -50%)",
-                          }}
-                        />
-                      ))}
-
-                      {/* Table button */}
-                      <button
-                        onClick={() => {
-                          const next = isSel ? null : pos.id;
-                          setSelected(next);
-                          if (next) onTableClick?.(next);
-                        }}
-                        style={{
-                          pointerEvents: "auto",
-                          width: w, height: h,
-                          borderRadius: pos.shape === "circle" ? "50%" : 8,
-                          background: fill,
-                          border: `${isSel ? 2.5 : 1.5}px solid ${border}`,
-                          color: textColor,
-                          fontSize: dim.fs,
-                          fontWeight: 700,
-                          cursor: "pointer",
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: 1,
-                          padding: 0,
-                          lineHeight: 1,
-                          boxShadow: isSel
-                            ? "0 0 0 3px rgba(196,120,90,0.2), 0 4px 12px rgba(196,120,90,0.25)"
-                            : status !== "free" ? "0 2px 6px rgba(0,0,0,0.08)" : "0 1px 2px rgba(0,0,0,0.04)",
-                          transition: "all 0.18s ease",
-                          position: "relative",
-                          transform: "translate(-50%, -50%)",
-                          top: "50%",
-                          left: "50%",
-                        }}
-                      >
-                        <span>{pos.id}</span>
-                        {resa && (
-                          <span style={{ fontSize: dim.fs - 3, fontWeight: 500, opacity: 0.9, lineHeight: 1 }}>
-                            {resa.time.slice(0, 5).replace(":", "h")}
-                          </span>
-                        )}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        );
-      })}
+                  {t.id}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
 
       {/* Legend */}
       <div style={{
-        display: "flex", gap: 16, fontSize: 11, color: "var(--text-secondary)",
-        padding: "10px 14px", borderRadius: 12,
+        display: "flex", gap: 14, fontSize: 11, color: "var(--text-secondary)",
+        padding: "9px 14px", borderRadius: 10,
         background: "var(--secondary-bg)",
         justifyContent: "center", flexWrap: "wrap",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 14, height: 14, borderRadius: 3, border: "1.5px solid #8A857E", background: "var(--card-bg)" }} />
+          <div style={{ width: 13, height: 13, borderRadius: 2, border: "2px solid #2C2520", background: "#FFFFFF" }} />
           Libre
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 14, height: 14, borderRadius: 3, background: "#D4A04A" }} />
+          <div style={{ width: 13, height: 13, borderRadius: 2, background: "#D4A04A" }} />
           Réservée
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 14, height: 14, borderRadius: 3, background: "#8B5A40" }} />
+          <div style={{ width: 13, height: 13, borderRadius: 2, background: "#8B5A40" }} />
           Arrivée
         </div>
       </div>
