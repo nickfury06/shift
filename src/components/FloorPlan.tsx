@@ -98,7 +98,7 @@ export default function FloorPlan({ tables, reservations, onTableClick }: FloorP
   }
 
   const markers = floor === "rdc" ? RDC_MARKERS : R1_MARKERS;
-  const planSrc = floor === "rdc" ? "/plans/plan-rdc.jpg" : "/plans/plan-r1.jpg";
+  const planSrc = floor === "rdc" ? "/plans/plan-table-R-0.jpg" : "/plans/plan-table-R-1.jpg";
 
   const selectedResa = selected ? resaByTable[selected] : null;
   const selectedTable = selected ? tables.find((t) => t.id === selected) : null;
