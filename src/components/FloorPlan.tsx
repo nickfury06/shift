@@ -11,163 +11,73 @@ interface FloorPlanProps {
 }
 
 type Floor = "rdc" | "r1";
-type TShape = "rect" | "circle";
 
-interface T {
+// Marker positions as % of the plan image (x, y from top-left)
+// Tuned against the architectural plans provided
+interface Marker {
   id: string;
-  x: number;   // center x
-  y: number;   // center y
-  w: number;
-  h: number;
-  shape: TShape;
+  x: number;  // % left
+  y: number;  // % top
+  size?: "sm" | "md" | "lg"; // button size
 }
 
-interface Room {
-  d: string;           // SVG path for room shape
-  fill: string;
-  label?: string;
-  labelX?: number;
-  labelY?: number;
-}
-
-interface Fixed {
-  x: number; y: number; w: number; h: number;
-  label: string;
-}
-
-// ═══════════════════════════════════════════════════════════════
-// RDC — scaled to match real architectural plan
-// ═══════════════════════════════════════════════════════════════
-
-const RDC_VIEW = { w: 1000, h: 740 };
-
-// Service rooms (colored backgrounds with outlined walls)
-const RDC_ROOMS: Room[] = [
-  // Restaurant — interior room (irregular shape matching walls)
-  {
-    d: "M 60 250 L 650 250 L 650 530 L 60 530 Z",
-    fill: "rgba(196,120,90,0.06)",
-    label: "RESTAURANT",
-    labelX: 85, labelY: 278,
-  },
-  // Terrasse (fumeur) — outdoor right
-  {
-    d: "M 680 250 L 940 250 L 940 560 L 680 560 Z",
-    fill: "rgba(212,160,74,0.06)",
-    label: "TERRASSE",
-    labelX: 705, labelY: 278,
-  },
-  // Terrasse avant (street-facing row)
-  {
-    d: "M 60 560 L 650 560 L 650 700 L 60 700 Z",
-    fill: "rgba(212,160,74,0.04)",
-    label: "TERRASSE AVANT",
-    labelX: 85, labelY: 585,
-  },
-  // Non-fumeur (covered open salle, bottom right)
-  {
-    d: "M 680 575 L 940 575 L 940 715 L 680 715 Z",
-    fill: "rgba(139,176,150,0.07)",
-    label: "NON-FUMEUR",
-    labelX: 705, labelY: 600,
-  },
+const RDC_MARKERS: Marker[] = [
+  // Restaurant interior
+  { id: "480", x: 27,  y: 37 },
+  { id: "470", x: 12,  y: 47 },
+  { id: "490", x: 28,  y: 46 },
+  { id: "420", x: 41,  y: 46 },
+  { id: "400", x: 53,  y: 52 },
+  { id: "430", x: 38,  y: 52 },
+  { id: "460", x: 12,  y: 55 },
+  { id: "450", x: 27,  y: 54 },
+  { id: "440", x: 37,  y: 57 },
+  { id: "410", x: 45,  y: 55 },
+  // Terrasse avant (building wall mini-row)
+  { id: "150", x: 27,  y: 63, size: "sm" },
+  { id: "160", x: 33,  y: 63, size: "sm" },
+  // Front street row
+  { id: "140", x: 13,  y: 70, size: "sm" },
+  { id: "130", x: 19,  y: 70, size: "sm" },
+  { id: "120", x: 25,  y: 70, size: "sm" },
+  { id: "110", x: 30,  y: 70, size: "sm" },
+  { id: "100", x: 36,  y: 70, size: "sm" },
+  // Terrasse middle
+  { id: "250", x: 44,  y: 70, size: "sm" },
+  { id: "240", x: 51,  y: 70, size: "sm" },
+  // Terrasse right column
+  { id: "200", x: 61,  y: 47 },
+  { id: "210", x: 61,  y: 54 },
+  { id: "220", x: 61,  y: 62 },
+  { id: "230", x: 63,  y: 71, size: "lg" },
+  // Non-fumeur (covered salle, bottom right)
+  { id: "340", x: 55,  y: 77, size: "sm" },
+  { id: "300", x: 64,  y: 77, size: "sm" },
+  { id: "330", x: 55,  y: 82, size: "sm" },
+  { id: "320", x: 55,  y: 87, size: "sm" },
+  { id: "310", x: 64,  y: 82, size: "sm" },
 ];
 
-// Non-service fixed areas
-const RDC_FIXED: Fixed[] = [
-  { x: 260, y: 70,  w: 240, h: 160, label: "Cuisine" },
-  { x: 520, y: 70,  w: 180, h: 80,  label: "WC" },
-  { x: 520, y: 160, w: 90,  h: 70,  label: "Escalier ↓" },
-  { x: 720, y: 70,  w: 220, h: 160, label: "Réserve" },
+const R1_MARKERS: Marker[] = [
+  // Bar stools (vertical column, right of bar counter)
+  { id: "10", x: 63, y: 50, size: "sm" },
+  { id: "20", x: 63, y: 58, size: "sm" },
+  { id: "30", x: 63, y: 66, size: "sm" },
+  { id: "40", x: 63, y: 74, size: "sm" },
+  // Tables along bottom wall
+  { id: "90", x: 22, y: 82 },
+  { id: "80", x: 37, y: 82, size: "sm" },
+  { id: "70", x: 51, y: 82 },
+  { id: "60", x: 64, y: 88 },
+  { id: "50", x: 79, y: 88 },
 ];
 
-// Tables — positions faithful to the plan
-const RDC_TABLES: T[] = [
-  // ── RESTAURANT (interior) ─────────────────────────────────
-  // Row near kitchen wall
-  { id: "480", x: 195, y: 315, w: 64, h: 64, shape: "circle" },
-  // Left wall tables
-  { id: "470", x: 105, y: 380, w: 64, h: 64, shape: "circle" },
-  { id: "460", x: 105, y: 470, w: 64, h: 64, shape: "circle" },
-  // Middle-upper row
-  { id: "490", x: 270, y: 380, w: 100, h: 55, shape: "rect" },
-  { id: "420", x: 410, y: 380, w: 100, h: 55, shape: "rect" },
-  { id: "400", x: 560, y: 410, w: 80, h: 65, shape: "rect" },
-  // Center
-  { id: "430", x: 345, y: 435, w: 56, h: 56, shape: "circle" },
-  // Middle-lower row
-  { id: "450", x: 235, y: 470, w: 100, h: 55, shape: "rect" },
-  { id: "440", x: 380, y: 485, w: 75, h: 50, shape: "rect" },
-  { id: "410", x: 540, y: 485, w: 90, h: 55, shape: "rect" },
+const SIZE_MAP = {
+  sm: 32,
+  md: 40,
+  lg: 52,
+};
 
-  // ── TERRASSE (fumeur, right side) ──────────────────────
-  { id: "200", x: 810, y: 310, w: 100, h: 55, shape: "rect" },
-  { id: "210", x: 810, y: 380, w: 100, h: 55, shape: "rect" },
-  { id: "220", x: 810, y: 450, w: 100, h: 55, shape: "rect" },
-  { id: "230", x: 820, y: 525, w: 70, h: 70, shape: "circle" },
-  { id: "240", x: 720, y: 510, w: 70, h: 45, shape: "rect" },
-  { id: "250", x: 720, y: 455, w: 70, h: 45, shape: "rect" },
-
-  // ── TERRASSE AVANT (100-160, street front) ───────────────
-  // Upper mini-row (150, 160) against the building exit
-  { id: "150", x: 280, y: 600, w: 55, h: 40, shape: "rect" },
-  { id: "160", x: 345, y: 600, w: 55, h: 40, shape: "rect" },
-  // Front street row (100-140)
-  { id: "140", x: 95,  y: 655, w: 55, h: 42, shape: "rect" },
-  { id: "130", x: 160, y: 655, w: 55, h: 42, shape: "rect" },
-  { id: "120", x: 225, y: 655, w: 55, h: 42, shape: "rect" },
-  { id: "110", x: 290, y: 655, w: 55, h: 42, shape: "rect" },
-  { id: "100", x: 355, y: 655, w: 55, h: 42, shape: "rect" },
-
-  // ── NON-FUMEUR (300s, covered open salle) ────────────────
-  // Plan arrangement:
-  //   340 | 300
-  //        330
-  //   320 | 310
-  { id: "340", x: 735, y: 615, w: 55, h: 40, shape: "rect" },
-  { id: "300", x: 870, y: 615, w: 55, h: 40, shape: "rect" },
-  { id: "330", x: 805, y: 650, w: 55, h: 40, shape: "rect" },
-  { id: "320", x: 735, y: 685, w: 55, h: 40, shape: "rect" },
-  { id: "310", x: 870, y: 685, w: 55, h: 40, shape: "rect" },
-];
-
-// ═══════════════════════════════════════════════════════════════
-// R-1 · Sous-sol
-// ═══════════════════════════════════════════════════════════════
-
-const R1_VIEW = { w: 1000, h: 600 };
-
-const R1_ROOMS: Room[] = [
-  {
-    d: "M 60 80 L 940 80 L 940 520 L 60 520 Z",
-    fill: "rgba(139,90,64,0.06)",
-    label: "BAR · SOUS-SOL",
-    labelX: 85, labelY: 108,
-  },
-];
-
-const R1_FIXED: Fixed[] = [
-  { x: 120, y: 180, w: 380, h: 75, label: "Comptoir" },
-  { x: 800, y: 160, w: 120, h: 110, label: "Escalier ↑" },
-];
-
-const R1_TABLES: T[] = [
-  // Bar stools right of counter
-  { id: "10", x: 620, y: 160, w: 58, h: 58, shape: "circle" },
-  { id: "20", x: 620, y: 235, w: 58, h: 58, shape: "circle" },
-  { id: "30", x: 620, y: 310, w: 58, h: 58, shape: "circle" },
-  { id: "40", x: 620, y: 385, w: 58, h: 58, shape: "circle" },
-  // Tables along bottom
-  { id: "90", x: 130, y: 470, w: 110, h: 60, shape: "rect" },
-  { id: "80", x: 270, y: 470, w: 100, h: 60, shape: "rect" },
-  { id: "70", x: 405, y: 470, w: 105, h: 60, shape: "rect" },
-  { id: "60", x: 545, y: 470, w: 105, h: 60, shape: "rect" },
-  { id: "50", x: 685, y: 470, w: 110, h: 60, shape: "rect" },
-];
-
-// ═══════════════════════════════════════════════════════════════
-// Component
-// ═══════════════════════════════════════════════════════════════
 export default function FloorPlan({ tables, reservations, onTableClick }: FloorPlanProps) {
   const [floor, setFloor] = useState<Floor>("rdc");
   const [selected, setSelected] = useState<string | null>(null);
@@ -181,20 +91,18 @@ export default function FloorPlan({ tables, reservations, onTableClick }: FloorP
     return r.status === "arrive" ? "arrive" : "attendu";
   }
 
-  const view = floor === "rdc" ? RDC_VIEW : R1_VIEW;
-  const rooms = floor === "rdc" ? RDC_ROOMS : R1_ROOMS;
-  const fixed = floor === "rdc" ? RDC_FIXED : R1_FIXED;
-  const layout = floor === "rdc" ? RDC_TABLES : R1_TABLES;
+  const markers = floor === "rdc" ? RDC_MARKERS : R1_MARKERS;
+  const planSrc = floor === "rdc" ? "/plans/plan-rdc.jpg" : "/plans/plan-r1.jpg";
 
   const selectedResa = selected ? resaByTable[selected] : null;
   const selectedTable = selected ? tables.find((t) => t.id === selected) : null;
 
-  const totalTables = layout.length;
-  const bookedTables = layout.filter((t) => getStatus(t.id) !== "free").length;
+  const totalTables = markers.length;
+  const bookedTables = markers.filter((m) => getStatus(m.id) !== "free").length;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {/* Floor switcher */}
+      {/* Floor switcher + count */}
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <div style={{ display: "flex", gap: 4, background: "var(--secondary-bg)", borderRadius: 10, padding: 3, flex: 1 }}>
           {([
@@ -226,150 +134,76 @@ export default function FloorPlan({ tables, reservations, onTableClick }: FloorP
         </div>
       </div>
 
-      {/* SVG plan */}
-      <div className="card-light" style={{ padding: 8, overflow: "hidden" }}>
-        <svg
-          viewBox={`0 0 ${view.w} ${view.h}`}
-          style={{ width: "100%", height: "auto", display: "block", borderRadius: 10 }}
-        >
-          <defs>
-            <pattern id="fp-grid" width="40" height="40" patternUnits="userSpaceOnUse">
-              <circle cx="1" cy="1" r="0.8" fill="var(--text-tertiary)" opacity="0.15" />
-            </pattern>
-          </defs>
-          <rect x="0" y="0" width={view.w} height={view.h} fill="var(--card-bg)" />
-          <rect x="0" y="0" width={view.w} height={view.h} fill="url(#fp-grid)" />
+      {/* Plan container */}
+      <div className="card-light" style={{ padding: 6, overflow: "hidden", position: "relative" }}>
+        <div style={{ position: "relative", width: "100%", borderRadius: 10, overflow: "hidden" }}>
+          {/* Actual architectural plan as background */}
+          <img
+            src={planSrc}
+            alt={floor === "rdc" ? "Plan RDC" : "Plan sous-sol"}
+            style={{
+              width: "100%", height: "auto", display: "block",
+              userSelect: "none",
+              pointerEvents: "none",
+            }}
+            draggable={false}
+          />
 
-          {/* Rooms (colored backgrounds with walls) */}
-          {rooms.map((r, i) => (
-            <g key={i}>
-              <path
-                d={r.d}
-                fill={r.fill}
-                stroke="var(--text-tertiary)"
-                strokeWidth={2.5}
-                strokeLinejoin="round"
-                opacity={0.85}
-              />
-              {r.label && (
-                <text
-                  x={r.labelX!} y={r.labelY!}
-                  fontSize={12} fontWeight={700}
-                  fill="var(--text-tertiary)"
-                  letterSpacing={2}
-                  style={{ pointerEvents: "none", userSelect: "none" }}
-                >
-                  {r.label}
-                </text>
-              )}
-            </g>
-          ))}
-
-          {/* Fixed non-service areas */}
-          {fixed.map((z, i) => (
-            <g key={i}>
-              <rect
-                x={z.x} y={z.y} width={z.w} height={z.h}
-                fill="var(--secondary-bg)"
-                stroke="var(--border-color)" strokeWidth={1.5}
-                rx={8}
-              />
-              <text
-                x={z.x + z.w / 2} y={z.y + z.h / 2 + 5}
-                fontSize={12} fontWeight={500}
-                fill="var(--text-tertiary)" textAnchor="middle"
-                style={{ pointerEvents: "none", userSelect: "none" }}
-              >
-                {z.label}
-              </text>
-            </g>
-          ))}
-
-          {/* Entrance marker */}
-          {floor === "rdc" && (
-            <text
-              x={300} y={732}
-              fontSize={11} fontWeight={700}
-              fill="var(--terra-medium)"
-              letterSpacing={2} textAnchor="middle"
-              style={{ pointerEvents: "none", userSelect: "none" }}
-            >
-              ▲ RUE DE METZ · ENTRÉE
-            </text>
-          )}
-
-          {/* Tables */}
-          {layout.map((t) => {
-            const status = getStatus(t.id);
-            const isSel = selected === t.id;
+          {/* Clickable markers overlaid on the plan */}
+          {markers.map((m) => {
+            const status = getStatus(m.id);
+            const isSel = selected === m.id;
+            const size = SIZE_MAP[m.size || "md"];
 
             const fill =
-              status === "arrive" ? "#8B5A40"
-              : status === "attendu" ? "#D4A04A"
-              : "var(--card-bg)";
+              status === "arrive" ? "rgba(139,90,64,0.95)"
+              : status === "attendu" ? "rgba(212,160,74,0.95)"
+              : "rgba(255,255,255,0.95)";
             const stroke =
               isSel ? "var(--terra-medium)"
               : status === "arrive" ? "#6B4A30"
               : status === "attendu" ? "#B88835"
-              : "#8A857E";
-            const textFill = status === "free" ? "var(--text-primary)" : "#fff";
+              : "#6B6560";
+            const textColor = status === "free" ? "var(--text-primary)" : "#fff";
 
-            const onClick = () => {
-              const next = isSel ? null : t.id;
-              setSelected(next);
-              if (next) onTableClick?.(next);
-            };
-
-            if (t.shape === "circle") {
-              const r = Math.max(t.w, t.h) / 2;
-              return (
-                <g key={t.id} onClick={onClick} style={{ cursor: "pointer" }}>
-                  {isSel && (
-                    <circle cx={t.x} cy={t.y} r={r + 7} fill="none" stroke="var(--terra-medium)" strokeWidth={2} strokeDasharray="5 4" opacity={0.55} />
-                  )}
-                  <circle
-                    cx={t.x} cy={t.y} r={r}
-                    fill={fill} stroke={stroke} strokeWidth={isSel ? 2.5 : 1.8}
-                  />
-                  <text
-                    x={t.x} y={t.y + 6}
-                    fontSize={16} fontWeight={700}
-                    fill={textFill} textAnchor="middle"
-                    style={{ pointerEvents: "none", userSelect: "none" }}
-                  >
-                    {t.id}
-                  </text>
-                </g>
-              );
-            }
             return (
-              <g key={t.id} onClick={onClick} style={{ cursor: "pointer" }}>
-                {isSel && (
-                  <rect
-                    x={t.x - t.w/2 - 5} y={t.y - t.h/2 - 5}
-                    width={t.w + 10} height={t.h + 10}
-                    fill="none" stroke="var(--terra-medium)" strokeWidth={2}
-                    strokeDasharray="5 4" rx={9} opacity={0.55}
-                  />
-                )}
-                <rect
-                  x={t.x - t.w/2} y={t.y - t.h/2}
-                  width={t.w} height={t.h}
-                  fill={fill} stroke={stroke} strokeWidth={isSel ? 2.5 : 1.8}
-                  rx={6}
-                />
-                <text
-                  x={t.x} y={t.y + 6}
-                  fontSize={16} fontWeight={700}
-                  fill={textFill} textAnchor="middle"
-                  style={{ pointerEvents: "none", userSelect: "none" }}
-                >
-                  {t.id}
-                </text>
-              </g>
+              <button
+                key={m.id}
+                onClick={() => {
+                  const next = isSel ? null : m.id;
+                  setSelected(next);
+                  if (next) onTableClick?.(next);
+                }}
+                style={{
+                  position: "absolute",
+                  left: `${m.x}%`,
+                  top: `${m.y}%`,
+                  transform: "translate(-50%, -50%)",
+                  width: size, height: size,
+                  borderRadius: "50%",
+                  background: fill,
+                  border: `${isSel ? 3 : 2}px solid ${stroke}`,
+                  color: textColor,
+                  fontSize: size <= 32 ? 11 : size <= 40 ? 13 : 15,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: 0,
+                  boxShadow: isSel
+                    ? "0 0 0 4px rgba(196,120,90,0.25), 0 4px 12px rgba(0,0,0,0.2)"
+                    : "0 2px 8px rgba(0,0,0,0.15)",
+                  transition: "all 0.15s ease",
+                  backdropFilter: "blur(4px)",
+                  WebkitBackdropFilter: "blur(4px)",
+                }}
+              >
+                {m.id}
+              </button>
             );
           })}
-        </svg>
+        </div>
       </div>
 
       {/* Legend */}
@@ -380,15 +214,15 @@ export default function FloorPlan({ tables, reservations, onTableClick }: FloorP
         justifyContent: "center", flexWrap: "wrap",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 13, height: 13, borderRadius: 3, border: "1.5px solid var(--text-tertiary)", background: "var(--card-bg)" }} />
+          <div style={{ width: 13, height: 13, borderRadius: "50%", border: "2px solid #6B6560", background: "rgba(255,255,255,0.95)" }} />
           Libre
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 13, height: 13, borderRadius: 3, background: "#D4A04A" }} />
+          <div style={{ width: 13, height: 13, borderRadius: "50%", background: "#D4A04A" }} />
           Réservée
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 13, height: 13, borderRadius: 3, background: "#8B5A40" }} />
+          <div style={{ width: 13, height: 13, borderRadius: "50%", background: "#8B5A40" }} />
           Arrivée
         </div>
       </div>
