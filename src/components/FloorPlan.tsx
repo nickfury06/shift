@@ -21,144 +21,184 @@ interface T {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// RDC — faithful recreation of the architectural survey plan
+// RDC — faithful to architect survey (25.01.2026)
+// ViewBox 1400 × 1000 matches the plan aspect ratio
 // ═══════════════════════════════════════════════════════════════
-const RDC_VIEW = { w: 1200, h: 800 };
+const RDC_VIEW = { w: 1400, h: 1000 };
 
-// Building walls — recreated from the architectural plan
-// Outer shell with its characteristic angular top-left corner
-const RDC_OUTER_WALL = "M 100 120 L 430 120 L 460 80 L 840 80 L 870 160 L 1050 160 L 1090 260 L 1110 370 L 1090 500 L 1050 620 L 780 620 L 780 660 L 100 660 Z";
+// Building outer walls — follows the real shape:
+//  - angular top-left cut
+//  - Pièce extension to the right
+//  - Non-fumeur salle extension to the bottom-right
+const RDC_OUTER = `
+  M 180 310
+  L 440 130
+  L 880 120
+  L 900 220
+  L 1220 220
+  L 1220 560
+  L 900 560
+  L 900 720
+  L 820 720
+  L 820 830
+  L 180 830
+  Z
+`;
 
-// Interior dividing walls (between rooms)
-const RDC_INTERIOR_WALLS = [
-  // Kitchen dividers
-  "M 280 120 L 280 290",
-  "M 280 290 L 560 290",
-  "M 560 120 L 560 290",
-  // WC block
-  "M 560 160 L 560 290",
-  "M 620 160 L 620 230",
-  "M 680 160 L 680 230",
-  "M 740 160 L 740 230",
-  "M 560 230 L 780 230",
-  // Escalier / pièce boundaries
-  "M 780 230 L 870 230",
-  "M 780 280 L 870 280",
-  "M 870 160 L 870 620",
-  // Local
-  "M 560 230 L 560 290",
-  // Main floor division between restaurant and terrasse
-  "M 780 290 L 780 620",
-  // Non-fumeur zone boundary
-  "M 780 550 L 870 550",
+// Interior walls
+const RDC_WALLS: string[] = [
+  // Cuisine bounds
+  "M 470 310 L 470 520",
+  "M 470 520 L 790 520",
+  "M 790 310 L 790 520",
+  // WC row wall
+  "M 560 220 L 560 330",
+  "M 630 220 L 630 330",
+  "M 700 220 L 700 330",
+  "M 770 220 L 770 330",
+  "M 560 330 L 820 330",
+  // Local wall (small space between Cuisine and right rooms)
+  "M 790 330 L 900 330",
+  "M 820 330 L 820 410",
+  // Escalier bounds
+  "M 790 410 L 900 410",
+  "M 790 520 L 900 520",
+  // Pièce (top right) bounds
+  "M 900 410 L 1220 410",
+  "M 900 520 L 1220 520",
+  // Non-fumeur salle dividers (multiple "Pièce" rooms)
+  "M 900 640 L 1220 640",
+  "M 1030 640 L 1030 720",
+  "M 1130 640 L 1130 720",
+  "M 900 720 L 1220 720",
+  // Bottom extension for 320s/310s area
+  "M 820 720 L 820 830",
+  "M 900 720 L 900 830",
+  "M 1030 720 L 1030 830",
+  "M 1130 720 L 1130 830",
 ];
 
-// Labels for non-service rooms/zones
-interface RoomLabel { x: number; y: number; text: string; }
-const RDC_ROOM_LABELS: RoomLabel[] = [
-  { x: 420, y: 210, text: "Cuisine" },
-  { x: 590, y: 200, text: "WC" },
-  { x: 650, y: 200, text: "WC" },
-  { x: 710, y: 200, text: "WC" },
-  { x: 770, y: 200, text: "WC" },
-  { x: 970, y: 200, text: "Pièce" },
-  { x: 822, y: 260, text: "Local" },
-  { x: 823, y: 330, text: "Escalier" },
-  { x: 970, y: 400, text: "Pièce" },
-  { x: 970, y: 590, text: "Pièce" },
+// Fixed rooms with labels
+interface Room { cx: number; cy: number; text: string; fontSize?: number; }
+const RDC_ROOMS: Room[] = [
+  { cx: 625, cy: 420, text: "Cuisine", fontSize: 16 },
+  { cx: 595, cy: 280, text: "WC", fontSize: 11 },
+  { cx: 665, cy: 280, text: "WC", fontSize: 11 },
+  { cx: 735, cy: 280, text: "WC", fontSize: 11 },
+  { cx: 795, cy: 280, text: "WC", fontSize: 11 },
+  { cx: 845, cy: 370, text: "Local", fontSize: 11 },
+  { cx: 845, cy: 465, text: "Escalier", fontSize: 12 },
+  { cx: 1060, cy: 315, text: "Pièce", fontSize: 13 },
+  { cx: 1060, cy: 465, text: "Pièce", fontSize: 13 },
 ];
 
-// Zone labels (for the service areas)
-interface ZoneLabel { x: number; y: number; text: string; }
-const RDC_ZONE_LABELS: ZoneLabel[] = [
-  { x: 150, y: 370, text: "RESTAURANT" },
-  { x: 940, y: 360, text: "TERRASSE" },
-  { x: 300, y: 690, text: "TERRASSE AVANT" },
-  { x: 925, y: 590, text: "NON-FUMEUR" },
+// Zone labels (service zones overlay)
+interface Zone { x: number; y: number; text: string; }
+const RDC_ZONES: Zone[] = [
+  { x: 240, y: 340, text: "RESTAURANT" },
+  { x: 935, y: 590, text: "TERRASSE" },
+  { x: 290, y: 870, text: "TERRASSE AVANT" },
+  { x: 915, y: 850, text: "NON-FUMEUR" },
 ];
 
-// Tables — positions matching the architectural survey
+// Tables — positioned to match the architect plan
 const RDC_TABLES: T[] = [
-  // Restaurant interior — tables 480, 470, 490, 420, 400, 430, 460, 450, 440, 410
-  { id: "480", x: 370, y: 320, w: 70, h: 70, shape: "circle" },
-  { id: "470", x: 140, y: 380, w: 70, h: 70, shape: "circle" },
-  { id: "490", x: 370, y: 405, w: 105, h: 55, shape: "rect" },
-  { id: "420", x: 510, y: 405, w: 105, h: 55, shape: "rect" },
-  { id: "400", x: 650, y: 435, w: 90, h: 70, shape: "rect" },
-  { id: "430", x: 445, y: 455, w: 60, h: 60, shape: "circle" },
-  { id: "460", x: 140, y: 470, w: 70, h: 70, shape: "circle" },
-  { id: "450", x: 330, y: 470, w: 110, h: 55, shape: "rect" },
-  { id: "440", x: 470, y: 505, w: 85, h: 55, shape: "rect" },
-  { id: "410", x: 610, y: 485, w: 100, h: 55, shape: "rect" },
+  // Restaurant (left interior)
+  { id: "480", x: 310, y: 410, w: 75, h: 75, shape: "circle" },
+  { id: "470", x: 220, y: 495, w: 75, h: 75, shape: "circle" },
+  { id: "460", x: 220, y: 590, w: 75, h: 75, shape: "circle" },
+  { id: "490", x: 360, y: 490, w: 110, h: 60, shape: "rect" },
+  { id: "420", x: 495, y: 490, w: 110, h: 60, shape: "rect" },
+  { id: "430", x: 415, y: 560, w: 65, h: 65, shape: "circle" },
+  { id: "450", x: 360, y: 610, w: 110, h: 60, shape: "rect" },
+  { id: "440", x: 490, y: 620, w: 85, h: 55, shape: "rect" },
 
-  // Terrasse (right side, between the main wall and the exterior)
-  { id: "200", x: 970, y: 270, w: 100, h: 55, shape: "rect" },
-  { id: "210", x: 970, y: 340, w: 100, h: 55, shape: "rect" },
-  { id: "220", x: 970, y: 410, w: 100, h: 55, shape: "rect" },
-  { id: "230", x: 975, y: 495, w: 80, h: 80, shape: "circle" },
-  { id: "240", x: 895, y: 490, w: 65, h: 50, shape: "rect" },
-  { id: "250", x: 820, y: 490, w: 65, h: 50, shape: "rect" },
+  // Right side restaurant tables (400, 410)
+  { id: "400", x: 690, y: 580, w: 90, h: 70, shape: "rect" },
+  { id: "410", x: 610, y: 620, w: 90, h: 55, shape: "rect" },
 
-  // Terrasse avant (street-facing row)
-  // Upper mini-row near building exit
-  { id: "150", x: 400, y: 585, w: 55, h: 45, shape: "rect" },
-  { id: "160", x: 460, y: 585, w: 55, h: 45, shape: "rect" },
-  // Front street row
-  { id: "140", x: 130, y: 700, w: 55, h: 45, shape: "rect" },
-  { id: "130", x: 195, y: 700, w: 55, h: 45, shape: "rect" },
-  { id: "120", x: 260, y: 700, w: 55, h: 45, shape: "rect" },
-  { id: "110", x: 325, y: 700, w: 55, h: 45, shape: "rect" },
-  { id: "100", x: 390, y: 700, w: 55, h: 45, shape: "rect" },
+  // Terrasse (right side of building, between walls)
+  { id: "200", x: 1060, y: 580, w: 110, h: 60, shape: "rect" },
+  { id: "210", x: 1200, y: 475, w: 110, h: 60, shape: "rect" }, // moved to fit
+  { id: "220", x: 1060, y: 475, w: 110, h: 60, shape: "rect" },
+  { id: "230", x: 1070, y: 680, w: 90, h: 90, shape: "circle" },
 
-  // Non-fumeur (covered open salle, bottom-right)
-  { id: "340", x: 800, y: 580, w: 55, h: 45, shape: "rect" },
-  { id: "300", x: 870, y: 580, w: 55, h: 45, shape: "rect" },
-  { id: "330", x: 835, y: 620, w: 55, h: 45, shape: "rect" },
-  { id: "320", x: 800, y: 720, w: 55, h: 45, shape: "rect" },
-  { id: "310", x: 870, y: 720, w: 55, h: 45, shape: "rect" },
+  // Middle pair 240/250 (between 230 and pergola area)
+  { id: "250", x: 680, y: 770, w: 70, h: 55, shape: "rect" },
+  { id: "240", x: 770, y: 770, w: 70, h: 55, shape: "rect" },
+
+  // Terrasse avant (front mini-row + street row)
+  { id: "150", x: 395, y: 770, w: 55, h: 50, shape: "rect" },
+  { id: "160", x: 455, y: 770, w: 55, h: 50, shape: "rect" },
+
+  { id: "140", x: 220, y: 870, w: 55, h: 50, shape: "rect" },
+  { id: "130", x: 285, y: 870, w: 55, h: 50, shape: "rect" },
+  { id: "120", x: 350, y: 870, w: 55, h: 50, shape: "rect" },
+  { id: "110", x: 415, y: 870, w: 55, h: 50, shape: "rect" },
+  { id: "100", x: 480, y: 870, w: 55, h: 50, shape: "rect" },
+
+  // Non-fumeur (separate rooms in the bottom-right)
+  { id: "340", x: 960, y: 680, w: 60, h: 50, shape: "rect" },
+  { id: "300", x: 1080, y: 680, w: 60, h: 50, shape: "rect" },
+  { id: "330", x: 1180, y: 680, w: 60, h: 50, shape: "rect" },
+  { id: "320", x: 960, y: 780, w: 60, h: 50, shape: "rect" },
+  { id: "310", x: 1080, y: 780, w: 60, h: 50, shape: "rect" },
 ];
 
 // ═══════════════════════════════════════════════════════════════
-// R-1 — Sous-sol bar
+// R-1 — Sous-sol bar (basement)
+// Follows the basement plan with angled top-left wall
 // ═══════════════════════════════════════════════════════════════
-const R1_VIEW = { w: 1200, h: 700 };
+const R1_VIEW = { w: 1400, h: 900 };
 
-const R1_OUTER_WALL = "M 120 100 L 600 100 L 630 150 L 1080 150 L 1080 620 L 120 620 Z";
+const R1_OUTER = `
+  M 180 470
+  L 380 230
+  L 640 150
+  L 1200 130
+  L 1260 200
+  L 1260 820
+  L 180 820
+  Z
+`;
 
-const R1_INTERIOR_WALLS = [
-  // Bar counter boundary
-  "M 180 260 L 620 260",
-  "M 180 340 L 620 340",
-  "M 180 260 L 180 340",
-  "M 620 260 L 620 340",
+const R1_WALLS: string[] = [
+  // Bar counter (long horizontal rect on the left)
+  "M 280 370 L 780 370",
+  "M 280 470 L 780 470",
+  "M 280 370 L 280 470",
+  "M 780 370 L 780 470",
   // Stairs
-  "M 900 240 L 1040 240",
-  "M 900 240 L 900 400",
-  "M 1040 240 L 1040 400",
-  "M 900 400 L 1040 400",
+  "M 1080 260 L 1240 260",
+  "M 1080 260 L 1080 480",
+  "M 1240 260 L 1240 480",
+  "M 1080 480 L 1240 480",
+  // Vertical divider around "Sous-sol 100" column between 30/40
+  "M 780 470 L 780 580",
 ];
 
-const R1_ROOM_LABELS: RoomLabel[] = [
-  { x: 400, y: 305, text: "Comptoir" },
-  { x: 970, y: 325, text: "Escalier ↑" },
+const R1_ROOMS: Room[] = [
+  { cx: 530, cy: 425, text: "Comptoir", fontSize: 18 },
+  { cx: 1160, cy: 380, text: "Escalier ↑", fontSize: 14 },
 ];
 
-const R1_ZONE_LABELS: ZoneLabel[] = [
-  { x: 220, y: 160, text: "BAR · SOUS-SOL" },
+const R1_ZONES: Zone[] = [
+  { x: 260, y: 200, text: "BAR · SOUS-SOL" },
 ];
 
 const R1_TABLES: T[] = [
-  // Bar stools right of counter
-  { id: "10", x: 730, y: 230, w: 58, h: 58, shape: "circle" },
-  { id: "20", x: 730, y: 305, w: 58, h: 58, shape: "circle" },
-  { id: "30", x: 730, y: 380, w: 58, h: 58, shape: "circle" },
-  { id: "40", x: 730, y: 455, w: 58, h: 58, shape: "circle" },
-  // Tables along the bottom wall
-  { id: "90", x: 200, y: 540, w: 120, h: 70, shape: "rect" },
-  { id: "80", x: 360, y: 540, w: 100, h: 70, shape: "rect" },
-  { id: "70", x: 520, y: 540, w: 110, h: 70, shape: "rect" },
-  { id: "60", x: 680, y: 540, w: 110, h: 70, shape: "rect" },
-  { id: "50", x: 840, y: 540, w: 120, h: 70, shape: "rect" },
+  // Bar stools (column to the right of counter)
+  { id: "10", x: 880, y: 340, w: 70, h: 70, shape: "circle" },
+  { id: "20", x: 880, y: 440, w: 70, h: 70, shape: "circle" },
+  { id: "30", x: 880, y: 540, w: 70, h: 70, shape: "circle" },
+  { id: "40", x: 880, y: 640, w: 70, h: 70, shape: "circle" },
+
+  // Tables along bottom wall
+  { id: "90", x: 280, y: 720, w: 140, h: 80, shape: "rect" },
+  { id: "80", x: 470, y: 720, w: 110, h: 80, shape: "rect" },
+  { id: "70", x: 640, y: 720, w: 120, h: 80, shape: "rect" },
+  { id: "60", x: 810, y: 780, w: 120, h: 70, shape: "rect" },
+  { id: "50", x: 970, y: 780, w: 130, h: 70, shape: "rect" },
 ];
 
 // ── Component ──────────────────────────────────────────────────
@@ -176,10 +216,10 @@ export default function FloorPlan({ tables, reservations, onTableClick }: FloorP
   }
 
   const view = floor === "rdc" ? RDC_VIEW : R1_VIEW;
-  const outerWall = floor === "rdc" ? RDC_OUTER_WALL : R1_OUTER_WALL;
-  const interiorWalls = floor === "rdc" ? RDC_INTERIOR_WALLS : R1_INTERIOR_WALLS;
-  const roomLabels = floor === "rdc" ? RDC_ROOM_LABELS : R1_ROOM_LABELS;
-  const zoneLabels = floor === "rdc" ? RDC_ZONE_LABELS : R1_ZONE_LABELS;
+  const outer = floor === "rdc" ? RDC_OUTER : R1_OUTER;
+  const walls = floor === "rdc" ? RDC_WALLS : R1_WALLS;
+  const rooms = floor === "rdc" ? RDC_ROOMS : R1_ROOMS;
+  const zones = floor === "rdc" ? RDC_ZONES : R1_ZONES;
   const layout = floor === "rdc" ? RDC_TABLES : R1_TABLES;
 
   const selectedResa = selected ? resaByTable[selected] : null;
@@ -222,55 +262,55 @@ export default function FloorPlan({ tables, reservations, onTableClick }: FloorP
         </div>
       </div>
 
-      {/* Blueprint-style plan */}
+      {/* Architectural plan SVG */}
       <div className="card-light" style={{ padding: 8, overflow: "hidden" }}>
         <svg
           viewBox={`0 0 ${view.w} ${view.h}`}
-          style={{ width: "100%", height: "auto", display: "block", borderRadius: 10, background: "#FAFAF8" }}
+          style={{ width: "100%", height: "auto", display: "block", borderRadius: 10, background: "#FAFAF7" }}
         >
-          {/* Building shadow/floor tint */}
-          <path d={outerWall} fill="#F7F5F0" />
+          {/* Building floor */}
+          <path d={outer} fill="#F5F2EB" />
 
-          {/* Outer walls (thick, architect style) */}
-          <path d={outerWall} fill="none" stroke="#2C2520" strokeWidth={6} strokeLinejoin="round" />
+          {/* Outer walls — thick black like architect plans */}
+          <path d={outer} fill="none" stroke="#1C1815" strokeWidth={8} strokeLinejoin="miter" />
 
-          {/* Interior dividing walls */}
-          {interiorWalls.map((d, i) => (
-            <path key={i} d={d} fill="none" stroke="#2C2520" strokeWidth={4} strokeLinecap="round" />
+          {/* Interior walls */}
+          {walls.map((d, i) => (
+            <path key={i} d={d} fill="none" stroke="#1C1815" strokeWidth={4} strokeLinecap="butt" />
           ))}
 
-          {/* Zone labels (light, in the middle of service areas) */}
-          {zoneLabels.map((z, i) => (
+          {/* Zone labels (big, uppercase, in service areas) */}
+          {zones.map((z, i) => (
             <text
               key={i}
               x={z.x} y={z.y}
-              fontSize={12} fontWeight={700}
-              fill="#8A857E" letterSpacing={2.5}
+              fontSize={14} fontWeight={700}
+              fill="#B5B0A8" letterSpacing={3}
               style={{ pointerEvents: "none", userSelect: "none" }}
             >
               {z.text}
             </text>
           ))}
 
-          {/* Room labels (Cuisine, WC, etc.) */}
-          {roomLabels.map((l, i) => (
+          {/* Fixed room labels */}
+          {rooms.map((r, i) => (
             <text
               key={i}
-              x={l.x} y={l.y}
-              fontSize={13} fontWeight={500}
+              x={r.cx} y={r.cy}
+              fontSize={r.fontSize || 14} fontWeight={500}
               fill="#5C564F"
               textAnchor="middle"
               style={{ pointerEvents: "none", userSelect: "none" }}
             >
-              {l.text}
+              {r.text}
             </text>
           ))}
 
           {/* Entrance marker */}
           {floor === "rdc" && (
             <text
-              x={400} y={780}
-              fontSize={11} fontWeight={700}
+              x={350} y={960}
+              fontSize={13} fontWeight={700}
               fill="#C4785A" letterSpacing={2}
               textAnchor="middle"
               style={{ pointerEvents: "none", userSelect: "none" }}
@@ -292,8 +332,8 @@ export default function FloorPlan({ tables, reservations, onTableClick }: FloorP
               isSel ? "#C4785A"
               : status === "arrive" ? "#6B4A30"
               : status === "attendu" ? "#B88835"
-              : "#2C2520";
-            const textFill = status === "free" ? "#2C2520" : "#FFFFFF";
+              : "#1C1815";
+            const textFill = status === "free" ? "#1C1815" : "#FFFFFF";
 
             const onClick = () => {
               const next = isSel ? null : t.id;
@@ -306,15 +346,15 @@ export default function FloorPlan({ tables, reservations, onTableClick }: FloorP
               return (
                 <g key={t.id} onClick={onClick} style={{ cursor: "pointer" }}>
                   {isSel && (
-                    <circle cx={t.x} cy={t.y} r={r + 7} fill="none" stroke="#C4785A" strokeWidth={2.5} strokeDasharray="6 4" opacity={0.7} />
+                    <circle cx={t.x} cy={t.y} r={r + 8} fill="none" stroke="#C4785A" strokeWidth={3} strokeDasharray="7 5" opacity={0.7} />
                   )}
                   <circle
                     cx={t.x} cy={t.y} r={r}
-                    fill={fill} stroke={stroke} strokeWidth={isSel ? 3 : 2}
+                    fill={fill} stroke={stroke} strokeWidth={isSel ? 3 : 2.5}
                   />
                   <text
-                    x={t.x} y={t.y + 6}
-                    fontSize={16} fontWeight={700}
+                    x={t.x} y={t.y + 7}
+                    fontSize={18} fontWeight={700}
                     fill={textFill} textAnchor="middle"
                     style={{ pointerEvents: "none", userSelect: "none" }}
                   >
@@ -327,21 +367,21 @@ export default function FloorPlan({ tables, reservations, onTableClick }: FloorP
               <g key={t.id} onClick={onClick} style={{ cursor: "pointer" }}>
                 {isSel && (
                   <rect
-                    x={t.x - t.w/2 - 6} y={t.y - t.h/2 - 6}
-                    width={t.w + 12} height={t.h + 12}
-                    fill="none" stroke="#C4785A" strokeWidth={2.5}
-                    strokeDasharray="6 4" rx={10} opacity={0.7}
+                    x={t.x - t.w/2 - 7} y={t.y - t.h/2 - 7}
+                    width={t.w + 14} height={t.h + 14}
+                    fill="none" stroke="#C4785A" strokeWidth={3}
+                    strokeDasharray="7 5" rx={10} opacity={0.7}
                   />
                 )}
                 <rect
                   x={t.x - t.w/2} y={t.y - t.h/2}
                   width={t.w} height={t.h}
-                  fill={fill} stroke={stroke} strokeWidth={isSel ? 3 : 2}
-                  rx={4}
+                  fill={fill} stroke={stroke} strokeWidth={isSel ? 3 : 2.5}
+                  rx={5}
                 />
                 <text
-                  x={t.x} y={t.y + 6}
-                  fontSize={16} fontWeight={700}
+                  x={t.x} y={t.y + 7}
+                  fontSize={18} fontWeight={700}
                   fill={textFill} textAnchor="middle"
                   style={{ pointerEvents: "none", userSelect: "none" }}
                 >
@@ -361,7 +401,7 @@ export default function FloorPlan({ tables, reservations, onTableClick }: FloorP
         justifyContent: "center", flexWrap: "wrap",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 13, height: 13, borderRadius: 2, border: "2px solid #2C2520", background: "#FFFFFF" }} />
+          <div style={{ width: 13, height: 13, borderRadius: 2, border: "2px solid #1C1815", background: "#FFFFFF" }} />
           Libre
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
