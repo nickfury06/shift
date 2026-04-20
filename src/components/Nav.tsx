@@ -63,6 +63,14 @@ export default function Nav() {
   // ── Main tabs by role ─────────────────────────────────────
   function getMainItems(): NavItem[] {
     if (role === "staff") {
+      // Extras get a simplified nav focused on their shift: Accueil, Résas (with floor plan), Debrief
+      if (profile?.employment_type === "extra") {
+        return [
+          { href: "/accueil", label: "Accueil", icon: <Home size={iconSize} strokeWidth={strokeWidth} /> },
+          { href: "/reservations", label: "Résas", icon: <BookOpen size={iconSize} strokeWidth={strokeWidth} /> },
+          { href: "/debrief", label: "Debrief", icon: <PenLine size={iconSize} strokeWidth={strokeWidth} /> },
+        ];
+      }
       return [
         { href: "/accueil", label: "Accueil", icon: <Home size={iconSize} strokeWidth={strokeWidth} /> },
         { href: "/planning", label: "Planning", icon: <Calendar size={iconSize} strokeWidth={strokeWidth} /> },
