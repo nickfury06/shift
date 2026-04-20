@@ -236,25 +236,23 @@ export default function ReservationsPage() {
         </button>
       </div>
 
-      {/* Capacity summary */}
-      <div className="card-medium" style={{ padding: "12px 16px", marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-around" }}>
-        <div style={{ textAlign: "center" }}>
-          <span style={{ fontSize: 22, fontWeight: 600, color: "var(--text-primary)" }}>{reservations.length}</span>
-          <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>résas</div>
-        </div>
-        <div style={{ width: 1, height: 32, background: "var(--border-color)" }} />
-        <div style={{ textAlign: "center" }}>
-          <span style={{ fontSize: 22, fontWeight: 600, color: bookedCovers > totalCapacity ? "var(--danger)" : "var(--text-primary)" }}>
+      {/* Capacity summary — compact single row */}
+      <div className="card-medium" style={{ padding: "10px 14px", marginBottom: 16, display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+          <span style={{ fontSize: 20, fontWeight: 700, color: bookedCovers > totalCapacity ? "var(--danger)" : "var(--text-primary)" }}>
             {bookedCovers}
           </span>
-          <span style={{ fontSize: 13, color: "var(--text-tertiary)" }}>/{totalCapacity}</span>
-          <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>couverts</div>
+          <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>/{totalCapacity} couverts</span>
         </div>
-        <div style={{ width: 1, height: 32, background: "var(--border-color)" }} />
-        <div style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 12, color: "var(--text-secondary)" }}>
-          <span>☀️ {reservations.filter((r) => r.seating === "terrasse").reduce((s, r) => s + r.covers, 0)}</span>
-          <span>🏠 {reservations.filter((r) => r.seating === "interieur").reduce((s, r) => s + r.covers, 0)}</span>
-          <span>🍸 {reservations.filter((r) => r.seating === "bar").reduce((s, r) => s + r.covers, 0)}</span>
+        <div style={{ width: 1, height: 20, background: "var(--border-color)" }} />
+        <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+          {reservations.length} résa{reservations.length > 1 ? "s" : ""}
+        </span>
+        <div style={{ flex: 1 }} />
+        <div style={{ display: "flex", gap: 8, fontSize: 11, color: "var(--text-tertiary)" }}>
+          <span>☀️{reservations.filter((r) => r.seating === "terrasse").reduce((s, r) => s + r.covers, 0)}</span>
+          <span>🏠{reservations.filter((r) => r.seating === "interieur").reduce((s, r) => s + r.covers, 0)}</span>
+          <span>🍸{reservations.filter((r) => r.seating === "bar").reduce((s, r) => s + r.covers, 0)}</span>
         </div>
       </div>
 

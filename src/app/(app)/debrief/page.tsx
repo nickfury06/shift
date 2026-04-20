@@ -49,6 +49,7 @@ export default function DebriefPage() {
   const [incidents, setIncidents] = useState("");
   const [clientFeedback, setClientFeedback] = useState("");
   const [suggestions, setSuggestions] = useState("");
+  const [showDetails, setShowDetails] = useState(false);
 
   const shiftDate = getShiftDate();
   const viewDate = (() => {
@@ -253,67 +254,85 @@ export default function DebriefPage() {
           {/* Separator */}
           <div style={{ height: 1, background: "var(--border-color)" }} />
 
-          {/* Optional text fields */}
-          <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: -8 }}>
-            Optionnel — remplis ce qui est pertinent
-          </p>
+          {/* Toggle for optional details */}
+          <button
+            onClick={() => setShowDetails(!showDetails)}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              width: "100%", padding: "10px 14px", borderRadius: 12, border: "none", cursor: "pointer",
+              background: "var(--secondary-bg)",
+            }}
+          >
+            <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>
+              {showDetails ? "Masquer" : "Ajouter"} des détails {!showDetails && <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>(incidents, retours, suggestions)</span>}
+            </span>
+            <ChevronDown size={14} style={{
+              color: "var(--text-tertiary)",
+              transition: "transform 0.2s",
+              transform: showDetails ? "rotate(180deg)" : "rotate(0deg)",
+            }} />
+          </button>
 
-          {/* Incidents */}
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-              <AlertTriangle size={14} style={{ color: "var(--warning)" }} />
-              <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>Incidents / Problèmes</span>
-            </div>
-            <textarea
-              placeholder="Machine en panne, plainte client, stock manquant..."
-              value={incidents}
-              onChange={(e) => setIncidents(e.target.value)}
-              rows={2}
-              style={{
-                width: "100%", borderRadius: 12, border: "1px solid var(--border-color)",
-                background: "var(--input-bg)", padding: "10px 12px", fontSize: 13,
-                color: "var(--text-primary)", outline: "none", resize: "none",
-              }}
-            />
-          </div>
+          {showDetails && (
+            <>
+              {/* Incidents */}
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                  <AlertTriangle size={14} style={{ color: "var(--warning)" }} />
+                  <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>Incidents / Problèmes</span>
+                </div>
+                <textarea
+                  placeholder="Machine en panne, plainte client, stock manquant..."
+                  value={incidents}
+                  onChange={(e) => setIncidents(e.target.value)}
+                  rows={2}
+                  style={{
+                    width: "100%", borderRadius: 12, border: "1px solid var(--border-color)",
+                    background: "var(--input-bg)", padding: "10px 12px", fontSize: 13,
+                    color: "var(--text-primary)", outline: "none", resize: "none",
+                  }}
+                />
+              </div>
 
-          {/* Client feedback */}
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-              <MessageSquare size={14} style={{ color: "#8B5A40" }} />
-              <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>Retours clients</span>
-            </div>
-            <textarea
-              placeholder="Compliments, plaintes, remarques..."
-              value={clientFeedback}
-              onChange={(e) => setClientFeedback(e.target.value)}
-              rows={2}
-              style={{
-                width: "100%", borderRadius: 12, border: "1px solid var(--border-color)",
-                background: "var(--input-bg)", padding: "10px 12px", fontSize: 13,
-                color: "var(--text-primary)", outline: "none", resize: "none",
-              }}
-            />
-          </div>
+              {/* Client feedback */}
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                  <MessageSquare size={14} style={{ color: "#8B5A40" }} />
+                  <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>Retours clients</span>
+                </div>
+                <textarea
+                  placeholder="Compliments, plaintes, remarques..."
+                  value={clientFeedback}
+                  onChange={(e) => setClientFeedback(e.target.value)}
+                  rows={2}
+                  style={{
+                    width: "100%", borderRadius: 12, border: "1px solid var(--border-color)",
+                    background: "var(--input-bg)", padding: "10px 12px", fontSize: 13,
+                    color: "var(--text-primary)", outline: "none", resize: "none",
+                  }}
+                />
+              </div>
 
-          {/* Suggestions */}
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-              <Lightbulb size={14} style={{ color: "var(--text-tertiary)" }} />
-              <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>Suggestions</span>
-            </div>
-            <textarea
-              placeholder="Comment on pourrait s'améliorer ?"
-              value={suggestions}
-              onChange={(e) => setSuggestions(e.target.value)}
-              rows={2}
-              style={{
-                width: "100%", borderRadius: 12, border: "1px solid var(--border-color)",
-                background: "var(--input-bg)", padding: "10px 12px", fontSize: 13,
-                color: "var(--text-primary)", outline: "none", resize: "none",
-              }}
-            />
-          </div>
+              {/* Suggestions */}
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                  <Lightbulb size={14} style={{ color: "var(--text-tertiary)" }} />
+                  <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>Suggestions</span>
+                </div>
+                <textarea
+                  placeholder="Comment on pourrait s'améliorer ?"
+                  value={suggestions}
+                  onChange={(e) => setSuggestions(e.target.value)}
+                  rows={2}
+                  style={{
+                    width: "100%", borderRadius: 12, border: "1px solid var(--border-color)",
+                    background: "var(--input-bg)", padding: "10px 12px", fontSize: 13,
+                    color: "var(--text-primary)", outline: "none", resize: "none",
+                  }}
+                />
+              </div>
+            </>
+          )}
 
           {/* Submit */}
           <button

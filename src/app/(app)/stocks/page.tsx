@@ -6,7 +6,7 @@ import { useToast } from "@/components/Toast";
 import { createClient } from "@/lib/supabase/client";
 import { getNow } from "@/lib/shift-utils";
 import type { StockProduct, StockOrder, StockAlert, StockCategory } from "@/lib/types";
-import { Search, AlertTriangle, Check, Plus, Minus, X, Bell, Truck, Clock, Package, ClipboardList, ShoppingCart } from "lucide-react";
+import { Search, AlertTriangle, Check, Plus, Minus, X, Bell, Truck, Clock, Package, ClipboardList, ShoppingCart, ChevronDown } from "lucide-react";
 
 const CATEGORY_LABELS: Record<StockCategory, string> = {
   spiritueux: "Spiritueux",
@@ -101,6 +101,15 @@ export default function StocksPage() {
   const [countValue, setCountValue] = useState("");
   const [saving, setSaving] = useState(false);
   const [invSearch, setInvSearch] = useState("");
+  const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set());
+
+  function toggleCat(cat: string) {
+    setCollapsedCats((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat); else next.add(cat);
+      return next;
+    });
+  }
 
   const fetchData = useCallback(async () => {
     const [prodRes, orderRes, alertRes, profRes] = await Promise.all([
@@ -411,9 +420,40 @@ export default function StocksPage() {
             </div>
           )}
 
-          {filteredGrouped.map((g) => (
-            <div key={g.cat} style={{ marginBottom: 20 }}>
-              <p className="section-label" style={{ marginBottom: 8 }}>{g.label}</p>
+          {filteredGrouped.map((g) => {
+            // Auto-expand when searching, otherwise respect user's toggle
+            const isCollapsed = q ? false : collapsedCats.has(g.cat);
+            const lowCount = g.items.filter((p) => stockStatus(p) !== "ok").length;
+            const flaggedCount = g.items.filter((p) => alertedInv.has(p.id)).length;
+            return (
+            <div key={g.cat} style={{ marginBottom: 12 }}>
+              <button
+                onClick={() => toggleCat(g.cat)}
+                style={{
+                  width: "100%", background: "none", border: "none", cursor: "pointer",
+                  padding: "6px 4px", display: "flex", alignItems: "center", gap: 8,
+                  marginBottom: isCollapsed ? 0 : 6,
+                }}
+              >
+                <ChevronDown size={13} style={{
+                  color: "var(--text-tertiary)",
+                  transform: isCollapsed ? "rotate(-90deg)" : "rotate(0deg)",
+                  transition: "transform 0.2s",
+                }} />
+                <span className="section-label" style={{ margin: 0 }}>{g.label}</span>
+                <span style={{ fontSize: 11, color: "var(--text-tertiary)", marginLeft: "auto" }}>
+                  {g.items.length}
+                </span>
+                {lowCount > 0 && (
+                  <span style={{ fontSize: 10, fontWeight: 600, color: "var(--warning)", background: "rgba(212,160,74,0.1)", padding: "1px 6px", borderRadius: 4 }}>
+                    {lowCount} bas
+                  </span>
+                )}
+                {flaggedCount > 0 && (
+                  <Bell size={11} style={{ color: "var(--warning)" }} />
+                )}
+              </button>
+              {!isCollapsed && (
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 {g.items.map((p) => {
                   const isCounting = countingId === p.id;
@@ -485,8 +525,10 @@ export default function StocksPage() {
                   );
                 })}
               </div>
+              )}
             </div>
-          ))}
+            );
+          })}
         </div>
         );
       })()}

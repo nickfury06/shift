@@ -585,13 +585,22 @@ export default function AccueilPage() {
         );
       })()}
 
-      {/* ── Tasks by moment ─────────────────────────────────── */}
+      {/* ── Tasks by moment (auto-collapse finished) ────────── */}
       {MOMENT_ORDER.map((moment, idx) => {
         const momentTasks = tasks.filter((t) => t.moment === moment);
         if (momentTasks.length === 0 && moment !== "fermeture") return null;
+        const done = momentTasks.filter((t) => t.completed).length;
+        const allDone = momentTasks.length > 0 && done === momentTasks.length;
+        // Collapse: fermeture by default, any fully-completed moment
+        const collapsed = moment === "fermeture" || allDone;
         return (
           <div key={moment}>
-            <MomentSection name={MOMENT_LABELS[moment]} tasks={momentTasks} onToggleTask={handleToggleTask} defaultCollapsed={moment === "fermeture"} />
+            <MomentSection
+              name={MOMENT_LABELS[moment]}
+              tasks={momentTasks}
+              onToggleTask={handleToggleTask}
+              defaultCollapsed={collapsed}
+            />
             {idx < MOMENT_ORDER.length - 1 && <div style={{ height: 20 }} />}
           </div>
         );
