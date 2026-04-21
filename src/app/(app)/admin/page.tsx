@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
-import { useAdminMode } from "@/components/AdminMode";
 import { createClient } from "@/lib/supabase/client";
 import { getShiftDate, formatDateFr } from "@/lib/shift-utils";
 import type { AvailabilityRequest, Profile, Debrief } from "@/lib/types";
@@ -11,7 +10,7 @@ import Link from "next/link";
 import {
   ThumbsUp, ThumbsDown, Calendar, MessageCircle, ListChecks,
   Users, Settings, ArrowRight, Repeat, UserX,
-  Send, Check, ChevronDown, AlertTriangle, Lightbulb, TrendingUp, Pencil,
+  Send, Check, ChevronDown, AlertTriangle, Lightbulb, TrendingUp,
 } from "lucide-react";
 
 const RATING_COLORS = ["", "#D44", "#D88", "#B89070", "#8B6A50", "#6B4A30"];
@@ -19,7 +18,6 @@ const RATING_COLORS = ["", "#D44", "#D88", "#B89070", "#8B6A50", "#6B4A30"];
 export default function AdminPage() {
   const { profile, user } = useAuth();
   const toast = useToast();
-  const adminMode = useAdminMode();
   const supabase = useRef(createClient()).current;
 
   const [loading, setLoading] = useState(true);
@@ -138,59 +136,9 @@ export default function AdminPage() {
   return (
     <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
 
-      <h1 style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-primary)", marginBottom: 14 }}>
+      <h1 style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-primary)", marginBottom: 20 }}>
         Admin
       </h1>
-
-      {/* ═══ MODE ADMIN ════════════════════════════════════ */}
-      <button
-        onClick={adminMode.toggle}
-        style={{
-          width: "100%", marginBottom: 24,
-          padding: "14px 16px", borderRadius: 14,
-          border: `1px solid ${adminMode.enabled ? "var(--terra-medium)" : "var(--border-color)"}`,
-          background: adminMode.enabled ? "rgba(196,120,90,0.08)" : "var(--card-bg)",
-          cursor: "pointer",
-          display: "flex", alignItems: "center", gap: 12,
-          transition: "all 0.2s ease",
-        }}
-      >
-        <div style={{
-          width: 36, height: 36, borderRadius: 10,
-          background: adminMode.enabled ? "var(--gradient-primary)" : "var(--secondary-bg)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          flexShrink: 0,
-        }}>
-          <Pencil size={16} style={{ color: adminMode.enabled ? "#fff" : "var(--text-secondary)" }} />
-        </div>
-        <div style={{ flex: 1, textAlign: "left" }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: adminMode.enabled ? "var(--terra-deep)" : "var(--text-primary)" }}>
-            Mode édition {adminMode.enabled ? "· Activé" : ""}
-          </div>
-          <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>
-            {adminMode.enabled
-              ? "Tu peux personnaliser le plan de table et les éléments éditables"
-              : "Active pour personnaliser l'app (plan de table, positions, etc.)"}
-          </div>
-        </div>
-        {/* Switch visual */}
-        <div style={{
-          width: 40, height: 24, borderRadius: 12, flexShrink: 0,
-          background: adminMode.enabled ? "var(--terra-medium)" : "var(--border-color)",
-          position: "relative",
-          transition: "background 0.2s",
-        }}>
-          <div style={{
-            position: "absolute",
-            top: 2,
-            left: adminMode.enabled ? 18 : 2,
-            width: 20, height: 20, borderRadius: "50%",
-            background: "#fff",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-            transition: "left 0.2s",
-          }} />
-        </div>
-      </button>
 
       {/* ═══ 1. ABSENCES EN ATTENTE ═══════════════════════ */}
       {absenceRequests.length > 0 && (

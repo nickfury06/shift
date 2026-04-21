@@ -84,10 +84,11 @@ export default function FloorPlan({ tables, reservations, onTableClick }: FloorP
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [editMode, setEditMode] = useState(false);
+  const [focusZone, setFocusZone] = useState<string | "all">("all");
 
   // Disable edit mode if admin mode gets turned off
   useEffect(() => {
-    if (!adminMode && editMode) setEditMode(false);
+    if (!adminMode && editMode) { setEditMode(false); setFocusZone("all"); }
   }, [adminMode, editMode]);
   const [rdcMarkers, setRdcMarkers] = useState<Marker[]>(() => loadMarkers("rdc"));
   const [r1Markers, setR1Markers] = useState<Marker[]>(() => loadMarkers("r1"));
@@ -177,17 +178,59 @@ export default function FloorPlan({ tables, reservations, onTableClick }: FloorP
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {/* Edit mode banner */}
+      {/* Edit mode banner + zone filter */}
       {editMode && (
-        <div style={{
-          padding: "10px 14px", borderRadius: 10,
-          background: "rgba(196,120,90,0.1)",
-          border: "1px solid rgba(196,120,90,0.25)",
-          fontSize: 12, color: "var(--terra-deep)", fontWeight: 500,
-          display: "flex", alignItems: "center", gap: 8,
-        }}>
-          <Move size={14} />
-          <span>Mode édition — glisse les marqueurs à leur position exacte</span>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{
+            padding: "10px 14px", borderRadius: 10,
+            background: "rgba(196,120,90,0.1)",
+            border: "1px solid rgba(196,120,90,0.25)",
+            fontSize: 12, color: "var(--terra-deep)", fontWeight: 500,
+            display: "flex", alignItems: "center", gap: 8,
+          }}>
+            <Move size={14} />
+            <span>Glisse les marqueurs à leur position exacte</span>
+          </div>
+
+          {/* Zone filter */}
+          <div style={{
+            padding: "8px 12px", borderRadius: 10,
+            background: "var(--card-bg)",
+            border: "1px solid var(--border-color)",
+          }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
+              Focus sur une salle
+            </div>
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+              {(() => {
+                const zones = [
+                  { key: "all", label: "Tout" },
+                  ...(floor === "rdc"
+                    ? [
+                        { key: "restaurant", label: "Restaurant" },
+                        { key: "terrasse", label: "Terrasse" },
+                        { key: "terrasse_couverte", label: "Non-fumeur" },
+                      ]
+                    : [
+                        { key: "bar", label: "Bar" },
+                      ]),
+                ];
+                return zones.map((z) => (
+                  <button
+                    key={z.key}
+                    onClick={() => setFocusZone(z.key)}
+                    style={{
+                      padding: "6px 12px", borderRadius: 8, border: "none", cursor: "pointer",
+                      fontSize: 11, fontWeight: 500,
+                      background: focusZone === z.key ? "var(--gradient-primary)" : "var(--secondary-bg)",
+                      color: focusZone === z.key ? "#fff" : "var(--text-secondary)",
+                      transition: "all 0.15s",
+                    }}
+                  >{z.label}</button>
+                ));
+              })()}
+            </div>
+          </div>
         </div>
       )}
 
@@ -283,6 +326,11 @@ export default function FloorPlan({ tables, reservations, onTableClick }: FloorP
                   const isSel = selected === m.id;
                   const isDragging = draggingId === m.id;
 
+                  // Zone filter in edit mode: dim markers not in focused zone
+                  const dbTable = tables.find((t) => t.id === m.id);
+                  const isInFocusedZone = focusZone === "all" || dbTable?.zone === focusZone;
+                  const dimmed = editMode && !isInFocusedZone;
+
                   const fill =
                     status === "arrive" ? "#8B5A40"
                     : status === "attendu" ? "#D4A04A"
@@ -324,10 +372,13 @@ export default function FloorPlan({ tables, reservations, onTableClick }: FloorP
                         transform: "translate(-50%, -50%)",
                         width: 44, height: 44,
                         padding: 0, border: "none", background: "transparent",
-                        cursor: editMode ? "move" : "pointer",
+                        cursor: dimmed ? "default" : editMode ? "move" : "pointer",
                         display: "flex", alignItems: "center", justifyContent: "center",
                         zIndex: isSel || isDragging ? 10 : 1,
-                        touchAction: editMode ? "none" : undefined,
+                        touchAction: editMode && !dimmed ? "none" : undefined,
+                        opacity: dimmed ? 0.25 : 1,
+                        pointerEvents: dimmed ? "none" : "auto",
+                        transition: "opacity 0.2s ease",
                       }}
                     >
                       <span style={{
