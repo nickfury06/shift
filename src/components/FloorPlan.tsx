@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { Reservation, VenueTable } from "@/lib/types";
-import { Users } from "lucide-react";
+import { Users, ZoomIn, ZoomOut, Maximize2, Move, Check, RotateCcw } from "lucide-react";
+import { useAdminMode } from "@/components/AdminMode";
 
 interface FloorPlanProps {
   tables: VenueTable[];
@@ -11,82 +12,88 @@ interface FloorPlanProps {
 }
 
 type Floor = "rdc" | "r1";
-type MSize = "sm" | "md" | "lg";
 
 interface Marker {
   id: string;
-  x: number; // % horizontal on the plan image
-  y: number; // % vertical
-  size?: MSize;
+  x: number;
+  y: number;
 }
 
-// Positions relatives (% de l'image) basées sur tes plans architecte
-const RDC_MARKERS: Marker[] = [
-  // Restaurant (intérieur)
-  { id: "480", x: 24,   y: 34 },
-  { id: "470", x: 11,   y: 43 },
-  { id: "490", x: 27,   y: 42 },
-  { id: "420", x: 40,   y: 42 },
-  { id: "430", x: 33,   y: 47, size: "sm" },
-  { id: "400", x: 51,   y: 47 },
-  { id: "460", x: 11,   y: 51 },
-  { id: "450", x: 26,   y: 51 },
-  { id: "440", x: 35,   y: 51, size: "sm" },
-  { id: "410", x: 43,   y: 51 },
-
-  // Terrasse (colonne droite)
-  { id: "200", x: 61,   y: 43 },
-  { id: "210", x: 61,   y: 49 },
-  { id: "220", x: 61,   y: 57 },
-  { id: "230", x: 64,   y: 65, size: "lg" },
-
-  // Paire du centre
-  { id: "250", x: 43,   y: 65, size: "sm" },
-  { id: "240", x: 52,   y: 65, size: "sm" },
-
-  // Terrasse avant (mini-rangée contre bâtiment)
-  { id: "150", x: 27,   y: 65, size: "sm" },
-  { id: "160", x: 33,   y: 65, size: "sm" },
-
-  // Rangée de rue
-  { id: "140", x: 13,   y: 70, size: "sm" },
-  { id: "130", x: 19,   y: 70, size: "sm" },
-  { id: "120", x: 24,   y: 70, size: "sm" },
-  { id: "110", x: 29,   y: 70, size: "sm" },
-  { id: "100", x: 34,   y: 70, size: "sm" },
-
-  // Non-fumeur (salle couverte ouverte, bas-droite)
-  { id: "340", x: 55,   y: 77, size: "sm" },
-  { id: "300", x: 62,   y: 77, size: "sm" },
-  { id: "330", x: 55,   y: 82, size: "sm" },
-  { id: "320", x: 55,   y: 87, size: "sm" },
-  { id: "310", x: 62,   y: 82, size: "sm" },
+// Positions de départ (tu pourras les ajuster en mode édition)
+const DEFAULT_RDC: Marker[] = [
+  { id: "480", x: 24, y: 34 },
+  { id: "470", x: 11, y: 43 },
+  { id: "490", x: 27, y: 42 },
+  { id: "420", x: 40, y: 42 },
+  { id: "430", x: 33, y: 48 },
+  { id: "400", x: 51, y: 47 },
+  { id: "460", x: 11, y: 51 },
+  { id: "450", x: 26, y: 51 },
+  { id: "440", x: 35, y: 53 },
+  { id: "410", x: 43, y: 51 },
+  { id: "200", x: 61, y: 43 },
+  { id: "210", x: 61, y: 49 },
+  { id: "220", x: 61, y: 57 },
+  { id: "230", x: 64, y: 65 },
+  { id: "250", x: 43, y: 65 },
+  { id: "240", x: 52, y: 65 },
+  { id: "150", x: 27, y: 65 },
+  { id: "160", x: 33, y: 65 },
+  { id: "140", x: 13, y: 70 },
+  { id: "130", x: 19, y: 70 },
+  { id: "120", x: 24, y: 70 },
+  { id: "110", x: 29, y: 70 },
+  { id: "100", x: 34, y: 70 },
+  { id: "340", x: 55, y: 77 },
+  { id: "300", x: 62, y: 77 },
+  { id: "330", x: 55, y: 82 },
+  { id: "320", x: 55, y: 87 },
+  { id: "310", x: 62, y: 82 },
 ];
 
-const R1_MARKERS: Marker[] = [
-  // Tabourets du bar (colonne)
-  { id: "10", x: 60, y: 45, size: "sm" },
-  { id: "20", x: 60, y: 52, size: "sm" },
-  { id: "30", x: 60, y: 59, size: "sm" },
-  { id: "40", x: 60, y: 66, size: "sm" },
-  // Tables du bas
+const DEFAULT_R1: Marker[] = [
+  { id: "10", x: 60, y: 45 },
+  { id: "20", x: 60, y: 52 },
+  { id: "30", x: 60, y: 59 },
+  { id: "40", x: 60, y: 66 },
   { id: "90", x: 23, y: 78 },
-  { id: "80", x: 37, y: 78, size: "sm" },
+  { id: "80", x: 37, y: 78 },
   { id: "70", x: 51, y: 80 },
   { id: "60", x: 63, y: 80 },
   { id: "50", x: 77, y: 80 },
 ];
 
-const SIZE_PX: Record<MSize, number> = {
-  sm: 34,
-  md: 42,
-  lg: 52,
-};
+function loadMarkers(floor: Floor): Marker[] {
+  if (typeof window === "undefined") return floor === "rdc" ? DEFAULT_RDC : DEFAULT_R1;
+  try {
+    const raw = localStorage.getItem(`shift-plan-${floor}`);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return floor === "rdc" ? DEFAULT_RDC : DEFAULT_R1;
+}
+function saveMarkers(floor: Floor, markers: Marker[]) {
+  localStorage.setItem(`shift-plan-${floor}`, JSON.stringify(markers));
+}
 
 export default function FloorPlan({ tables, reservations, onTableClick }: FloorPlanProps) {
+  const { enabled: adminMode } = useAdminMode();
+  const editable = adminMode; // only admin mode allows editing positions
   const [floor, setFloor] = useState<Floor>("rdc");
   const [selected, setSelected] = useState<string | null>(null);
   const [imgFailed, setImgFailed] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [editMode, setEditMode] = useState(false);
+
+  // Disable edit mode if admin mode gets turned off
+  useEffect(() => {
+    if (!adminMode && editMode) setEditMode(false);
+  }, [adminMode, editMode]);
+  const [rdcMarkers, setRdcMarkers] = useState<Marker[]>(() => loadMarkers("rdc"));
+  const [r1Markers, setR1Markers] = useState<Marker[]>(() => loadMarkers("r1"));
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const planAreaRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ startX: number; startY: number; panX: number; panY: number } | null>(null);
 
   const resaByTable: Record<string, Reservation> = {};
   reservations.forEach((r) => { if (r.table_id) resaByTable[r.table_id] = r; });
@@ -97,7 +104,8 @@ export default function FloorPlan({ tables, reservations, onTableClick }: FloorP
     return r.status === "arrive" ? "arrive" : "attendu";
   }
 
-  const markers = floor === "rdc" ? RDC_MARKERS : R1_MARKERS;
+  const markers = floor === "rdc" ? rdcMarkers : r1Markers;
+  const setMarkers = floor === "rdc" ? setRdcMarkers : setR1Markers;
   const planSrc = floor === "rdc" ? "/plans/plan-table-R-0.jpg" : "/plans/plan-table-R-1.jpg";
 
   const selectedResa = selected ? resaByTable[selected] : null;
@@ -106,9 +114,84 @@ export default function FloorPlan({ tables, reservations, onTableClick }: FloorP
   const totalTables = markers.length;
   const bookedTables = markers.filter((m) => getStatus(m.id) !== "free").length;
 
+  // ── Move marker to new position (edit mode) ──────────────
+  function moveMarker(id: string, clientX: number, clientY: number) {
+    if (!planAreaRef.current) return;
+    const rect = planAreaRef.current.getBoundingClientRect();
+    const x = ((clientX - rect.left) / rect.width) * 100;
+    const y = ((clientY - rect.top) / rect.height) * 100;
+    if (x < 0 || x > 100 || y < 0 || y > 100) return;
+
+    setMarkers((prev) => {
+      const next = prev.map((m) => (m.id === id ? { ...m, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 } : m));
+      saveMarkers(floor, next);
+      return next;
+    });
+  }
+
+  function resetPositions() {
+    if (!confirm("Réinitialiser les positions par défaut ?")) return;
+    localStorage.removeItem(`shift-plan-${floor}`);
+    const defaults = floor === "rdc" ? DEFAULT_RDC : DEFAULT_R1;
+    setMarkers(defaults);
+  }
+
+  // Mouse / touch handlers for edit drag
+  useEffect(() => {
+    if (!draggingId) return;
+    function onMove(e: MouseEvent | TouchEvent) {
+      const cx = "touches" in e ? e.touches[0].clientX : e.clientX;
+      const cy = "touches" in e ? e.touches[0].clientY : e.clientY;
+      moveMarker(draggingId!, cx, cy);
+    }
+    function onUp() { setDraggingId(null); }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchmove", onMove);
+    window.addEventListener("touchend", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draggingId, floor]);
+
+  // ── Zoom controls ───────────────────────────────────────
+  function zoomIn() { setZoom((z) => Math.min(3, z + 0.5)); }
+  function zoomOut() { setZoom((z) => Math.max(1, z - 0.5)); }
+  function reset() { setZoom(1); setPan({ x: 0, y: 0 }); }
+
+  function onPanStart(clientX: number, clientY: number) {
+    if (zoom <= 1 || editMode) return;
+    dragRef.current = { startX: clientX, startY: clientY, panX: pan.x, panY: pan.y };
+  }
+  function onPanMove(clientX: number, clientY: number) {
+    if (!dragRef.current) return;
+    const dx = clientX - dragRef.current.startX;
+    const dy = clientY - dragRef.current.startY;
+    setPan({ x: dragRef.current.panX + dx, y: dragRef.current.panY + dy });
+  }
+  function onPanEnd() { dragRef.current = null; }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {/* Floor switcher */}
+      {/* Edit mode banner */}
+      {editMode && (
+        <div style={{
+          padding: "10px 14px", borderRadius: 10,
+          background: "rgba(196,120,90,0.1)",
+          border: "1px solid rgba(196,120,90,0.25)",
+          fontSize: 12, color: "var(--terra-deep)", fontWeight: 500,
+          display: "flex", alignItems: "center", gap: 8,
+        }}>
+          <Move size={14} />
+          <span>Mode édition — glisse les marqueurs à leur position exacte</span>
+        </div>
+      )}
+
+      {/* Floor switcher + count */}
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <div style={{ display: "flex", gap: 4, background: "var(--secondary-bg)", borderRadius: 10, padding: 3, flex: 1 }}>
           {([
@@ -117,7 +200,7 @@ export default function FloorPlan({ tables, reservations, onTableClick }: FloorP
           ]).map((f) => (
             <button
               key={f.key}
-              onClick={() => { setFloor(f.key); setSelected(null); setImgFailed(false); }}
+              onClick={() => { setFloor(f.key); setSelected(null); setImgFailed(false); reset(); }}
               style={{
                 flex: 1, padding: "9px 0", borderRadius: 8, border: "none", cursor: "pointer",
                 fontSize: 12, fontWeight: 500,
@@ -140,10 +223,9 @@ export default function FloorPlan({ tables, reservations, onTableClick }: FloorP
         </div>
       </div>
 
-      {/* Plan avec image en fond */}
-      <div className="card-light" style={{ padding: 6, overflow: "hidden" }}>
+      {/* Plan */}
+      <div className="card-light" style={{ padding: 6, overflow: "hidden", position: "relative" }}>
         {imgFailed ? (
-          // Placeholder d'instruction si images pas trouvées
           <div style={{
             padding: "40px 24px", textAlign: "center",
             background: "var(--secondary-bg)", borderRadius: 10,
@@ -152,86 +234,227 @@ export default function FloorPlan({ tables, reservations, onTableClick }: FloorP
             <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", marginBottom: 8 }}>
               Plans à ajouter
             </div>
-            <p>Sauvegarde les 2 images de plan dans :</p>
             <div style={{ fontFamily: "monospace", fontSize: 11, background: "var(--card-bg)", padding: "8px 12px", borderRadius: 6, margin: "8px auto", display: "inline-block" }}>
-              public/plans/plan-rdc.jpg
+              public/plans/plan-table-R-0.jpg
               <br />
-              public/plans/plan-r1.jpg
+              public/plans/plan-table-R-1.jpg
             </div>
-            <p style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 8 }}>
-              Puis recharge cette page. Les marqueurs se placeront automatiquement.
-            </p>
           </div>
         ) : (
-          <div style={{ position: "relative", borderRadius: 10, overflow: "hidden" }}>
-            <img
-              src={planSrc}
-              alt={floor === "rdc" ? "Plan rez-de-chaussée" : "Plan sous-sol"}
-              onError={() => setImgFailed(true)}
+          <>
+            <div
+              ref={planAreaRef}
               style={{
-                width: "100%", height: "auto", display: "block",
-                userSelect: "none", pointerEvents: "none",
+                position: "relative", borderRadius: 10, overflow: "hidden",
+                touchAction: zoom > 1 && !editMode ? "pan-x pan-y" : "auto",
+                cursor: editMode ? "default" : zoom > 1 ? (dragRef.current ? "grabbing" : "grab") : "default",
               }}
-              draggable={false}
-            />
-
-            {/* Marqueurs superposés */}
-            {markers.map((m) => {
-              const status = getStatus(m.id);
-              const isSel = selected === m.id;
-              const size = SIZE_PX[m.size || "md"];
-
-              const fill =
-                status === "arrive" ? "rgba(139,90,64,0.95)"
-                : status === "attendu" ? "rgba(212,160,74,0.95)"
-                : "rgba(255,255,255,0.92)";
-              const stroke =
-                isSel ? "#C4785A"
-                : status === "arrive" ? "#6B4A30"
-                : status === "attendu" ? "#B88835"
-                : "#2C2520";
-              const textColor = status === "free" ? "#1C1815" : "#FFFFFF";
-
-              return (
-                <button
-                  key={m.id}
-                  onClick={() => {
-                    const next = isSel ? null : m.id;
-                    setSelected(next);
-                    if (next) onTableClick?.(next);
-                  }}
+              onMouseDown={(e) => onPanStart(e.clientX, e.clientY)}
+              onMouseMove={(e) => onPanMove(e.clientX, e.clientY)}
+              onMouseUp={onPanEnd}
+              onMouseLeave={onPanEnd}
+              onTouchStart={(e) => onPanStart(e.touches[0].clientX, e.touches[0].clientY)}
+              onTouchMove={(e) => onPanMove(e.touches[0].clientX, e.touches[0].clientY)}
+              onTouchEnd={onPanEnd}
+            >
+              <div
+                style={{
+                  position: "relative",
+                  width: "100%",
+                  transform: editMode ? "none" : `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+                  transformOrigin: "0 0",
+                  transition: dragRef.current ? "none" : "transform 0.2s ease",
+                }}
+              >
+                <img
+                  src={planSrc}
+                  alt={floor === "rdc" ? "Plan rez-de-chaussée" : "Plan sous-sol"}
+                  onError={() => setImgFailed(true)}
                   style={{
-                    position: "absolute",
-                    left: `${m.x}%`,
-                    top: `${m.y}%`,
-                    transform: "translate(-50%, -50%)",
-                    width: size, height: size,
-                    borderRadius: "50%",
-                    background: fill,
-                    border: `${isSel ? 3 : 2}px solid ${stroke}`,
-                    color: textColor,
-                    fontSize: size <= 34 ? 11 : size <= 42 ? 13 : 15,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: 0,
-                    boxShadow: isSel
-                      ? "0 0 0 4px rgba(196,120,90,0.25), 0 4px 12px rgba(0,0,0,0.25)"
-                      : "0 2px 6px rgba(0,0,0,0.2)",
-                    transition: "all 0.15s ease",
+                    width: "100%", height: "auto", display: "block",
+                    userSelect: "none", pointerEvents: "none",
                   }}
-                >
-                  {m.id}
-                </button>
-              );
-            })}
-          </div>
+                  draggable={false}
+                />
+
+                {/* Marqueurs */}
+                {markers.map((m) => {
+                  const status = getStatus(m.id);
+                  const isSel = selected === m.id;
+                  const isDragging = draggingId === m.id;
+
+                  const fill =
+                    status === "arrive" ? "#8B5A40"
+                    : status === "attendu" ? "#D4A04A"
+                    : editMode ? "rgba(196,120,90,0.9)" : "#FFFFFF";
+                  const stroke =
+                    editMode ? "#6B4A30"
+                    : isSel ? "#C4785A"
+                    : status === "arrive" ? "#6B4A30"
+                    : status === "attendu" ? "#B88835"
+                    : "#2C2520";
+                  const textColor = editMode || status !== "free" ? "#FFFFFF" : "#1C1815";
+                  const dotSize = isSel || isDragging ? 30 : 22;
+
+                  return (
+                    <button
+                      key={m.id}
+                      onClick={(e) => {
+                        if (editMode) return;
+                        e.stopPropagation();
+                        const next = isSel ? null : m.id;
+                        setSelected(next);
+                        if (next) onTableClick?.(next);
+                      }}
+                      onMouseDown={(e) => {
+                        if (!editMode) return;
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setDraggingId(m.id);
+                      }}
+                      onTouchStart={(e) => {
+                        if (!editMode) return;
+                        e.stopPropagation();
+                        setDraggingId(m.id);
+                      }}
+                      style={{
+                        position: "absolute",
+                        left: `${m.x}%`,
+                        top: `${m.y}%`,
+                        transform: "translate(-50%, -50%)",
+                        width: 44, height: 44,
+                        padding: 0, border: "none", background: "transparent",
+                        cursor: editMode ? "move" : "pointer",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        zIndex: isSel || isDragging ? 10 : 1,
+                        touchAction: editMode ? "none" : undefined,
+                      }}
+                    >
+                      <span style={{
+                        width: dotSize, height: dotSize,
+                        borderRadius: "50%",
+                        background: fill,
+                        border: `${isSel || isDragging ? 3 : 1.5}px solid ${stroke}`,
+                        color: textColor,
+                        fontSize: isSel || isDragging ? 11 : 9,
+                        fontWeight: 700,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        boxShadow: isSel || isDragging
+                          ? "0 0 0 4px rgba(196,120,90,0.3), 0 4px 12px rgba(0,0,0,0.3)"
+                          : "0 1px 3px rgba(0,0,0,0.3)",
+                        transition: isDragging ? "none" : "all 0.15s ease",
+                      }}>
+                        {m.id}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Top-right controls */}
+            <div style={{
+              position: "absolute", top: 14, right: 14,
+              display: "flex", flexDirection: "column", gap: 4,
+              background: "var(--card-bg)",
+              borderRadius: 10,
+              border: "1px solid var(--border-color)",
+              boxShadow: "var(--shadow-medium)",
+              overflow: "hidden",
+            }}>
+              {editable && (
+                <>
+                  <button
+                    onClick={() => { setEditMode(!editMode); setSelected(null); }}
+                    style={{
+                      width: 34, height: 34, border: "none", cursor: "pointer",
+                      background: editMode ? "var(--terra-medium)" : "transparent",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      borderBottom: "1px solid var(--border-color)",
+                    }}
+                    title={editMode ? "Valider positions" : "Éditer positions"}
+                  >
+                    {editMode ? <Check size={16} style={{ color: "#fff" }} /> : <Move size={16} style={{ color: "var(--text-secondary)" }} />}
+                  </button>
+                  {editMode && (
+                    <button
+                      onClick={resetPositions}
+                      style={{
+                        width: 34, height: 34, border: "none", cursor: "pointer",
+                        background: "transparent",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        borderBottom: "1px solid var(--border-color)",
+                      }}
+                      title="Réinitialiser"
+                    >
+                      <RotateCcw size={15} style={{ color: "var(--text-secondary)" }} />
+                    </button>
+                  )}
+                </>
+              )}
+              {!editMode && (
+                <>
+                  <button
+                    onClick={zoomIn}
+                    disabled={zoom >= 3}
+                    style={{
+                      width: 34, height: 34, border: "none", cursor: "pointer",
+                      background: "transparent",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      opacity: zoom >= 3 ? 0.3 : 1,
+                      borderBottom: "1px solid var(--border-color)",
+                    }}
+                  >
+                    <ZoomIn size={16} style={{ color: "var(--text-secondary)" }} />
+                  </button>
+                  <button
+                    onClick={zoomOut}
+                    disabled={zoom <= 1}
+                    style={{
+                      width: 34, height: 34, border: "none", cursor: "pointer",
+                      background: "transparent",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      opacity: zoom <= 1 ? 0.3 : 1,
+                    }}
+                  >
+                    <ZoomOut size={16} style={{ color: "var(--text-secondary)" }} />
+                  </button>
+                  {zoom > 1 && (
+                    <button
+                      onClick={reset}
+                      style={{
+                        width: 34, height: 34, border: "none", cursor: "pointer",
+                        background: "transparent",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        borderTop: "1px solid var(--border-color)",
+                      }}
+                    >
+                      <Maximize2 size={14} style={{ color: "var(--text-secondary)" }} />
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+
+            {zoom > 1 && !editMode && (
+              <div style={{
+                position: "absolute", top: 14, left: 14,
+                background: "var(--card-bg)",
+                padding: "4px 10px", borderRadius: 8,
+                fontSize: 11, fontWeight: 600, color: "var(--text-secondary)",
+                border: "1px solid var(--border-color)",
+                boxShadow: "var(--shadow-light)",
+              }}>
+                {Math.round(zoom * 100)}%
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      {/* Légende */}
+      {/* Legend */}
       <div style={{
         display: "flex", gap: 14, fontSize: 11, color: "var(--text-secondary)",
         padding: "9px 14px", borderRadius: 10,
@@ -239,21 +462,21 @@ export default function FloorPlan({ tables, reservations, onTableClick }: FloorP
         justifyContent: "center", flexWrap: "wrap",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 13, height: 13, borderRadius: "50%", border: "2px solid #2C2520", background: "#FFFFFF" }} />
+          <div style={{ width: 11, height: 11, borderRadius: "50%", border: "1.5px solid #2C2520", background: "#FFFFFF" }} />
           Libre
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 13, height: 13, borderRadius: "50%", background: "#D4A04A" }} />
+          <div style={{ width: 11, height: 11, borderRadius: "50%", background: "#D4A04A" }} />
           Réservée
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 13, height: 13, borderRadius: "50%", background: "#8B5A40" }} />
+          <div style={{ width: 11, height: 11, borderRadius: "50%", background: "#8B5A40" }} />
           Arrivée
         </div>
       </div>
 
-      {/* Détail de la table sélectionnée */}
-      {selected && selectedTable && (
+      {/* Selected table detail */}
+      {selected && selectedTable && !editMode && (
         <div className="card-medium" style={{ padding: "14px 16px", animation: "fadeInUp 0.2s ease-out" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
             <span style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)" }}>
