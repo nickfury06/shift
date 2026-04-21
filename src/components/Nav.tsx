@@ -16,6 +16,7 @@ import {
   PenLine,
   HelpCircle,
   Settings as SettingsIcon,
+  MessageCircle,
 } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useAuth } from "@/components/AuthProvider";
@@ -99,6 +100,7 @@ export default function Nav() {
 
   // ── "More" menu — guide + profile for everyone, extras for patron ───────────────
   const moreItems: NavItem[] = [
+    { href: "/messages", label: "Messages équipe", icon: <MessageCircle size={iconSize} strokeWidth={strokeWidth} /> },
     { href: "/guide", label: "Guide du lieu", icon: <HelpCircle size={iconSize} strokeWidth={strokeWidth} /> },
     { href: "/profile", label: "Mon profil", icon: <User size={iconSize} strokeWidth={strokeWidth} /> },
     ...(role === "patron"

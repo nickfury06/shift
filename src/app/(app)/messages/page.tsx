@@ -40,17 +40,6 @@ export default function MessagesPage() {
     fetchMessages();
   }, [fetchMessages]);
 
-  // Guard: patron only
-  if (profile && profile.role !== "patron") {
-    return (
-      <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
-        <div className="card-medium" style={{ padding: 24, textAlign: "center" }}>
-          <p style={{ color: "var(--text-secondary)" }}>Accès réservé au patron</p>
-        </div>
-      </div>
-    );
-  }
-
   async function handleSend() {
     if (!content.trim() || !user) return;
     setSending(true);
@@ -104,7 +93,7 @@ export default function MessagesPage() {
             <p className="section-label">Nouveau message pour l&apos;équipe</p>
 
             <textarea
-              placeholder="Ex: Plus que 3 portions de tartare — proposer le carpaccio..."
+              placeholder="Ex: client a laissé ses clés au bar · rupture de citrons..."
               value={content}
               onChange={(e) => setContent(e.target.value)}
               style={{
@@ -172,6 +161,7 @@ export default function MessagesPage() {
           <div className="stagger" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {messages.map((msg) => {
               const isPast = msg.date < today;
+              const canDelete = profile?.role === "patron" || msg.created_by === user?.id;
               return (
                 <div
                   key={msg.id}
@@ -192,26 +182,28 @@ export default function MessagesPage() {
                       — {profiles[msg.created_by] || "?"} · {formatDateFr(msg.date)}
                     </p>
                   </div>
-                  <button
-                    onClick={() => handleDelete(msg.id)}
-                    style={{
-                      position: "absolute",
-                      top: 12,
-                      right: 12,
-                      width: 28,
-                      height: 28,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      borderRadius: 8,
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                    }}
-                    aria-label="Supprimer"
-                  >
-                    <Trash2 size={13} style={{ color: "var(--danger)" }} />
-                  </button>
+                  {canDelete && (
+                    <button
+                      onClick={() => handleDelete(msg.id)}
+                      style={{
+                        position: "absolute",
+                        top: 12,
+                        right: 12,
+                        width: 28,
+                        height: 28,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderRadius: 8,
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                      }}
+                      aria-label="Supprimer"
+                    >
+                      <Trash2 size={13} style={{ color: "var(--danger)" }} />
+                    </button>
+                  )}
                 </div>
               );
             })}
