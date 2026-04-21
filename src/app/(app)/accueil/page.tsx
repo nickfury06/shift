@@ -22,7 +22,7 @@ import type {
 import MessageBanner from "@/components/MessageBanner";
 import MomentSection from "@/components/MomentSection";
 import Link from "next/link";
-import { Users, Bell, Search, X, ChevronDown, BookOpen } from "lucide-react";
+import { Users, Bell, Search, X, ChevronDown, BookOpen, Check } from "lucide-react";
 
 interface MergedTask {
   id: string;
@@ -230,6 +230,21 @@ export default function AccueilPage() {
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, completed } : t)));
   }
 
+  // ── Mark reservation arrived (quick action from Accueil) ─
+  async function markResaArrived(resaId: string) {
+    if (!profile) return;
+    // Optimistic
+    setReservations((prev) => prev.map((r) => r.id === resaId ? { ...r, status: "arrive", arrived_by: profile.id } : r));
+    const { error } = await supabase.from("reservations").update({ status: "arrive", arrived_by: profile.id }).eq("id", resaId);
+    if (error) {
+      toast.error("Erreur, réessaie");
+      setReservations((prev) => prev.map((r) => r.id === resaId ? { ...r, status: "attendu", arrived_by: null } : r));
+      return;
+    }
+    const r = reservations.find((x) => x.id === resaId);
+    toast.success(r ? `${r.name} · arrivée ✓` : "Arrivée confirmée");
+  }
+
   // ── Derived ───────────────────────────────────────────────
   const totalTasks = tasks.length;
   const doneTasks = tasks.filter((t) => t.completed).length;
@@ -237,6 +252,25 @@ export default function AccueilPage() {
   const totalCovers = reservations.reduce((sum, r) => sum + r.covers, 0);
   const pendingResas = reservations.filter((r) => r.status === "attendu").length;
   const activeMessages = messages.filter((m) => !dismissedMsgIds.has(m.id));
+
+  // Imminent reservations (pending, within 45 min window or overdue)
+  const nowMins = (() => {
+    const n = new Date();
+    return n.getHours() * 60 + n.getMinutes();
+  })();
+  function resaToMins(t: string) {
+    const [h, m] = t.split(":").map(Number);
+    return (h || 0) * 60 + (m || 0);
+  }
+  const imminentResas = reservations
+    .filter((r) => r.status === "attendu")
+    .filter((r) => {
+      const rm = resaToMins(r.time);
+      // Within next 45 min OR late (past arrival time by any amount)
+      return rm - nowMins <= 45;
+    })
+    .sort((a, b) => resaToMins(a.time) - resaToMins(b.time))
+    .slice(0, 3);
 
   if (loading) {
     return (
@@ -481,6 +515,56 @@ export default function AccueilPage() {
           </p>
         </Link>
       </div>
+
+      {/* ── Imminent arrivals (quick-tap check) ──────────────── */}
+      {imminentResas.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+            <span className="section-label">Arrivées imminentes</span>
+            <Link href="/reservations" style={{ fontSize: 11, color: "var(--terra-medium)", textDecoration: "none" }}>Voir tout →</Link>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {imminentResas.map((r) => {
+              const rm = resaToMins(r.time);
+              const overdue = nowMins - rm;
+              const isLate = overdue > 0;
+              return (
+                <div key={r.id} className="card-light" style={{
+                  padding: "10px 12px 10px 14px",
+                  display: "flex", alignItems: "center", gap: 10,
+                  borderLeft: isLate && overdue >= 15 ? "3px solid var(--danger)" : isLate ? "3px solid var(--warning)" : "3px solid var(--terra-medium)",
+                }}>
+                  <div style={{ minWidth: 46, fontSize: 14, fontWeight: 700, color: "#8B5A40" }}>
+                    {r.time.slice(0, 5).replace(":", "h")}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {r.name}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                      {r.covers} pers.
+                      {r.table_id && ` · T.${r.table_id}`}
+                      {isLate && overdue >= 15 && ` · 🔔 ${overdue}min retard`}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => markResaArrived(r.id)}
+                    style={{
+                      width: 36, height: 36, borderRadius: "50%",
+                      border: "2px solid #8B5A40", background: "transparent",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      cursor: "pointer", padding: 0, flexShrink: 0,
+                    }}
+                    aria-label="Marquer arrivé"
+                  >
+                    <Check size={16} strokeWidth={2.5} style={{ color: "rgba(139,90,64,0.55)" }} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Stock signal modal overlay (doesn't push content) ─── */}
       {showStockSignal && (
