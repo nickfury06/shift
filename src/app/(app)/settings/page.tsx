@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { createClient } from "@/lib/supabase/client";
-import { Heart, Clock, Info } from "lucide-react";
+import { Heart, Clock, Info, MapPin } from "lucide-react";
 
 interface Setting { key: string; value: string; }
 
@@ -19,6 +19,12 @@ export default function SettingsPage() {
   const [fnfMaxPerPeriod, setFnfMaxPerPeriod] = useState(1);
   const [shiftStartHour, setShiftStartHour] = useState(16);
   const [shiftEndHour, setShiftEndHour] = useState(1);
+  const [wifiName, setWifiName] = useState("");
+  const [wifiPassword, setWifiPassword] = useState("");
+  const [storageNotes, setStorageNotes] = useState("");
+  const [vestiaireNotes, setVestiaireNotes] = useState("");
+  const [firstAidNotes, setFirstAidNotes] = useState("");
+  const [emergencyContacts, setEmergencyContacts] = useState("");
 
   const fetchSettings = useCallback(async () => {
     const { data } = await supabase.from("settings").select("*");
@@ -28,6 +34,12 @@ export default function SettingsPage() {
     if (map.discount_max_per_period) setFnfMaxPerPeriod(parseInt(map.discount_max_per_period));
     if (map.shift_start_hour) setShiftStartHour(parseInt(map.shift_start_hour));
     if (map.shift_end_hour) setShiftEndHour(parseInt(map.shift_end_hour));
+    if (map.wifi_name) setWifiName(map.wifi_name);
+    if (map.wifi_password) setWifiPassword(map.wifi_password);
+    if (map.storage_notes) setStorageNotes(map.storage_notes);
+    if (map.vestiaire_notes) setVestiaireNotes(map.vestiaire_notes);
+    if (map.first_aid_notes) setFirstAidNotes(map.first_aid_notes);
+    if (map.emergency_contacts) setEmergencyContacts(map.emergency_contacts);
     setLoading(false);
   }, [supabase]);
 
@@ -163,6 +175,63 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Infos du lieu — affichées dans le Guide pour toute l'équipe */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+          <MapPin size={12} style={{ color: "var(--terra-medium)" }} />
+          <span className="section-label">Infos du lieu</span>
+        </div>
+        <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: 10, lineHeight: 1.4 }}>
+          Visibles par toute l&apos;équipe dans le Guide. Remplis ce que tu veux partager.
+        </p>
+        <div className="card-light" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 14 }}>
+          <VenueField
+            label="Nom du WiFi staff"
+            value={wifiName}
+            onChange={setWifiName}
+            onBlur={() => updateSetting("wifi_name", wifiName)}
+            placeholder="ex. LeHive-Staff"
+          />
+          <VenueField
+            label="Mot de passe WiFi"
+            value={wifiPassword}
+            onChange={setWifiPassword}
+            onBlur={() => updateSetting("wifi_password", wifiPassword)}
+            placeholder="ex. abeille2024"
+          />
+          <VenueField
+            label="Vestiaire"
+            value={vestiaireNotes}
+            onChange={setVestiaireNotes}
+            onBlur={() => updateSetting("vestiaire_notes", vestiaireNotes)}
+            placeholder="ex. Couloir arrière, casiers à gauche"
+          />
+          <VenueField
+            label="Trousse 1er secours"
+            value={firstAidNotes}
+            onChange={setFirstAidNotes}
+            onBlur={() => updateSetting("first_aid_notes", firstAidNotes)}
+            placeholder="ex. Derrière le bar, étagère du haut"
+          />
+          <VenueField
+            label="Où trouver quoi"
+            value={storageNotes}
+            onChange={setStorageNotes}
+            onBlur={() => updateSetting("storage_notes", storageNotes)}
+            placeholder="Verres, sirops, tickets de caisse, nappes..."
+            multiline
+          />
+          <VenueField
+            label="Contacts urgence"
+            value={emergencyContacts}
+            onChange={setEmergencyContacts}
+            onBlur={() => updateSetting("emergency_contacts", emergencyContacts)}
+            placeholder="Nicolas 06.XX.XX.XX.XX · Sophie 06.XX.XX.XX.XX"
+            multiline
+          />
+        </div>
+      </div>
+
       {/* À propos */}
       <div>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
@@ -186,6 +255,61 @@ export default function SettingsPage() {
       </div>
 
       <div style={{ height: 20 }} />
+    </div>
+  );
+}
+
+function VenueField({
+  label,
+  value,
+  onChange,
+  onBlur,
+  placeholder,
+  multiline,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  onBlur: () => void;
+  placeholder?: string;
+  multiline?: boolean;
+}) {
+  const commonStyle: React.CSSProperties = {
+    width: "100%",
+    borderRadius: 10,
+    border: "1px solid var(--border-color)",
+    background: "var(--input-bg)",
+    padding: "10px 12px",
+    fontSize: 14,
+    color: "var(--text-primary)",
+    outline: "none",
+    fontFamily: "inherit",
+    resize: "vertical",
+  };
+  return (
+    <div>
+      <label style={{ fontSize: 12, color: "var(--text-tertiary)", fontWeight: 500, display: "block", marginBottom: 6 }}>
+        {label}
+      </label>
+      {multiline ? (
+        <textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
+          placeholder={placeholder}
+          rows={2}
+          style={{ ...commonStyle, minHeight: 56 }}
+        />
+      ) : (
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
+          placeholder={placeholder}
+          style={commonStyle}
+        />
+      )}
     </div>
   );
 }

@@ -14,6 +14,8 @@ import {
   Shield,
   Calendar,
   PenLine,
+  HelpCircle,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useAuth } from "@/components/AuthProvider";
@@ -95,9 +97,13 @@ export default function Nav() {
     ];
   }
 
-  // ── "More" menu — profile link for everyone ───────────────
+  // ── "More" menu — guide + profile for everyone, extras for patron ───────────────
   const moreItems: NavItem[] = [
+    { href: "/guide", label: "Guide du lieu", icon: <HelpCircle size={iconSize} strokeWidth={strokeWidth} /> },
     { href: "/profile", label: "Mon profil", icon: <User size={iconSize} strokeWidth={strokeWidth} /> },
+    ...(role === "patron"
+      ? [{ href: "/settings", label: "Réglages", icon: <SettingsIcon size={iconSize} strokeWidth={strokeWidth} /> }]
+      : []),
   ];
 
   const mainItems = getMainItems();
