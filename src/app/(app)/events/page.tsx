@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/Confirm";
 import { createClient } from "@/lib/supabase/client";
 import type { Ritual, Event, Day } from "@/lib/types";
 import { Plus, Trash2, Edit3, X, Calendar, Repeat } from "lucide-react";
@@ -16,6 +18,8 @@ const DAY_OPTIONS: { value: Day; label: string }[] = [
 
 export default function EventsPage() {
   const { profile, user } = useAuth();
+  const toast = useToast();
+  const { confirm } = useConfirm();
   const supabase = useRef(createClient()).current;
 
   const [rituals, setRituals] = useState<Ritual[]>([]);
@@ -82,18 +86,33 @@ export default function EventsPage() {
       description: rDescription.trim() || null,
       organizer: rOrganizer.trim() || null,
     };
+    let error = null;
     if (editRitualId) {
-      await supabase.from("rituals").update(payload).eq("id", editRitualId);
+      const res = await supabase.from("rituals").update(payload).eq("id", editRitualId);
+      error = res.error;
     } else {
-      await supabase.from("rituals").insert({ ...payload, sort_order: rituals.length + 1 });
+      const res = await supabase.from("rituals").insert({ ...payload, sort_order: rituals.length + 1 });
+      error = res.error;
     }
     setSaving(false);
+    if (error) { toast.error("Erreur, réessaie"); return; }
+    toast.success(editRitualId ? "Rituel modifié" : "Rituel créé");
     resetRitualForm();
     fetchData();
   }
 
   async function deleteRitual(id: string) {
-    await supabase.from("rituals").delete().eq("id", id);
+    const r = rituals.find((x) => x.id === id);
+    const ok = await confirm({
+      title: "Supprimer ce rituel ?",
+      message: r?.name ? `"${r.name}" sera supprimé.` : undefined,
+      variant: "danger",
+      confirmLabel: "Supprimer",
+    });
+    if (!ok) return;
+    const { error } = await supabase.from("rituals").delete().eq("id", id);
+    if (error) { toast.error("Erreur, réessaie"); return; }
+    toast.success("Rituel supprimé");
     fetchData();
   }
 
@@ -110,7 +129,7 @@ export default function EventsPage() {
   async function saveEvent() {
     if (!eName.trim() || !eDate || !user || saving) return;
     setSaving(true);
-    await supabase.from("events").insert({
+    const { error } = await supabase.from("events").insert({
       title: eName.trim(),
       description: eDescription.trim() || null,
       date: eDate,
@@ -118,12 +137,22 @@ export default function EventsPage() {
       created_by: user.id,
     });
     setSaving(false);
+    if (error) { toast.error("Erreur, réessaie"); return; }
+    toast.success("Événement créé");
     resetEventForm();
     fetchData();
   }
 
   async function deleteEvent(id: string) {
-    await supabase.from("events").delete().eq("id", id);
+    const ok = await confirm({
+      title: "Supprimer cet événement ?",
+      variant: "danger",
+      confirmLabel: "Supprimer",
+    });
+    if (!ok) return;
+    const { error } = await supabase.from("events").delete().eq("id", id);
+    if (error) { toast.error("Erreur, réessaie"); return; }
+    toast.success("Événement supprimé");
     fetchData();
   }
 

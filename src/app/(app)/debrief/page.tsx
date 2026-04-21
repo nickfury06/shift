@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { useToast } from "@/components/Toast";
 import { createClient } from "@/lib/supabase/client";
 import { getShiftDate, formatDateFr } from "@/lib/shift-utils";
 import type { Debrief, Affluence, ClosingState, Profile } from "@/lib/types";
@@ -26,6 +27,7 @@ const CLOSING_OPTIONS: { value: ClosingState; label: string; icon: string }[] = 
 
 export default function DebriefPage() {
   const { profile, user, loading: authLoading } = useAuth();
+  const toast = useToast();
   const supabase = useRef(createClient()).current;
   const isPatron = profile?.role === "patron" || profile?.role === "responsable";
 
@@ -97,7 +99,7 @@ export default function DebriefPage() {
     if (!user || !canSubmit || saving) return;
     setSaving(true);
 
-    await supabase.from("debriefs").insert({
+    const { error } = await supabase.from("debriefs").insert({
       user_id: user.id,
       date: shiftDate,
       global_rating: globalRating,
@@ -111,6 +113,8 @@ export default function DebriefPage() {
     });
 
     setSaving(false);
+    if (error) { toast.error("Erreur, réessaie"); return; }
+    toast.success("Merci pour ton debrief !");
     setSubmitted(true);
     fetchData();
   }

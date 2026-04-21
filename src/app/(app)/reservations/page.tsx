@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/Confirm";
 import { createClient } from "@/lib/supabase/client";
 import { getShiftDate, formatDateFr, formatTime, getNow } from "@/lib/shift-utils";
 import { SEATING_LABELS, SEATING_ICONS, TYPE_LABELS, SOURCE_LABELS, SOURCE_ICONS } from "@/lib/constants";
@@ -14,6 +15,7 @@ import FloorPlan from "@/components/FloorPlan";
 export default function ReservationsPage() {
   const { profile, user } = useAuth();
   const toast = useToast();
+  const { confirm } = useConfirm();
   const supabase = useRef(createClient()).current;
 
   const [loading, setLoading] = useState(true);
@@ -144,11 +146,22 @@ export default function ReservationsPage() {
   }
 
   async function handleDelete(id: string) {
+    const resa = reservations.find((r) => r.id === id);
+    const ok = await confirm({
+      title: "Supprimer cette réservation ?",
+      message: resa ? `${resa.name} · ${resa.time.slice(0, 5).replace(":", "h")} · ${resa.covers} pers.` : undefined,
+      variant: "danger",
+      confirmLabel: "Supprimer",
+    });
+    if (!ok) return;
+
     setDeletingId(id);
     await new Promise((r) => setTimeout(r, 250));
     setReservations((prev) => prev.filter((r) => r.id !== id));
     setDeletingId(null);
-    await supabase.from("reservations").delete().eq("id", id);
+    const { error } = await supabase.from("reservations").delete().eq("id", id);
+    if (error) { toast.error("Erreur, réessaie"); return; }
+    toast.success("Réservation supprimée");
   }
 
   async function toggleArrived(resa: Reservation) {

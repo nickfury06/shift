@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/Confirm";
 import { createClient } from "@/lib/supabase/client";
 import { getShiftDate } from "@/lib/shift-utils";
 import type { Schedule, Profile, AvailabilityRequest } from "@/lib/types";
@@ -9,6 +11,8 @@ import { Plus, Trash2, X, CalendarOff, Check } from "lucide-react";
 
 export default function PlanningPage() {
   const { profile, user } = useAuth();
+  const toast = useToast();
+  const { confirm } = useConfirm();
   const supabase = useRef(createClient()).current;
   const isPatron = profile?.role === "patron";
 
@@ -63,38 +67,52 @@ export default function PlanningPage() {
     const { error } = await supabase.from("schedules").insert({
       user_id: newUserId, date: newDate, start_time: newStart, end_time: newEnd, created_by: user.id,
     });
-    if (!error) {
-      setShowAddForm(false);
-      setNewUserId("");
-      setNewDate("");
-      fetchData();
-    }
+    if (error) { toast.error("Erreur, réessaie"); return; }
+    toast.success("Shift ajouté");
+    setShowAddForm(false);
+    setNewUserId("");
+    setNewDate("");
+    fetchData();
   }
 
-  async function deleteShift(id: string) {
-    await supabase.from("schedules").delete().eq("id", id);
+  async function deleteShift(id: string, askConfirm = true) {
+    if (askConfirm) {
+      const ok = await confirm({
+        title: "Supprimer ce shift ?",
+        variant: "danger",
+        confirmLabel: "Supprimer",
+      });
+      if (!ok) return;
+    }
+    const { error } = await supabase.from("schedules").delete().eq("id", id);
+    if (error) { toast.error("Erreur, réessaie"); return; }
+    if (askConfirm) toast.success("Shift supprimé");
     fetchData();
   }
 
   async function submitAvailRequest(date: string) {
     if (!user) return;
-    await supabase.from("availability_requests").insert({
+    const { error } = await supabase.from("availability_requests").insert({
       user_id: user.id, date, reason: availReason.trim() || null,
     });
+    if (error) { toast.error("Erreur, réessaie"); return; }
+    toast.success("Demande envoyée");
     setShowAvailForm(null);
     setAvailReason("");
     fetchData();
   }
 
   async function handleAvailDecision(id: string, status: "accepted" | "refused") {
-    await supabase.from("availability_requests").update({ status }).eq("id", id);
+    const { error } = await supabase.from("availability_requests").update({ status }).eq("id", id);
+    if (error) { toast.error("Erreur, réessaie"); return; }
     if (status === "accepted") {
       const req = availRequests.find((r) => r.id === id);
       if (req) {
         const sched = schedules.find((s) => s.user_id === req.user_id && s.date === req.date);
-        if (sched) await deleteShift(sched.id);
+        if (sched) await deleteShift(sched.id, false);
       }
     }
+    toast.success(status === "accepted" ? "Absence acceptée" : "Absence refusée");
     fetchData();
   }
 

@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/Confirm";
 import { createClient } from "@/lib/supabase/client";
 import type { Profile, Role, EmploymentType } from "@/lib/types";
 import { Trash2, KeyRound, UserPlus, Copy, X, Check, Power } from "lucide-react";
@@ -10,6 +11,7 @@ import { Trash2, KeyRound, UserPlus, Copy, X, Check, Power } from "lucide-react"
 export default function StaffPage() {
   const { profile } = useAuth();
   const toast = useToast();
+  const { confirm } = useConfirm();
   const supabase = useRef(createClient()).current;
 
   const [staff, setStaff] = useState<Profile[]>([]);
@@ -120,7 +122,14 @@ export default function StaffPage() {
   }
 
   async function handleDelete(userId: string) {
-    if (!confirm("Supprimer ce membre ?")) return;
+    const member = staff.find((s) => s.id === userId);
+    const ok = await confirm({
+      title: "Supprimer ce membre ?",
+      message: member?.name ? `${member.name} sera définitivement supprimé. Cette action est irréversible.` : undefined,
+      variant: "danger",
+      confirmLabel: "Supprimer",
+    });
+    if (!ok) return;
     const { error } = await supabase.from("profiles").delete().eq("id", userId);
     if (error) { toast.error("Erreur, réessaie"); return; }
     toast.success("Membre supprimé");

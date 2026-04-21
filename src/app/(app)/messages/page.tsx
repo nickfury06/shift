@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/Confirm";
 import { createClient } from "@/lib/supabase/client";
 import { getShiftDate, formatDateFr } from "@/lib/shift-utils";
 import type { ManagerMessage } from "@/lib/types";
@@ -9,6 +11,8 @@ import { Send, Trash2 } from "lucide-react";
 
 export default function MessagesPage() {
   const { profile, user } = useAuth();
+  const toast = useToast();
+  const { confirm } = useConfirm();
   const supabase = useRef(createClient()).current;
 
   const [messages, setMessages] = useState<ManagerMessage[]>([]);
@@ -56,16 +60,23 @@ export default function MessagesPage() {
       date,
       created_by: user.id,
     });
-
-    if (!error) {
-      setContent("");
-      fetchMessages();
-    }
     setSending(false);
+    if (error) { toast.error("Erreur, réessaie"); return; }
+    toast.success("Message envoyé");
+    setContent("");
+    fetchMessages();
   }
 
   async function handleDelete(id: string) {
-    await supabase.from("messages").delete().eq("id", id);
+    const ok = await confirm({
+      title: "Supprimer ce message ?",
+      variant: "danger",
+      confirmLabel: "Supprimer",
+    });
+    if (!ok) return;
+    const { error } = await supabase.from("messages").delete().eq("id", id);
+    if (error) { toast.error("Erreur, réessaie"); return; }
+    toast.success("Message supprimé");
     fetchMessages();
   }
 

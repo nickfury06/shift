@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/Confirm";
 import { createClient } from "@/lib/supabase/client";
 import { getNow } from "@/lib/shift-utils";
 import type { StockProduct, StockOrder, StockAlert, StockCategory } from "@/lib/types";
@@ -48,6 +49,7 @@ function getDomainLabel(domain: string): string {
 export default function StocksPage() {
   const { profile, user } = useAuth();
   const toast = useToast();
+  const { confirm: confirmDialog } = useConfirm();
   const supabase = useRef(createClient()).current;
   const [orderQuantities, setOrderQuantities] = useState<Record<string, number>>(() => {
     if (typeof window === "undefined") return {};
@@ -748,7 +750,15 @@ export default function StocksPage() {
 
                 {/* Clear order */}
                 <button
-                  onClick={() => { if (confirm("Réinitialiser la commande ?")) clearOrder(); }}
+                  onClick={async () => {
+                    const ok = await confirmDialog({
+                      title: "Réinitialiser la commande ?",
+                      message: "Tous les produits et quantités de la liste actuelle seront effacés.",
+                      variant: "danger",
+                      confirmLabel: "Réinitialiser",
+                    });
+                    if (ok) clearOrder();
+                  }}
                   style={{
                     padding: "10px 0", background: "none", border: "none",
                     fontSize: 12, color: "var(--text-tertiary)", cursor: "pointer",

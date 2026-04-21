@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/Confirm";
 import { createClient } from "@/lib/supabase/client";
 import { ZONE_LABELS, ZONE_COLORS, MOMENT_LABELS, MOMENT_ORDER } from "@/lib/constants";
 import type { Task, Zone, Moment, Day, Profile } from "@/lib/types";
@@ -24,6 +26,8 @@ type FilterCategory = "all" | Zone;
 
 export default function TasksPage() {
   const { profile, user } = useAuth();
+  const toast = useToast();
+  const { confirm } = useConfirm();
   const supabase = useRef(createClient()).current;
 
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -138,29 +142,43 @@ export default function TasksPage() {
       created_by: user?.id ?? null,
     };
 
+    let error = null;
     if (editId) {
       const { created_by, ...updatePayload } = payload;
-      // Optimistic update
       setTasks((prev) =>
         prev.map((t) => (t.id === editId ? { ...t, ...updatePayload } : t))
       );
-      await supabase.from("tasks").update(updatePayload).eq("id", editId);
+      const res = await supabase.from("tasks").update(updatePayload).eq("id", editId);
+      error = res.error;
     } else {
-      await supabase.from("tasks").insert(payload);
+      const res = await supabase.from("tasks").insert(payload);
+      error = res.error;
     }
 
     setSaving(false);
+    if (error) { toast.error("Erreur, réessaie"); return; }
+    toast.success(editId ? "Tâche modifiée" : "Tâche créée");
     resetForm();
     fetchTasks();
   }
 
   async function handleDelete(id: string) {
-    // Optimistic: fade out then remove
+    const task = tasks.find((t) => t.id === id);
+    const ok = await confirm({
+      title: "Supprimer cette tâche ?",
+      message: task?.title ? `"${task.title}" sera définitivement supprimée.` : undefined,
+      variant: "danger",
+      confirmLabel: "Supprimer",
+    });
+    if (!ok) return;
+
     setDeletingId(id);
     await new Promise((r) => setTimeout(r, 300));
     setTasks((prev) => prev.filter((t) => t.id !== id));
     setDeletingId(null);
-    await supabase.from("tasks").delete().eq("id", id);
+    const { error } = await supabase.from("tasks").delete().eq("id", id);
+    if (error) { toast.error("Erreur, réessaie"); fetchTasks(); return; }
+    toast.success("Tâche supprimée");
     fetchTasks();
   }
 
