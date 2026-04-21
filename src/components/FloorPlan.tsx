@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import type { Reservation, VenueTable } from "@/lib/types";
 import { Users, ZoomIn, ZoomOut, Maximize2, Move, Check, RotateCcw } from "lucide-react";
-import { useAdminMode } from "@/components/AdminMode";
+import { useAuth } from "@/components/AuthProvider";
 
 interface FloorPlanProps {
   tables: VenueTable[];
@@ -76,8 +76,8 @@ function saveMarkers(floor: Floor, markers: Marker[]) {
 }
 
 export default function FloorPlan({ tables, reservations, onTableClick }: FloorPlanProps) {
-  const { enabled: adminMode } = useAdminMode();
-  const editable = adminMode; // only admin mode allows editing positions
+  const { profile } = useAuth();
+  const editable = profile?.role === "patron";
   const [floor, setFloor] = useState<Floor>("rdc");
   const [selected, setSelected] = useState<string | null>(null);
   const [imgFailed, setImgFailed] = useState(false);
@@ -86,10 +86,10 @@ export default function FloorPlan({ tables, reservations, onTableClick }: FloorP
   const [editMode, setEditMode] = useState(false);
   const [focusZone, setFocusZone] = useState<string | "all">("all");
 
-  // Disable edit mode if admin mode gets turned off
+  // Defensive: if role changes away from patron, close editor
   useEffect(() => {
-    if (!adminMode && editMode) { setEditMode(false); setFocusZone("all"); }
-  }, [adminMode, editMode]);
+    if (!editable && editMode) { setEditMode(false); setFocusZone("all"); }
+  }, [editable, editMode]);
   const [rdcMarkers, setRdcMarkers] = useState<Marker[]>(() => loadMarkers("rdc"));
   const [r1Markers, setR1Markers] = useState<Marker[]>(() => loadMarkers("r1"));
   const [draggingId, setDraggingId] = useState<string | null>(null);
