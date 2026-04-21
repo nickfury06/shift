@@ -534,20 +534,26 @@ export default function ReservationsPage() {
                     {n}
                   </button>
                 ))}
-                <button
-                  onClick={() => {
-                    const v = prompt("Nombre de personnes ?");
-                    if (v && !isNaN(Number(v)) && Number(v) > 0) setCovers(Number(v));
+                <input
+                  type="number"
+                  min={9}
+                  value={covers > 8 ? covers : ""}
+                  placeholder="9+"
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value);
+                    if (!isNaN(v) && v > 0) setCovers(v);
                   }}
                   style={{
-                    flex: 1, height: 42, borderRadius: 10, border: "none", cursor: "pointer",
-                    fontSize: 13, fontWeight: 500,
+                    flex: 1, height: 42, borderRadius: 10,
+                    border: covers > 8 ? "none" : "1px solid var(--border-color)",
+                    fontSize: 15, fontWeight: 600, textAlign: "center",
                     background: covers > 8 ? "var(--gradient-primary)" : "var(--secondary-bg)",
                     color: covers > 8 ? "#fff" : "var(--text-tertiary)",
+                    outline: "none",
+                    appearance: "none",
+                    MozAppearance: "textfield",
                   }}
-                >
-                  {covers > 8 ? covers : "9+"}
-                </button>
+                />
               </div>
             </div>
 

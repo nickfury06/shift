@@ -324,7 +324,20 @@ export default function TasksPage() {
 
               {/* Days */}
               <div>
-                <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 8 }}>Jours</p>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <p style={{ fontSize: 12, color: "var(--text-secondary)" }}>Jours</p>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button
+                      onClick={() => setSelectedDays([...TASK_WORK_DAYS])}
+                      style={{ fontSize: 11, fontWeight: 500, color: "var(--terra-medium)", background: "none", border: "none", cursor: "pointer", padding: 2 }}
+                    >Tout</button>
+                    <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>·</span>
+                    <button
+                      onClick={() => setSelectedDays([])}
+                      style={{ fontSize: 11, fontWeight: 500, color: "var(--text-secondary)", background: "none", border: "none", cursor: "pointer", padding: 2 }}
+                    >Aucun</button>
+                  </div>
+                </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   {TASK_WORK_DAYS.map((d) => (
                     <button
@@ -345,7 +358,10 @@ export default function TasksPage() {
 
               {/* Priority */}
               <div>
-                <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 8 }}>Priorite</p>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <p style={{ fontSize: 12, color: "var(--text-secondary)" }}>Priorité</p>
+                  <span style={{ fontSize: 10, color: "var(--text-tertiary)" }}>1 = Urgent · 5 = Bas</span>
+                </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   {[1, 2, 3, 4, 5].map((p) => (
                     <button

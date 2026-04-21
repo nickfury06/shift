@@ -183,16 +183,31 @@ export default function AccueilPage() {
   }, [supabase, shiftDate, fetchData]);
 
   // ── Stock signal ──────────────────────────────────────────
+  // Recent signals (last 5 distinct products this user signaled, stored locally)
+  const [recentSignals, setRecentSignals] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    try { return JSON.parse(localStorage.getItem("shift-recent-signals") || "[]"); }
+    catch { return []; }
+  });
+
   async function sendStockAlert(productId: string) {
     if (!profile) return;
     const p = stockProducts.find((x) => x.id === productId);
-    await supabase.from("stock_alerts").insert({ product_id: productId, message: `${p?.name} est bas`, created_by: profile.id });
+    const { error } = await supabase.from("stock_alerts").insert({ product_id: productId, message: `${p?.name} est bas`, created_by: profile.id });
+    if (error) { toast.error("Erreur, réessaie"); return; }
+    toast.success(`${p?.name} signalé`);
+    // Remember this product in user's recents
+    setRecentSignals((prev) => {
+      const next = [productId, ...prev.filter((id) => id !== productId)].slice(0, 5);
+      try { localStorage.setItem("shift-recent-signals", JSON.stringify(next)); } catch {}
+      return next;
+    });
     setStockSearch("");
     setShowStockSignal(false);
   }
 
-  const stockSearchResults = stockSearch.length >= 2
-    ? stockProducts.filter((p) => p.name.toLowerCase().includes(stockSearch.toLowerCase())).slice(0, 6)
+  const stockSearchResults = stockSearch.length >= 1
+    ? stockProducts.filter((p) => p.name.toLowerCase().includes(stockSearch.toLowerCase())).slice(0, 8)
     : [];
   const alertedProductIds = new Set(stockAlerts.map((a) => a.product_id));
 
@@ -467,90 +482,128 @@ export default function AccueilPage() {
         </Link>
       </div>
 
-      {/* ── Stock signal panel ──────────────────────────────── */}
+      {/* ── Stock signal modal overlay (doesn't push content) ─── */}
       {showStockSignal && (
-        <div style={{ marginBottom: 16 }}>
-          {/* Search */}
-          <div className="card-medium" style={{ padding: 14, marginBottom: stockAlerts.length > 0 ? 10 : 0 }}>
-            <div style={{ position: "relative", marginBottom: stockSearchResults.length > 0 ? 10 : 0 }}>
+        <div
+          onClick={() => { setShowStockSignal(false); setStockSearch(""); }}
+          style={{
+            position: "fixed", inset: 0, zIndex: 100,
+            display: "flex", alignItems: "flex-end", justifyContent: "center",
+            background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)",
+            animation: "fadeIn 0.15s ease-out",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="card-medium"
+            style={{
+              position: "relative", width: "100%", maxWidth: 512, maxHeight: "80vh",
+              overflowY: "auto", padding: 16, borderRadius: "20px 20px 0 0",
+              animation: "fadeInUp 0.22s ease-out",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Bell size={16} style={{ color: "var(--warning)" }} />
+                <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>Signaler un manque</span>
+              </div>
+              <button onClick={() => { setShowStockSignal(false); setStockSearch(""); }} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+                <X size={18} style={{ color: "var(--text-tertiary)" }} />
+              </button>
+            </div>
+
+            <div style={{ position: "relative", marginBottom: 12 }}>
               <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-tertiary)" }} />
               <input
                 type="text"
-                placeholder="Quel produit manque ?"
+                placeholder="Nom du produit..."
                 value={stockSearch}
                 onChange={(e) => setStockSearch(e.target.value)}
                 autoFocus
                 style={{
                   width: "100%", borderRadius: 10, border: "1px solid var(--border-color)",
-                  background: "var(--input-bg)", padding: "10px 14px 10px 36px", fontSize: 14,
+                  background: "var(--input-bg)", padding: "12px 14px 12px 36px", fontSize: 15,
                   color: "var(--text-primary)", outline: "none",
                 }}
               />
-              <button onClick={() => { setShowStockSignal(false); setStockSearch(""); }} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", padding: 4 }}>
-                <X size={14} style={{ color: "var(--text-tertiary)" }} />
-              </button>
             </div>
-            {stockSearchResults.map((p) => {
-              const flagged = alertedProductIds.has(p.id);
-              return (
-                <button
-                  key={p.id}
-                  onClick={() => !flagged && sendStockAlert(p.id)}
-                  disabled={flagged}
-                  style={{
-                    width: "100%", textAlign: "left", border: "none", cursor: flagged ? "default" : "pointer",
-                    padding: "10px 12px", borderRadius: 10, marginBottom: 4,
-                    background: flagged ? "transparent" : "rgba(212,160,74,0.06)",
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                    opacity: flagged ? 0.35 : 1,
-                  }}
-                >
-                  <span style={{ fontSize: 15, fontWeight: 500, color: "var(--text-primary)" }}>{p.name}</span>
-                  {flagged
-                    ? <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Déjà signalé</span>
-                    : <span style={{
-                        fontSize: 12, fontWeight: 600, color: "#fff", background: "var(--warning)",
-                        padding: "4px 12px", borderRadius: 8,
-                      }}>Signaler</span>
-                  }
-                </button>
-              );
-            })}
-          </div>
 
-          {/* Active alerts — graphic cards */}
-          {stockAlerts.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {stockAlerts.map((a) => {
-                const prod = stockProducts.find((p) => p.id === a.product_id);
-                const time = new Date(a.created_at);
-                const timeStr = `${time.getHours()}h${String(time.getMinutes()).padStart(2, "0")}`;
-                return (
-                  <div key={a.id} className="card-medium" style={{
-                    padding: "14px 16px",
-                    borderLeft: "4px solid var(--warning)",
-                    display: "flex", alignItems: "center", gap: 12,
-                  }}>
-                    <div style={{
-                      width: 36, height: 36, borderRadius: 10,
-                      background: "rgba(212,160,74,0.12)",
-                      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                    }}>
-                      <Bell size={18} style={{ color: "var(--warning)" }} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text-primary)" }}>
-                        {prod?.name || "Produit"}
-                      </div>
-                      <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>
-                        {profiles[a.created_by] || "Staff"} · {timeStr}
-                      </div>
-                    </div>
+            {/* Recent signals by this user (quick access) */}
+            {stockSearch.length < 2 && recentSignals.length > 0 && (
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6, padding: "0 4px" }}>
+                  Récents
+                </div>
+                {recentSignals.map((pid) => {
+                  const p = stockProducts.find((sp) => sp.id === pid);
+                  if (!p) return null;
+                  const flagged = alertedProductIds.has(p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => !flagged && sendStockAlert(p.id)}
+                      disabled={flagged}
+                      style={{
+                        width: "100%", textAlign: "left", border: "none", cursor: flagged ? "default" : "pointer",
+                        padding: "10px 12px", borderRadius: 10, marginBottom: 4,
+                        background: flagged ? "transparent" : "var(--secondary-bg)",
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        opacity: flagged ? 0.35 : 1,
+                      }}
+                    >
+                      <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>{p.name}</span>
+                      {flagged
+                        ? <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Déjà signalé</span>
+                        : <span style={{ fontSize: 12, fontWeight: 600, color: "var(--warning)" }}>Signaler</span>
+                      }
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {stockSearchResults.length > 0 && (
+              <div>
+                {stockSearch.length >= 2 && (
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6, padding: "0 4px" }}>
+                    Résultats
                   </div>
-                );
-              })}
-            </div>
-          )}
+                )}
+                {stockSearchResults.map((p) => {
+                  const flagged = alertedProductIds.has(p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => !flagged && sendStockAlert(p.id)}
+                      disabled={flagged}
+                      style={{
+                        width: "100%", textAlign: "left", border: "none", cursor: flagged ? "default" : "pointer",
+                        padding: "12px 14px", borderRadius: 10, marginBottom: 4,
+                        background: flagged ? "transparent" : "rgba(212,160,74,0.06)",
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        opacity: flagged ? 0.35 : 1,
+                      }}
+                    >
+                      <span style={{ fontSize: 15, fontWeight: 500, color: "var(--text-primary)" }}>{p.name}</span>
+                      {flagged
+                        ? <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Déjà signalé</span>
+                        : <span style={{
+                            fontSize: 12, fontWeight: 600, color: "#fff", background: "var(--warning)",
+                            padding: "4px 12px", borderRadius: 8,
+                          }}>Signaler</span>
+                      }
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {stockSearch.length >= 2 && stockSearchResults.length === 0 && (
+              <div style={{ padding: "20px 12px", textAlign: "center", color: "var(--text-tertiary)", fontSize: 13 }}>
+                Aucun produit trouvé pour « {stockSearch} »
+              </div>
+            )}
+          </div>
         </div>
       )}
 
