@@ -1,8 +1,8 @@
-// Le Hive Management — Service Worker
-// Handles: PWA install, offline task caching, push notifications
+// Shift — Service Worker
+// Handles: PWA install, offline app-shell caching, push notifications
 
-const CACHE_NAME = "le-hive-v1";
-const STATIC_ASSETS = ["/", "/ce-soir", "/planning", "/debrief"];
+const CACHE_NAME = "shift-v2";
+const STATIC_ASSETS = ["/", "/accueil"];
 
 // Install — pre-cache app shell
 self.addEventListener("install", (event) => {
@@ -55,11 +55,11 @@ self.addEventListener("push", (event) => {
   const { title, body, url } = data;
 
   event.waitUntil(
-    self.registration.showNotification(title || "Le Hive", {
+    self.registration.showNotification(title || "Shift", {
       body: body || "",
       icon: "/icons/icon-192.png",
       badge: "/icons/icon-192.png",
-      data: { url: url || "/ce-soir" },
+      data: { url: url || "/accueil" },
       vibrate: [200, 100, 200],
     })
   );
@@ -68,7 +68,7 @@ self.addEventListener("push", (event) => {
 // Notification click — open app at specified URL
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || "/ce-soir";
+  const url = event.notification.data?.url || "/accueil";
 
   event.waitUntil(
     self.clients.matchAll({ type: "window" }).then((clients) => {
