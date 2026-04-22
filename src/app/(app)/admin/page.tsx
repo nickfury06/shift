@@ -143,6 +143,26 @@ export default function AdminPage() {
         Admin
       </h1>
 
+      {/* ═══ Zero-state summary when nothing is pending ══════ */}
+      {absenceRequests.length === 0 && debriefs.length === 0 && (
+        <div className="card-light" style={{
+          padding: "14px 16px",
+          marginBottom: 24,
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          borderLeft: "3px solid var(--terra-medium)",
+        }}>
+          <Check size={18} style={{ color: "#8B5A40", flexShrink: 0 }} />
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>Rien n&apos;attend ta décision</div>
+            <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>
+              Les demandes d&apos;absence et debriefs du soir apparaîtront ici.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ═══ 1. ABSENCES EN ATTENTE ═══════════════════════ */}
       {absenceRequests.length > 0 && (
         <div style={{ marginBottom: 24 }}>

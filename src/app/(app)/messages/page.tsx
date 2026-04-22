@@ -8,7 +8,8 @@ import { createClient } from "@/lib/supabase/client";
 import { haptic } from "@/lib/haptics";
 import { getShiftDate, formatDateFr } from "@/lib/shift-utils";
 import type { ManagerMessage } from "@/lib/types";
-import { Send, Trash2 } from "lucide-react";
+import { Send, Trash2, MessageCircle } from "lucide-react";
+import EmptyState from "@/components/EmptyState";
 
 export default function MessagesPage() {
   const { profile, user } = useAuth();
@@ -211,9 +212,11 @@ export default function MessagesPage() {
             })}
 
             {messages.length === 0 && (
-              <div className="card-light" style={{ padding: 24, textAlign: "center" }}>
-                <p style={{ fontSize: 14, color: "var(--text-secondary)" }}>Aucun message — publie ton premier message pour l&apos;équipe</p>
-              </div>
+              <EmptyState
+                icon={<MessageCircle size={24} />}
+                title="Aucun message pour l'instant"
+                message="Partage une info, une alerte ou un rappel pour l'équipe du soir."
+              />
             )}
           </div>
         </div>

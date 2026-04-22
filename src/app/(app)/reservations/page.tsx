@@ -10,6 +10,7 @@ import { getShiftDate, formatDateFr, formatTime, getNow } from "@/lib/shift-util
 import { SEATING_LABELS, SEATING_ICONS, TYPE_LABELS, SOURCE_LABELS, SOURCE_ICONS } from "@/lib/constants";
 import type { Reservation, VenueTable, ReservationSeating, ReservationType, ReservationSource } from "@/lib/types";
 import type { Profile } from "@/lib/types";
+import EmptyState from "@/components/EmptyState";
 import { Plus, ChevronLeft, ChevronRight, Check, Trash2, X, Armchair, Phone, ChevronDown, Heart, ThumbsUp, ThumbsDown, List, Map } from "lucide-react";
 import FloorPlan from "@/components/FloorPlan";
 
@@ -464,10 +465,12 @@ export default function ReservationsPage() {
       )}
 
       {view === "list" && reservations.length === 0 && (
-        <div className="card-light" style={{ padding: 32, textAlign: "center" }}>
-          <Armchair size={28} style={{ color: "var(--text-tertiary)", margin: "0 auto 12px" }} />
-          <p style={{ fontSize: 14, color: "var(--text-secondary)" }}>Aucune réservation</p>
-        </div>
+        <EmptyState
+          icon={<Armchair size={24} />}
+          title="Aucune réservation ce jour"
+          message="Ajoute une résa quand un client appelle ou passe par Instagram."
+          action={{ label: "+ Nouvelle résa", onClick: () => setShowForm(true) }}
+        />
       )}
 
       {/* ── FORM MODAL ───────────────────────────────────── */}
