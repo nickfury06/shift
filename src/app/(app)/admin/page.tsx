@@ -11,7 +11,7 @@ import Link from "next/link";
 import {
   ThumbsUp, ThumbsDown, Calendar, MessageCircle, ListChecks,
   Users, Settings, ArrowRight, Repeat, UserX,
-  Send, Check, ChevronDown, AlertTriangle, Lightbulb, TrendingUp,
+  Send, Check, ChevronDown, AlertTriangle, Lightbulb,
 } from "lucide-react";
 
 const RATING_COLORS = ["", "#D44", "#D88", "#B89070", "#8B6A50", "#6B4A30"];
@@ -112,12 +112,6 @@ export default function AdminPage() {
       items: [
         { href: "/staff", label: "Comptes", icon: <Users size={20} />, tint: "rgba(139,90,64,0.1)", iconColor: "var(--terra-deep)" },
         { href: "/planning", label: "Planning", icon: <Calendar size={20} />, tint: "rgba(139,90,64,0.1)", iconColor: "var(--terra-deep)" },
-      ],
-    },
-    {
-      label: "Insights",
-      items: [
-        { href: "/analytics", label: "Analytics", icon: <TrendingUp size={20} />, tint: "rgba(196,120,90,0.08)", iconColor: "var(--terra-medium)" },
       ],
     },
     {

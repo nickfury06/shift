@@ -89,3 +89,52 @@ insert into public.tasks (title, note, zone, moment, assigned_to, days, priority
   ('Réorganiser la réserve', 'Ranger par catégorie', 'bar_reserve', 'service', '{}', '{"mardi","mercredi","jeudi","vendredi","samedi"}', 4, false, true),
   ('Nettoyer les vitres terrasse', null, 'terrasse', 'ouverture', '{}', '{"mardi","mercredi","jeudi","vendredi","samedi"}', 5, false, true);
 */
+
+-- ============================================================
+-- Onboarding docs (shown to every new non-patron on first login)
+-- Extras only see docs with for_extras = true
+-- ============================================================
+
+/*
+insert into public.onboarding_docs (title, content, category, required, for_extras, sort_order) values
+  (
+    'Règlement intérieur',
+    E'Bienvenue chez Le Hive !\n\nQuelques règles de base pour que tout se passe bien :\n\n• Arriver 10 min avant ta prise de service, en tenue\n• Téléphone dans la poche pendant le service — pas sur la table, pas derrière le bar\n• Pause : 15 min par shift de 6h, coordonne avec ton responsable\n• Pas d''alcool avant ou pendant le service\n• Fumer uniquement côté rue, jamais côté terrasse client\n• Respect entre collègues, respect des clients — zéro tolérance pour harcèlement ou propos discriminants\n\nEn cas de doute ou de conflit : parle au responsable du service en premier. Sinon, contacte directement Nicolas ou Sophie.',
+    'rules',
+    true,
+    true,
+    1
+  ),
+  (
+    'Tenue et présentation',
+    E'Tenue standard :\n• T-shirt ou chemise noir, propre, repassé\n• Pantalon noir ou jean foncé\n• Chaussures fermées, noires de préférence\n• Cheveux attachés si longs\n• Bijoux discrets uniquement\n\nTablier fourni sur place.\n\nLe vestiaire est à l''arrière — laisse tes affaires en sécurité dans un casier.',
+    'uniform',
+    true,
+    true,
+    2
+  ),
+  (
+    'Sécurité et premiers secours',
+    E'Numéros d''urgence :\n• SAMU : 15\n• Pompiers : 18\n• Police : 17\n• Numéro unique européen : 112\n\nDans l''établissement :\n• Trousse de premiers secours : derrière le bar, étagère du haut\n• Extincteur : près de la porte de la réserve et en cuisine\n• Issues de secours : porte de derrière, sortie terrasse\n\nEn cas d''incident (blessure, malaise client, bagarre) : préviens immédiatement le responsable, puis appelle les secours si nécessaire. N''interviens jamais seul sur un conflit physique.',
+    'safety',
+    true,
+    true,
+    3
+  ),
+  (
+    'Utilisation de la caisse (POS)',
+    E'Formation POS à faire avec Benjamin ou le responsable en service avant ta première prise en autonomie.\n\nPoints clés :\n• Chaque ticket = un client ou une table\n• Pas de cumul de plusieurs tables sur un même ticket\n• Offrir/remise : doit être validé par le responsable\n• Fin de service : clôturer ta caisse, compter le fond, signer le bordereau\n\nEn cas d''erreur : ne panique pas, appelle le responsable.',
+    'pos',
+    false,
+    false,
+    4
+  ),
+  (
+    'Contrat de travail',
+    E'Ton contrat est à signer avec Nicolas (ou envoyé par email via signature électronique).\n\nDocuments requis avant ta première paie :\n• Pièce d''identité\n• RIB\n• Justificatif de domicile (moins de 3 mois)\n• Copie carte vitale (numéro SS)\n• Autorisation de travail si applicable\n\nEnvoie ces documents à lehivebar@gmail.com ou remets-les en main propre.',
+    'contract',
+    true,
+    false,
+    5
+  );
+*/
