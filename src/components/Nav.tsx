@@ -39,12 +39,17 @@ export default function Nav() {
   const role = profile?.role;
 
   useEffect(() => {
-    if (role !== "patron") return;
+    const canSeeFnFBadge = role === "patron" || role === "responsable";
+    if (role !== "patron" && !canSeeFnFBadge) return;
 
     async function fetchCounts() {
       const [abs, fnf] = await Promise.all([
-        supabase.from("availability_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
-        supabase.from("reservations").select("id", { count: "exact", head: true }).eq("fnf_status", "pending"),
+        role === "patron"
+          ? supabase.from("availability_requests").select("id", { count: "exact", head: true }).eq("status", "pending")
+          : Promise.resolve({ count: 0 }),
+        canSeeFnFBadge
+          ? supabase.from("reservations").select("id", { count: "exact", head: true }).eq("fnf_status", "pending")
+          : Promise.resolve({ count: 0 }),
       ]);
       setPendingAbsences(abs.count || 0);
       setPendingFnF(fnf.count || 0);
@@ -86,7 +91,7 @@ export default function Nav() {
         { href: "/accueil", label: "Accueil", icon: <Home size={iconSize} strokeWidth={strokeWidth} /> },
         { href: "/planning", label: "Planning", icon: <Calendar size={iconSize} strokeWidth={strokeWidth} /> },
         { href: "/stocks", label: "Stocks", icon: <Package size={iconSize} strokeWidth={strokeWidth} /> },
-        { href: "/reservations", label: "Résas", icon: <BookOpen size={iconSize} strokeWidth={strokeWidth} /> },
+        { href: "/reservations", label: "Résas", icon: <BookOpen size={iconSize} strokeWidth={strokeWidth} />, badge: pendingFnF },
         { href: "/debrief", label: "Debrief", icon: <PenLine size={iconSize} strokeWidth={strokeWidth} /> },
       ];
     }

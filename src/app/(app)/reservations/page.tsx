@@ -29,6 +29,7 @@ export default function ReservationsPage() {
   const [view, setView] = useState<"list" | "plan">("list");
   const [profileMap, setProfileMap] = useState<Record<string, string>>({});
   const isPatron = profile?.role === "patron";
+  const canApproveFnF = profile?.role === "patron" || profile?.role === "responsable";
 
   // Form
   const [name, setName] = useState("");
@@ -377,8 +378,8 @@ export default function ReservationsPage() {
                       }}>
                         F&F {resa.fnf_status === "pending" ? `— ${profileMap[resa.fnf_requested_by!] || "Staff"}` : resa.fnf_status === "accepted" ? "accepté" : "refusé"}
                       </span>
-                      {/* Patron: approve/refuse buttons */}
-                      {isPatron && resa.fnf_status === "pending" && (
+                      {/* Patron or responsable: approve/refuse buttons */}
+                      {canApproveFnF && resa.fnf_status === "pending" && (
                         <>
                           <button
                             onClick={(e) => { e.stopPropagation(); respondFnF(resa.id, "accepted"); }}
@@ -395,7 +396,7 @@ export default function ReservationsPage() {
                         </>
                       )}
                       {/* Staff can cancel their own pending request */}
-                      {!isPatron && resa.fnf_status === "pending" && resa.fnf_requested_by === user?.id && (
+                      {!canApproveFnF && resa.fnf_status === "pending" && resa.fnf_requested_by === user?.id && (
                         <button
                           onClick={(e) => { e.stopPropagation(); cancelFnF(resa.id); }}
                           style={{ background: "none", border: "none", cursor: "pointer", padding: 2, marginLeft: 2 }}

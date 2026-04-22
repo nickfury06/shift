@@ -24,20 +24,31 @@ const CATEGORY_ORDER: StockCategory[] = [
 ];
 
 // France Boissons deadlines
-function getNextDeadline(): { label: string; urgent: boolean } {
+function getNextDeadline(): { label: string; urgent: boolean; minutesLeft: number | null } {
   const now = getNow();
   const day = now.getDay(); // 0=sun 1=mon 2=tue 3=wed 4=thu 5=fri 6=sat
   const hour = now.getHours();
+  const minute = now.getMinutes();
+
+  const minutesUntil11 = (11 - hour) * 60 - minute;
 
   // Tue before 11h → deadline today
-  if (day === 2 && hour < 11) return { label: "Aujourd'hui 11h → livré mercredi", urgent: true };
+  if (day === 2 && hour < 11) return { label: "Aujourd'hui 11h → livré mercredi", urgent: true, minutesLeft: minutesUntil11 };
   // Thu before 11h → deadline today
-  if (day === 4 && hour < 11) return { label: "Aujourd'hui 11h → livré vendredi", urgent: true };
+  if (day === 4 && hour < 11) return { label: "Aujourd'hui 11h → livré vendredi", urgent: true, minutesLeft: minutesUntil11 };
   // After tue 11h, before thu 11h → next is thursday
   if ((day === 2 && hour >= 11) || day === 3 || (day === 4 && hour < 11))
-    return { label: "Jeudi 11h → livré vendredi", urgent: day === 3 };
+    return { label: "Jeudi 11h → livré vendredi", urgent: day === 3, minutesLeft: null };
   // After thu 11h through monday → next is tuesday
-  return { label: "Mardi 11h → livré mercredi", urgent: day === 1 };
+  return { label: "Mardi 11h → livré mercredi", urgent: day === 1, minutesLeft: null };
+}
+
+function formatMinutesLeft(m: number): string {
+  if (m <= 0) return "maintenant";
+  if (m < 60) return `dans ${m} min`;
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  return rem === 0 ? `dans ${h}h` : `dans ${h}h${String(rem).padStart(2, "0")}`;
 }
 
 type View = "signal" | "inventaire" | "commande";
@@ -92,6 +103,7 @@ export default function StocksPage() {
 
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>("signal");
+  const [didAutoSwitchToCommande, setDidAutoSwitchToCommande] = useState(false);
   const [products, setProducts] = useState<StockProduct[]>([]);
   const [orders, setOrders] = useState<StockOrder[]>([]);
   const [alerts, setAlerts] = useState<StockAlert[]>([]);
@@ -130,6 +142,16 @@ export default function StocksPage() {
   }, [supabase]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Auto-switch managers to Commande view when inside France Boissons deadline window (Tue/Thu before 11h)
+  useEffect(() => {
+    if (!isManager || didAutoSwitchToCommande) return;
+    const { minutesLeft } = getNextDeadline();
+    if (minutesLeft !== null && minutesLeft > 0) {
+      setView("commande");
+      setDidAutoSwitchToCommande(true);
+    }
+  }, [isManager, didAutoSwitchToCommande]);
 
   useEffect(() => {
     const ch = supabase.channel("stocks-rt")
@@ -234,6 +256,38 @@ export default function StocksPage() {
       <h1 style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-primary)", marginBottom: 16 }}>
         Stocks
       </h1>
+
+      {/* ── France Boissons deadline banner (Tue/Thu before 11h, managers) ── */}
+      {isManager && deadline.minutesLeft !== null && deadline.minutesLeft > 0 && (
+        <button
+          onClick={() => setView("commande")}
+          style={{
+            width: "100%", display: "flex", alignItems: "center", gap: 12,
+            padding: "12px 14px", marginBottom: 16, borderRadius: 14,
+            background: deadline.minutesLeft <= 30 ? "rgba(200,60,60,0.08)" : "rgba(212,160,74,0.08)",
+            border: `1px solid ${deadline.minutesLeft <= 30 ? "rgba(200,60,60,0.25)" : "rgba(212,160,74,0.25)"}`,
+            cursor: "pointer",
+            textAlign: "left",
+          }}
+        >
+          <Clock size={18} style={{ color: deadline.minutesLeft <= 30 ? "var(--danger)" : "var(--warning)", flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
+              Commande France Boissons — deadline 11h ({formatMinutesLeft(deadline.minutesLeft)})
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>
+              {deadline.label}
+            </div>
+          </div>
+          <span style={{
+            fontSize: 11, fontWeight: 600, color: "#fff",
+            background: deadline.minutesLeft <= 30 ? "var(--danger)" : "var(--warning)",
+            padding: "4px 10px", borderRadius: 8, flexShrink: 0,
+          }}>
+            Préparer
+          </span>
+        </button>
+      )}
 
       {/* ── Tabs (manager only sees all 3) ───────────────── */}
       {isManager ? (
