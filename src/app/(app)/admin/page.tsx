@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { createClient } from "@/lib/supabase/client";
+import { haptic } from "@/lib/haptics";
 import { getShiftDate, formatDateFr } from "@/lib/shift-utils";
 import type { AvailabilityRequest, Profile, Debrief } from "@/lib/types";
 import Link from "next/link";
@@ -68,8 +69,9 @@ export default function AdminPage() {
   }
 
   async function respondAbsence(id: string, status: "accepted" | "refused") {
+    haptic(status === "accepted" ? "success" : "medium");
     const { error } = await supabase.from("availability_requests").update({ status }).eq("id", id);
-    if (error) { toast.error("Erreur, réessaie"); return; }
+    if (error) { toast.error("Erreur, réessaie"); haptic("error"); return; }
     if (status === "accepted") {
       const req = absenceRequests.find((r) => r.id === id);
       if (req) {
@@ -89,7 +91,8 @@ export default function AdminPage() {
       created_by: user.id,
     });
     setMsgSending(false);
-    if (error) { toast.error("Erreur, réessaie"); return; }
+    if (error) { toast.error("Erreur, réessaie"); haptic("error"); return; }
+    haptic("success");
     setMsgContent("");
     setMsgSent(true);
     toast.success("Message envoyé");

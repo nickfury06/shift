@@ -22,6 +22,7 @@ import type {
 import MessageBanner from "@/components/MessageBanner";
 import MomentSection from "@/components/MomentSection";
 import Link from "next/link";
+import { haptic } from "@/lib/haptics";
 import { Users, Bell, Search, X, ChevronDown, BookOpen, Check } from "lucide-react";
 
 interface MergedTask {
@@ -208,7 +209,8 @@ export default function AccueilPage() {
     if (!profile) return;
     const p = stockProducts.find((x) => x.id === productId);
     const { error } = await supabase.from("stock_alerts").insert({ product_id: productId, message: `${p?.name} est bas`, created_by: profile.id });
-    if (error) { toast.error("Erreur, réessaie"); return; }
+    if (error) { toast.error("Erreur, réessaie"); haptic("error"); return; }
+    haptic("warning");
     toast.success(`${p?.name} signalé`);
     // Remember this product in user's recents
     setRecentSignals((prev) => {
@@ -231,6 +233,8 @@ export default function AccueilPage() {
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
 
+    haptic(completed ? "success" : "light");
+
     if (task.isOneOff) {
       await supabase.from("one_off_tasks").update({ completed }).eq("id", taskId);
     } else {
@@ -247,11 +251,13 @@ export default function AccueilPage() {
   // ── Mark reservation arrived (quick action from Accueil) ─
   async function markResaArrived(resaId: string) {
     if (!profile) return;
+    haptic("success");
     // Optimistic
     setReservations((prev) => prev.map((r) => r.id === resaId ? { ...r, status: "arrive", arrived_by: profile.id } : r));
     const { error } = await supabase.from("reservations").update({ status: "arrive", arrived_by: profile.id }).eq("id", resaId);
     if (error) {
       toast.error("Erreur, réessaie");
+      haptic("error");
       setReservations((prev) => prev.map((r) => r.id === resaId ? { ...r, status: "attendu", arrived_by: null } : r));
       return;
     }
@@ -299,7 +305,7 @@ export default function AccueilPage() {
   }
 
   return (
-    <div style={{ padding: "0 20px", paddingTop: "env(safe-area-inset-top, 16px)", paddingBottom: 96, maxWidth: 512, margin: "0 auto" }}>
+    <div style={{ padding: "0 20px", paddingBottom: 96, maxWidth: 512, margin: "0 auto" }}>
 
       {/* ── Header ──────────────────────────────────────────── */}
       <div style={{ padding: "16px 0 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>

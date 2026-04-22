@@ -5,6 +5,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/Confirm";
 import { createClient } from "@/lib/supabase/client";
+import { haptic } from "@/lib/haptics";
 import { getShiftDate, formatDateFr, formatTime, getNow } from "@/lib/shift-utils";
 import { SEATING_LABELS, SEATING_ICONS, TYPE_LABELS, SOURCE_LABELS, SOURCE_ICONS } from "@/lib/constants";
 import type { Reservation, VenueTable, ReservationSeating, ReservationType, ReservationSource } from "@/lib/types";
@@ -185,7 +186,10 @@ export default function ReservationsPage() {
   }
 
   async function respondFnF(resaId: string, status: "accepted" | "refused") {
-    await supabase.from("reservations").update({ fnf_status: status }).eq("id", resaId);
+    haptic(status === "accepted" ? "success" : "medium");
+    const { error } = await supabase.from("reservations").update({ fnf_status: status }).eq("id", resaId);
+    if (error) { toast.error("Erreur, réessaie"); haptic("error"); return; }
+    toast.success(status === "accepted" ? "F&F accepté" : "F&F refusé");
     fetchData();
   }
 

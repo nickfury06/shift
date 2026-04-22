@@ -142,7 +142,7 @@ export default function Nav() {
         <div
           style={{
             position: "fixed",
-            bottom: 80,
+            bottom: "calc(env(safe-area-inset-bottom, 0px) + 80px)",
             left: 0,
             right: 0,
             zIndex: 50,
@@ -238,11 +238,11 @@ export default function Nav() {
         </div>
       )}
 
-      {/* Bottom nav bar */}
+      {/* Bottom nav bar — respects iOS home bar safe area */}
       <nav
         style={{
           position: "fixed",
-          bottom: 12,
+          bottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)",
           left: 20,
           right: 20,
           zIndex: 40,

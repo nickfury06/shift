@@ -5,6 +5,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/Confirm";
 import { createClient } from "@/lib/supabase/client";
+import { haptic } from "@/lib/haptics";
 import { getShiftDate, formatDateFr } from "@/lib/shift-utils";
 import type { ManagerMessage } from "@/lib/types";
 import { Send, Trash2 } from "lucide-react";
@@ -50,7 +51,8 @@ export default function MessagesPage() {
       created_by: user.id,
     });
     setSending(false);
-    if (error) { toast.error("Erreur, réessaie"); return; }
+    if (error) { toast.error("Erreur, réessaie"); haptic("error"); return; }
+    haptic("success");
     toast.success("Message envoyé");
     setContent("");
     fetchMessages();

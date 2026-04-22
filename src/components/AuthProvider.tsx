@@ -77,6 +77,16 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     await supabaseRef.current.auth.signOut();
     setUser(null);
     setProfile(null);
+    // Clear per-user client cache so next sign-in starts clean.
+    if (typeof window !== "undefined") {
+      try {
+        Object.keys(localStorage)
+          .filter((k) => k.startsWith("shift-"))
+          .forEach((k) => localStorage.removeItem(k));
+      } catch {
+        // ignore
+      }
+    }
   }
 
   return (

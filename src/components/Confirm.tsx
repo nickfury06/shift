@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
+import { haptic } from "@/lib/haptics";
 
 interface ConfirmOptions {
   title: string;
@@ -35,6 +36,7 @@ export default function ConfirmProvider({ children }: { children: ReactNode }) {
   }, []);
 
   function handleClose(result: boolean) {
+    if (result) haptic(pending?.variant === "danger" ? "warning" : "medium");
     if (pending) pending.resolve(result);
     setPending(null);
   }

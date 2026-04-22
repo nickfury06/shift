@@ -10,7 +10,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <ToastProvider>
         <ConfirmProvider>
           <OnboardingGuard>
-            <main className="flex-1 pb-28">{children}</main>
+            <main
+              className="flex-1 pb-28"
+              style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+            >
+              {children}
+            </main>
             <Nav />
           </OnboardingGuard>
         </ConfirmProvider>
