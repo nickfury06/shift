@@ -34,6 +34,7 @@ interface MergedTask {
   moment: Moment;
   isOneOff: boolean;
   isLibre?: boolean;
+  assignedTo: string[];
 }
 
 export default function AccueilPage() {
@@ -73,6 +74,17 @@ export default function AccueilPage() {
   const [stockSearch, setStockSearch] = useState("");
   const [showStockSignal, setShowStockSignal] = useState(false);
   const [alertsExpanded, setAlertsExpanded] = useState(false);
+  const [expandedResaId, setExpandedResaId] = useState<string | null>(null);
+  const [taskFilter, setTaskFilter] = useState<"mine" | "all">(() => {
+    if (typeof window === "undefined") return "all";
+    const stored = localStorage.getItem("shift-task-filter");
+    if (stored === "mine" || stored === "all") return stored;
+    return "all";
+  });
+  function switchTaskFilter(next: "mine" | "all") {
+    setTaskFilter(next);
+    localStorage.setItem("shift-task-filter", next);
+  }
 
   const shiftDate = getShiftDate();
   const shiftDay = getShiftDay();
@@ -120,16 +132,18 @@ export default function AccueilPage() {
       id: t.id, title: t.title, zone: ZONE_LABELS[t.zone] || t.zone,
       zoneKey: t.zone, description: t.note, completed: completedIds.has(t.id),
       moment: t.moment, isOneOff: false, isLibre: t.is_libre,
+      assignedTo: t.assigned_to || [],
     }));
 
     const oneOff: MergedTask[] = ((oneOffRes.data as OneOffTask[]) || []).map((t) => ({
       id: t.id, title: t.title, zone: ZONE_LABELS[t.zone] || t.zone,
       zoneKey: t.zone, description: t.note, completed: completedIds.has(t.id),
-      moment: t.moment, isOneOff: true,
+      moment: t.moment, isOneOff: true, isLibre: t.is_libre,
+      assignedTo: t.assigned_to || [],
     }));
 
     const allTasks = [...recurring, ...oneOff];
-    setTasks(allTasks.filter((t) => !t.isLibre));
+    setTasks(allTasks);
     setLoading(false);
   }, [profile, supabase, shiftDate, shiftDay]);
 
@@ -528,37 +542,79 @@ export default function AccueilPage() {
               const rm = resaToMins(r.time);
               const overdue = nowMins - rm;
               const isLate = overdue > 0;
+              const isExpanded = expandedResaId === r.id;
+              const hasDetails = r.notes || r.phone || r.source;
               return (
                 <div key={r.id} className="card-light" style={{
-                  padding: "10px 12px 10px 14px",
-                  display: "flex", alignItems: "center", gap: 10,
+                  overflow: "hidden",
                   borderLeft: isLate && overdue >= 15 ? "3px solid var(--danger)" : isLate ? "3px solid var(--warning)" : "3px solid var(--terra-medium)",
                 }}>
-                  <div style={{ minWidth: 46, fontSize: 14, fontWeight: 700, color: "#8B5A40" }}>
-                    {r.time.slice(0, 5).replace(":", "h")}
+                  <div style={{ padding: "10px 12px 10px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+                    <button
+                      onClick={() => hasDetails && setExpandedResaId(isExpanded ? null : r.id)}
+                      disabled={!hasDetails}
+                      style={{
+                        flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 10,
+                        background: "none", border: "none", padding: 0, textAlign: "left",
+                        cursor: hasDetails ? "pointer" : "default",
+                      }}
+                    >
+                      <div style={{ minWidth: 46, fontSize: 14, fontWeight: 700, color: "#8B5A40" }}>
+                        {r.time.slice(0, 5).replace(":", "h")}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {r.name}
+                        </div>
+                        <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                          {r.covers} pers.
+                          {r.table_id && ` · T.${r.table_id}`}
+                          {isLate && overdue >= 15 && ` · 🔔 ${overdue}min retard`}
+                        </div>
+                      </div>
+                      {hasDetails && (
+                        <ChevronDown size={14} style={{
+                          color: "var(--text-tertiary)", flexShrink: 0,
+                          transform: isExpanded ? "rotate(180deg)" : "rotate(0)",
+                          transition: "transform 0.2s",
+                        }} />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => markResaArrived(r.id)}
+                      style={{
+                        width: 36, height: 36, borderRadius: "50%",
+                        border: "2px solid #8B5A40", background: "transparent",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        cursor: "pointer", padding: 0, flexShrink: 0,
+                      }}
+                      aria-label="Marquer arrivé"
+                    >
+                      <Check size={16} strokeWidth={2.5} style={{ color: "rgba(139,90,64,0.55)" }} />
+                    </button>
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {r.name}
+                  {isExpanded && hasDetails && (
+                    <div style={{
+                      padding: "0 14px 12px 70px",
+                      display: "flex", flexDirection: "column", gap: 6,
+                      fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5,
+                    }}>
+                      {r.source && (
+                        <div>
+                          <span style={{ color: "var(--text-tertiary)", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Source</span>
+                          <span style={{ marginLeft: 8 }}>{r.source}</span>
+                        </div>
+                      )}
+                      {r.phone && (
+                        <div>
+                          <a href={`tel:${r.phone}`} style={{ color: "var(--terra-medium)", textDecoration: "none", fontWeight: 500 }}>{r.phone}</a>
+                        </div>
+                      )}
+                      {r.notes && (
+                        <div style={{ whiteSpace: "pre-wrap" }}>{r.notes}</div>
+                      )}
                     </div>
-                    <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-                      {r.covers} pers.
-                      {r.table_id && ` · T.${r.table_id}`}
-                      {isLate && overdue >= 15 && ` · 🔔 ${overdue}min retard`}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => markResaArrived(r.id)}
-                    style={{
-                      width: 36, height: 36, borderRadius: "50%",
-                      border: "2px solid #8B5A40", background: "transparent",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      cursor: "pointer", padding: 0, flexShrink: 0,
-                    }}
-                    aria-label="Marquer arrivé"
-                  >
-                    <Check size={16} strokeWidth={2.5} style={{ color: "rgba(139,90,64,0.55)" }} />
-                  </button>
+                  )}
                 </div>
               );
             })}
@@ -761,9 +817,43 @@ export default function AccueilPage() {
         );
       })()}
 
+      {/* ── Task filter toggle (mes tâches / toutes) ────────── */}
+      {tasks.length > 0 && profile?.role !== "patron" && (() => {
+        const mineCount = tasks.filter((t) => t.assignedTo.includes(profile?.id || "") || t.isLibre).length;
+        if (mineCount === 0) return null;
+        return (
+          <div style={{ display: "flex", gap: 4, marginBottom: 12, background: "var(--secondary-bg)", borderRadius: 12, padding: 4 }}>
+            {([
+              { key: "mine" as const, label: `Mes tâches (${mineCount})` },
+              { key: "all" as const, label: `Équipe (${tasks.length})` },
+            ]).map((t) => (
+              <button
+                key={t.key}
+                onClick={() => switchTaskFilter(t.key)}
+                style={{
+                  flex: 1, borderRadius: 8, padding: "8px 0", border: "none", cursor: "pointer",
+                  fontSize: 13, fontWeight: 500,
+                  background: taskFilter === t.key ? "var(--card-bg)" : "transparent",
+                  color: taskFilter === t.key ? "var(--text-primary)" : "var(--text-tertiary)",
+                  boxShadow: taskFilter === t.key ? "var(--shadow-light)" : "none",
+                  transition: "all 0.15s",
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        );
+      })()}
+
       {/* ── Tasks by moment (auto-collapse finished) ────────── */}
       {MOMENT_ORDER.map((moment, idx) => {
-        const momentTasks = tasks.filter((t) => t.moment === moment);
+        const momentTasks = tasks
+          .filter((t) => t.moment === moment)
+          .filter((t) => {
+            if (taskFilter === "all" || profile?.role === "patron") return true;
+            return t.assignedTo.includes(profile?.id || "") || t.isLibre;
+          });
         if (momentTasks.length === 0 && moment !== "fermeture") return null;
         const done = momentTasks.filter((t) => t.completed).length;
         const allDone = momentTasks.length > 0 && done === momentTasks.length;

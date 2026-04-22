@@ -104,8 +104,12 @@ export default function Nav() {
   }
 
   // ── "More" menu — guide + profile for everyone, extras for patron ───────────────
+  const isPermanentStaff = role === "staff" && profile?.employment_type !== "extra";
   const moreItems: NavItem[] = [
     { href: "/messages", label: "Messages équipe", icon: <MessageCircle size={iconSize} strokeWidth={strokeWidth} /> },
+    ...(isPermanentStaff
+      ? [{ href: "/stocks", label: "Stocks (consulter)", icon: <Package size={iconSize} strokeWidth={strokeWidth} /> }]
+      : []),
     { href: "/guide", label: "Guide du lieu", icon: <HelpCircle size={iconSize} strokeWidth={strokeWidth} /> },
     { href: "/profile", label: "Mon profil", icon: <User size={iconSize} strokeWidth={strokeWidth} /> },
     ...(role === "patron"
