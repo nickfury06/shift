@@ -301,34 +301,80 @@
     }
   }
 
-  /* ── Desktop ergonomics (≥ 900px) ─────────────────────────
-     The app is mobile-first — every page wraps content in
-     `.max-w-lg.mx-auto` (or an inline maxWidth:512 centered) and
-     applies tight horizontal padding meant for a 375px phone viewport.
-     On desktop that looks like a tiny column floating in whitespace.
-     Expand the outer wrapper so content breathes, but keep card/form
-     internals as designed. Modals are styled with inline maxWidth
-     inside fixed overlays and are not affected. */
+  /* ── App shell ─────────────────────────────────────────────
+     The outer wrapper around DesktopNav + main content. On mobile it's
+     a plain block (main fills width, bottom nav is separate position:
+     fixed pill). On desktop it becomes a flex row with the sidebar. */
+  .app-shell {
+    display: block;
+    min-height: 100dvh;
+    width: 100%;
+  }
+
+  /* ── Desktop sidebar (hidden on mobile) ──────────────────── */
+  .desktop-nav { display: none; }
+
+  /* ── Desktop ergonomics (≥ 900px) ───────────────────────── */
   @media (min-width: 900px) {
-    /* All page wrappers using Tailwind's max-w-lg inside the app shell */
-    main.flex-1 .max-w-lg.mx-auto,
-    main.flex-1 [style*="max-width: 512"][style*="margin:"],
-    main.flex-1 .page-shell {
-      max-width: min(1400px, 100%) !important;
+    /* Shell becomes a two-column flex: sidebar + content */
+    .app-shell {
+      display: flex;
+      align-items: stretch;
+    }
+
+    /* Show sidebar */
+    .desktop-nav {
+      display: block;
+      flex: 0 0 244px;
+      width: 244px;
+      border-right: 1px solid var(--card-border);
+      background: var(--card-bg);
+      position: sticky;
+      top: 0;
+      align-self: flex-start;
+      height: 100dvh;
+    }
+    .desktop-nav-inner {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    /* Main content eats remaining width, no longer needs space for
+       bottom nav (it's hidden on desktop) */
+    .app-main {
+      flex: 1 1 auto;
+      min-width: 0; /* allow children to shrink */
+      padding-bottom: 48px !important;
+    }
+
+    /* Hide the mobile bottom pill nav on desktop */
+    body > nav,
+    main ~ nav,
+    .app-shell + nav,
+    nav[style*="position: fixed"][style*="bottom:"] {
+      display: none !important;
+    }
+
+    /* Page wrappers expand to use desktop width */
+    main.app-main .max-w-lg.mx-auto,
+    main.app-main [style*="max-width: 512"][style*="margin:"],
+    main.app-main .page-shell {
+      max-width: min(1200px, 100%) !important;
       padding-left: 32px !important;
       padding-right: 32px !important;
     }
-    /* Heading + reading width remains comfortable (don't blow out lines
-       of paragraph text). Constrain content-dense first-level children. */
-    main.flex-1 .max-w-lg.mx-auto > h1 {
+
+    /* Heading + reading width stays comfortable */
+    main.app-main .max-w-lg.mx-auto > h1 {
       font-size: 22px;
     }
   }
 
   /* ── Extra-wide (≥ 1400px) ───────────────────────────────── */
   @media (min-width: 1400px) {
-    main.flex-1 .max-w-lg.mx-auto,
-    main.flex-1 .page-shell {
+    main.app-main .max-w-lg.mx-auto,
+    main.app-main .page-shell {
       padding-left: 48px !important;
       padding-right: 48px !important;
     }
