@@ -23,7 +23,7 @@ import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/Confirm";
 import { createClient } from "@/lib/supabase/client";
 import type { VenueTable, VenueSpace, Reservation } from "@/lib/types";
-import { Plus, Pencil, Check, Trash2, X as XIcon, Move, Table2, ChevronDown } from "lucide-react";
+import { Plus, Pencil, Check, Trash2, X as XIcon, Move, Table2, ChevronDown, Image as ImageIcon, Upload } from "lucide-react";
 import { haptic } from "@/lib/haptics";
 
 interface FloorPlanProps {
@@ -79,6 +79,12 @@ export default function FloorPlan({ tables, reservations = [], onTableTap, onTab
   const [newTableSpaceId, setNewTableSpaceId] = useState<string | null>(null);
   const [savingTable, setSavingTable] = useState(false);
 
+  // Background template image (patron-uploaded tracing guide)
+  const [bgImageUrl, setBgImageUrl] = useState<string | null>(null);
+  const [bgOpacity, setBgOpacity] = useState(0.4);
+  const [uploadingBg, setUploadingBg] = useState(false);
+  const bgInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => { setLocalTables(tables); }, [tables]);
 
   // ── Load spaces ────────────────────────────────────────────
@@ -88,6 +94,70 @@ export default function FloorPlan({ tables, reservations = [], onTableTap, onTab
   }, [supabase]);
 
   useEffect(() => { fetchSpaces(); }, [fetchSpaces]);
+
+  // ── Load background image settings ─────────────────────────
+  const fetchBgSettings = useCallback(async () => {
+    const { data } = await supabase
+      .from("settings")
+      .select("key, value")
+      .in("key", ["floor_plan_image_url", "floor_plan_image_opacity"]);
+    const map: Record<string, string> = {};
+    ((data as { key: string; value: string }[]) || []).forEach((s) => { map[s.key] = s.value; });
+    setBgImageUrl(map.floor_plan_image_url || null);
+    if (map.floor_plan_image_opacity) {
+      const n = parseFloat(map.floor_plan_image_opacity);
+      if (!Number.isNaN(n)) setBgOpacity(n);
+    }
+  }, [supabase]);
+
+  useEffect(() => { fetchBgSettings(); }, [fetchBgSettings]);
+
+  // ── Background image mutations ─────────────────────────────
+  async function handleBgUpload(file: File) {
+    if (!file.type.startsWith("image/")) { toast.error("Fichier image uniquement"); return; }
+    if (file.size > 8 * 1024 * 1024) { toast.error("Image trop grande (max 8 Mo)"); return; }
+    setUploadingBg(true);
+    // Overwrite the same object each time so old versions don't pile up.
+    const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    const path = `floor-plan.${ext}`;
+    const { error: upErr } = await supabase.storage
+      .from("venue-assets")
+      .upload(path, file, { upsert: true, contentType: file.type });
+    if (upErr) {
+      setUploadingBg(false);
+      toast.error("Upload échoué");
+      haptic("error");
+      return;
+    }
+    const { data: urlData } = supabase.storage.from("venue-assets").getPublicUrl(path);
+    // Append a cache-buster so old versions don't linger on other devices
+    const url = `${urlData.publicUrl}?v=${Date.now()}`;
+    await supabase.from("settings").upsert({ key: "floor_plan_image_url", value: url, updated_at: new Date().toISOString() });
+    setBgImageUrl(url);
+    setUploadingBg(false);
+    haptic("success");
+    toast.success("Image importée");
+  }
+
+  async function handleBgRemove() {
+    const ok = await confirm({
+      title: "Supprimer l'image de fond ?",
+      variant: "danger",
+      confirmLabel: "Supprimer",
+    });
+    if (!ok) return;
+    haptic("warning");
+    // Best-effort: remove known extensions (we don't track which was uploaded)
+    await supabase.storage.from("venue-assets").remove(["floor-plan.jpg", "floor-plan.jpeg", "floor-plan.png", "floor-plan.webp"]);
+    await supabase.from("settings").delete().eq("key", "floor_plan_image_url");
+    setBgImageUrl(null);
+    toast.success("Image supprimée");
+  }
+
+  async function handleBgOpacityChange(next: number) {
+    setBgOpacity(next);
+    await supabase.from("settings").upsert({ key: "floor_plan_image_opacity", value: String(next), updated_at: new Date().toISOString() });
+  }
 
   // ── Helpers ────────────────────────────────────────────────
   const bookedTableIds = new Set(
@@ -362,6 +432,32 @@ export default function FloorPlan({ tables, reservations = [], onTableTap, onTab
             >
               <Table2 size={12} /> Tables
             </button>
+            <button
+              onClick={() => bgInputRef.current?.click()}
+              disabled={uploadingBg}
+              style={{
+                display: "flex", alignItems: "center", gap: 4,
+                padding: "6px 10px", borderRadius: 8,
+                background: "var(--secondary-bg)",
+                color: "var(--text-secondary)",
+                border: "none", cursor: uploadingBg ? "default" : "pointer",
+                fontSize: 12, fontWeight: 500,
+                opacity: uploadingBg ? 0.6 : 1,
+              }}
+            >
+              <ImageIcon size={12} /> {bgImageUrl ? "Remplacer image" : "Image de fond"}
+            </button>
+            <input
+              ref={bgInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/jpg,image/webp"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleBgUpload(f);
+                e.target.value = "";
+              }}
+            />
           </div>
         )}
       </div>
@@ -389,6 +485,20 @@ export default function FloorPlan({ tables, reservations = [], onTableTap, onTab
           onPointerLeave={onPointerUp}
           style={{ display: "block" }}
         >
+          {/* Background template image (patron-uploaded tracing guide) */}
+          {bgImageUrl && (
+            <image
+              href={bgImageUrl}
+              x={0}
+              y={0}
+              width={VIEWBOX_W}
+              height={VIEWBOX_H}
+              preserveAspectRatio="xMidYMid meet"
+              opacity={bgOpacity}
+              style={{ pointerEvents: "none" }}
+            />
+          )}
+
           {/* Grid background (edit mode only — visual aid) */}
           {editing && (
             <g opacity={0.15}>
@@ -580,6 +690,49 @@ export default function FloorPlan({ tables, reservations = [], onTableTap, onTab
           <Move size={11} style={{ display: "inline", marginRight: 4 }} />
           Glisse les espaces et les tables. Touche le coin d&apos;un espace pour redimensionner.
         </p>
+      )}
+
+      {/* Background image controls (edit mode, only when an image is loaded) */}
+      {editing && bgImageUrl && (
+        <div
+          className="card-light"
+          style={{ marginTop: 12, padding: 12, display: "flex", flexDirection: "column", gap: 10 }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <ImageIcon size={14} style={{ color: "var(--terra-medium)" }} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", flex: 1 }}>Image de fond</span>
+            <button
+              onClick={handleBgRemove}
+              aria-label="Supprimer"
+              style={{
+                width: 32, height: 32, borderRadius: 8,
+                background: "rgba(192,122,122,0.1)", border: "none", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+            >
+              <Trash2 size={14} style={{ color: "var(--danger)" }} />
+            </button>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <span style={{ fontSize: 12, color: "var(--text-tertiary)", minWidth: 60 }}>Opacité</span>
+            <input
+              type="range"
+              min={0.1}
+              max={1}
+              step={0.05}
+              value={bgOpacity}
+              onChange={(e) => handleBgOpacityChange(parseFloat(e.target.value))}
+              style={{ flex: 1, accentColor: "var(--terra-medium)" }}
+            />
+            <span style={{ fontSize: 11, color: "var(--text-tertiary)", minWidth: 36, textAlign: "right" }}>
+              {Math.round(bgOpacity * 100)}%
+            </span>
+          </div>
+          <p style={{ fontSize: 11, color: "var(--text-tertiary)", lineHeight: 1.4 }}>
+            <Upload size={10} style={{ display: "inline", marginRight: 4 }} />
+            L&apos;image sert de modèle pour placer les espaces et tables. Remplace-la via le bouton &quot;Remplacer image&quot; ci-dessus.
+          </p>
+        </div>
       )}
 
       {/* Tables manager */}
