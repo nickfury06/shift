@@ -8,34 +8,28 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    async function checkAuth() {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
+    const supabase = createClient();
+    let cancelled = false;
 
-      if (!session) {
-        router.replace("/login");
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role, onboarding_completed")
-        .eq("id", session.user.id)
-        .single();
-
-      if (!profile) {
-        router.replace("/login");
-        return;
-      }
-
-      if (!profile.onboarding_completed && profile.role !== "patron") {
-        router.replace("/onboarding");
-      } else {
-        router.replace("/accueil");
+    async function route() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (cancelled) return;
+        if (!session) {
+          router.replace("/login");
+        } else {
+          // Onboarding enforcement happens inside the (app) layout via
+          // OnboardingGuard, which reads profile from AuthProvider. We just
+          // punt the user into the app and let the guard redirect as needed.
+          router.replace("/accueil");
+        }
+      } catch {
+        if (!cancelled) router.replace("/login");
       }
     }
 
-    checkAuth();
+    route();
+    return () => { cancelled = true; };
   }, [router]);
 
   return (

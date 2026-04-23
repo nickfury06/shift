@@ -44,14 +44,23 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     const supabase = supabaseRef.current;
 
     async function fetchProfile(userId: string) {
-      const { data } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .single();
-
-      if (data) setProfile(data as Profile);
+      // Race the query against a timeout so a stuck network call never
+      // freezes the whole app on an infinite spinner.
+      const query = supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
+      const timeout = new Promise<{ data: null }>((resolve) =>
+        setTimeout(() => resolve({ data: null }), 8000)
+      );
+      try {
+        const { data } = await Promise.race([query, timeout]);
+        if (data) setProfile(data as Profile);
+      } catch {
+        // swallow — leaves profile null, app shell still renders
+      }
     }
+
+    // Safety net: if nothing flips loading to false within 10s, bail out
+    // so the user at least sees the login page instead of a dead spinner.
+    const bailout = setTimeout(() => setLoading(false), 10000);
 
     // Use onAuthStateChange as the single source of truth
     // This avoids the lock conflict with getSession()
@@ -66,10 +75,12 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(null);
       }
       setLoading(false);
+      clearTimeout(bailout);
     });
 
     return () => {
       subscription.unsubscribe();
+      clearTimeout(bailout);
     };
   }, []);
 
