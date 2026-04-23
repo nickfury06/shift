@@ -128,6 +128,7 @@ export interface VenueTable {
   x: number;
   y: number;
   space_id: string | null;
+  radius: number;
 }
 
 export interface VenueSpace {

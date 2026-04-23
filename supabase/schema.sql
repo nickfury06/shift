@@ -621,3 +621,4 @@ create policy "venue_spaces_manage_patron" on public.venue_spaces for all using 
 alter table public.venue_tables add column if not exists x integer not null default 100;
 alter table public.venue_tables add column if not exists y integer not null default 100;
 alter table public.venue_tables add column if not exists space_id uuid references public.venue_spaces on delete set null;
+alter table public.venue_tables add column if not exists radius integer not null default 24;

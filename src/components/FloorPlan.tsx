@@ -36,7 +36,9 @@ interface FloorPlanProps {
 
 const VIEWBOX_W = 1000;
 const VIEWBOX_H = 700;
-const TABLE_RADIUS = 24;
+const DEFAULT_TABLE_RADIUS = 24;
+const MIN_TABLE_RADIUS = 14;
+const MAX_TABLE_RADIUS = 56;
 const MIN_SPACE_W = 120;
 const MIN_SPACE_H = 80;
 
@@ -199,6 +201,8 @@ export default function FloorPlan({ tables, reservations = [], onTableTap, onTab
         x: Math.round(x),
         y: Math.round(y),
         space_id: newTableSpaceId,
+        // Smart default: bigger tables for more seats (18 + 2*capacity, clamped)
+        radius: Math.max(MIN_TABLE_RADIUS, Math.min(MAX_TABLE_RADIUS, 18 + newTableCapacity * 2)),
       })
       .select()
       .single();
@@ -280,8 +284,10 @@ export default function FloorPlan({ tables, reservations = [], onTableTap, onTab
       const height = Math.max(MIN_SPACE_H, Math.min(VIEWBOX_H - space.y, dragging.startH + dy));
       setSpaces((prev) => prev.map((s) => (s.id === dragging.id ? { ...s, width, height } : s)));
     } else if (dragging.kind === "table") {
-      const x = Math.max(TABLE_RADIUS, Math.min(VIEWBOX_W - TABLE_RADIUS, p.x - dragging.offsetX));
-      const y = Math.max(TABLE_RADIUS, Math.min(VIEWBOX_H - TABLE_RADIUS, p.y - dragging.offsetY));
+      const t = localTables.find((x) => x.id === dragging.id);
+      const r = t?.radius ?? DEFAULT_TABLE_RADIUS;
+      const x = Math.max(r, Math.min(VIEWBOX_W - r, p.x - dragging.offsetX));
+      const y = Math.max(r, Math.min(VIEWBOX_H - r, p.y - dragging.offsetY));
       setLocalTables((prev) => prev.map((t) => (t.id === dragging.id ? { ...t, x, y } : t)));
     }
   }
@@ -443,6 +449,10 @@ export default function FloorPlan({ tables, reservations = [], onTableTap, onTab
           {/* Tables */}
           {localTables.map((t) => {
             const booked = bookedTableIds.has(t.id);
+            const r = t.radius || DEFAULT_TABLE_RADIUS;
+            const idFontSize = Math.max(10, Math.round(r * 0.55));
+            const capFontSize = Math.max(8, Math.round(r * 0.38));
+            const capOffset = Math.round(r * 0.58);
             return (
               <g
                 key={t.id}
@@ -452,17 +462,17 @@ export default function FloorPlan({ tables, reservations = [], onTableTap, onTab
                 <circle
                   cx={t.x}
                   cy={t.y}
-                  r={TABLE_RADIUS}
+                  r={r}
                   fill={booked ? "rgba(192,122,122,0.9)" : "rgba(255,255,255,0.95)"}
                   stroke={booked ? "#C07A7A" : "var(--terra-medium)"}
                   strokeWidth={2}
                 />
                 <text
                   x={t.x}
-                  y={t.y + 1}
+                  y={t.y - 2}
                   textAnchor="middle"
                   dominantBaseline="middle"
-                  fontSize={13}
+                  fontSize={idFontSize}
                   fontWeight={700}
                   fill={booked ? "#fff" : "var(--text-primary)"}
                   style={{ pointerEvents: "none", userSelect: "none" }}
@@ -471,10 +481,10 @@ export default function FloorPlan({ tables, reservations = [], onTableTap, onTab
                 </text>
                 <text
                   x={t.x}
-                  y={t.y + 14}
+                  y={t.y + capOffset}
                   textAnchor="middle"
                   dominantBaseline="middle"
-                  fontSize={9}
+                  fontSize={capFontSize}
                   fill={booked ? "rgba(255,255,255,0.8)" : "var(--text-tertiary)"}
                   style={{ pointerEvents: "none", userSelect: "none" }}
                 >
@@ -822,6 +832,39 @@ function TablesByGroup({
                               fontSize: 13, color: "var(--text-primary)", outline: "none", textAlign: "center",
                             }}
                           />
+                        </div>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                          <span style={{ fontSize: 12, color: "var(--text-tertiary)", minWidth: 60 }}>Taille</span>
+                          <button
+                            onClick={() => onUpdate(t.id, { radius: Math.max(14, (t.radius || 24) - 4) })}
+                            aria-label="Réduire"
+                            style={{
+                              width: 32, height: 32, borderRadius: 8,
+                              background: "var(--secondary-bg)", border: "none", cursor: "pointer",
+                              fontSize: 16, fontWeight: 700, color: "var(--text-secondary)",
+                            }}
+                          >−</button>
+                          <input
+                            type="range"
+                            min={14}
+                            max={56}
+                            step={2}
+                            value={t.radius || 24}
+                            onChange={(e) => onUpdate(t.id, { radius: parseInt(e.target.value) })}
+                            style={{ flex: 1, accentColor: "var(--terra-medium)" }}
+                          />
+                          <button
+                            onClick={() => onUpdate(t.id, { radius: Math.min(56, (t.radius || 24) + 4) })}
+                            aria-label="Agrandir"
+                            style={{
+                              width: 32, height: 32, borderRadius: 8,
+                              background: "var(--secondary-bg)", border: "none", cursor: "pointer",
+                              fontSize: 16, fontWeight: 700, color: "var(--text-secondary)",
+                            }}
+                          >+</button>
+                          <span style={{ fontSize: 11, color: "var(--text-tertiary)", minWidth: 28, textAlign: "right" }}>
+                            {t.radius || 24}
+                          </span>
                         </div>
                         <div>
                           <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: 6 }}>Type</div>
