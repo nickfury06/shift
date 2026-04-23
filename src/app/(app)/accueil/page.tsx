@@ -93,12 +93,20 @@ export default function AccueilPage() {
   const dateLabelShort = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
 
   const fetchData = useCallback(async () => {
-    if (!profile) return;
+    if (!profile) {
+      // Profile hasn't loaded — render empty shell rather than freeze the spinner.
+      setLoading(false);
+      return;
+    }
 
-    // Wrap each query in a catch so one missing table (e.g. not-yet-migrated)
-    // doesn't hang the whole page on an infinite spinner.
+    // Wrap each query in a timeout+catch so one stuck/missing table
+    // (not-yet-migrated, blocked by browser, network hiccup) can't freeze
+    // the whole page.
     const safe = <T,>(p: PromiseLike<{ data: T | null }>): Promise<{ data: T | null }> =>
-      Promise.resolve(p).then((r) => r).catch(() => ({ data: null }));
+      Promise.race([
+        Promise.resolve(p).then((r) => r).catch(() => ({ data: null })),
+        new Promise<{ data: T | null }>((resolve) => setTimeout(() => resolve({ data: null }), 6000)),
+      ]);
 
     try {
       const [msgRes, resaRes, taskRes, oneOffRes, compRes, profRes, alertRes, prodRes, eventRes, ritualRes] =
