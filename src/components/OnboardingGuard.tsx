@@ -4,38 +4,25 @@ import { useAuth } from "@/components/AuthProvider";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
+/**
+ * Redirects non-patron users whose `onboarding_completed` is false to
+ * `/onboarding`. Never blocks the subtree render — children always mount,
+ * so the Nav/DesktopNav stay visible during transient auth re-checks
+ * (HMR, realtime updates, token refresh).
+ */
 export default function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const { profile, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
-  const needsOnboarding =
-    !loading &&
-    profile &&
-    !profile.onboarding_completed &&
-    profile.role !== "patron";
-
   useEffect(() => {
-    if (needsOnboarding && pathname !== "/onboarding") {
-      router.replace("/onboarding");
-    }
-  }, [needsOnboarding, pathname, router]);
-
-  // Block rendering of (app) routes while we wait for profile or redirect the user.
-  if (loading) {
-    return (
-      <div className="min-h-dvh flex items-center justify-center">
-        <div
-          className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
-          style={{ borderColor: "var(--terra-medium)", borderTopColor: "transparent" }}
-        />
-      </div>
-    );
-  }
-
-  if (needsOnboarding && pathname !== "/onboarding") {
-    return null;
-  }
+    if (loading) return;
+    if (!profile) return;
+    if (profile.role === "patron") return;
+    if (profile.onboarding_completed) return;
+    if (pathname === "/onboarding") return;
+    router.replace("/onboarding");
+  }, [loading, profile, pathname, router]);
 
   return <>{children}</>;
 }

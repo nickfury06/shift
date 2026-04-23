@@ -166,6 +166,17 @@ export default function AccueilPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // Refresh when the tab becomes visible again (handles overnight idle:
+  // shiftDate is computed on render, so a refetch + re-render rolls the
+  // UI over to the new day automatically).
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === "visible") fetchData();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [fetchData]);
+
   // Check for responded requests and notify staff once
   useEffect(() => {
     if (!user || profile?.role === "patron") return;

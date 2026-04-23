@@ -5,9 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home, BookOpen, Package, User, LogOut, Shield, Calendar, PenLine,
-  HelpCircle, Settings as SettingsIcon, MessageCircle,
+  HelpCircle, Settings as SettingsIcon, MessageCircle, Sun, Moon,
 } from "lucide-react";
-import ThemeToggle from "@/components/ThemeToggle";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
 
@@ -29,8 +28,20 @@ export default function DesktopNav() {
   const pathname = usePathname();
   const [pendingAbsences, setPendingAbsences] = useState(0);
   const [pendingFnF, setPendingFnF] = useState(0);
+  const [dark, setDark] = useState(false);
   const supabase = useRef(createClient()).current;
   const role = profile?.role;
+
+  useEffect(() => {
+    setDark(document.documentElement.classList.contains("dark"));
+  }, []);
+
+  function toggleTheme() {
+    const next = !dark;
+    setDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("shift-theme", next ? "dark" : "light");
+  }
 
   useEffect(() => {
     const canSeeFnFBadge = role === "patron" || role === "responsable";
@@ -143,14 +154,19 @@ export default function DesktopNav() {
           borderTop: "1px solid var(--card-border)",
           display: "flex", flexDirection: "column", gap: 4,
         }}>
-          <div style={{
-            display: "flex", alignItems: "center", gap: 10,
-            padding: "8px 10px", borderRadius: 10,
-            fontSize: 13, color: "var(--text-secondary)",
-          }}>
-            <ThemeToggle />
-            <span style={{ fontSize: 13 }}>Thème</span>
-          </div>
+          <button
+            onClick={toggleTheme}
+            style={{
+              display: "flex", alignItems: "center", gap: 10,
+              padding: "10px", borderRadius: 10,
+              background: "none", border: "none", cursor: "pointer",
+              textAlign: "left", width: "100%",
+              fontSize: 13, fontWeight: 500, color: "var(--text-secondary)",
+            }}
+          >
+            {dark ? <Sun size={ICON} strokeWidth={1.5} /> : <Moon size={ICON} strokeWidth={1.5} />}
+            <span style={{ flex: 1 }}>Thème {dark ? "clair" : "sombre"}</span>
+          </button>
           <button
             onClick={signOut}
             style={{

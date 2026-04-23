@@ -17,8 +17,9 @@ import {
   HelpCircle,
   Settings as SettingsIcon,
   MessageCircle,
+  Sun,
+  Moon,
 } from "lucide-react";
-import ThemeToggle from "@/components/ThemeToggle";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
 
@@ -35,8 +36,20 @@ export default function Nav() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [pendingAbsences, setPendingAbsences] = useState(0);
   const [pendingFnF, setPendingFnF] = useState(0);
+  const [dark, setDark] = useState(false);
   const supabase = useRef(createClient()).current;
   const role = profile?.role;
+
+  useEffect(() => {
+    setDark(document.documentElement.classList.contains("dark"));
+  }, []);
+
+  function toggleTheme() {
+    const next = !dark;
+    setDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("shift-theme", next ? "dark" : "light");
+  }
 
   useEffect(() => {
     const canSeeFnFBadge = role === "patron" || role === "responsable";
@@ -212,26 +225,28 @@ export default function Nav() {
                   Déconnexion
                 </button>
 
-                {/* Theme toggle */}
-                <div
+                {/* Theme toggle — whole row clickable */}
+                <button
+                  onClick={toggleTheme}
                   style={{
                     display: "flex",
                     alignItems: "center",
+                    width: "100%",
                     gap: 12,
                     borderRadius: 12,
                     padding: "10px 12px",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    fontSize: 14,
+                    fontWeight: 500,
+                    color: "var(--text-secondary)",
                   }}
                 >
-                  <ThemeToggle />
-                  <span
-                    style={{
-                      fontSize: 14,
-                      color: "var(--text-secondary)",
-                    }}
-                  >
-                    Thème
-                  </span>
-                </div>
+                  {dark ? <Sun size={iconSize} strokeWidth={strokeWidth} /> : <Moon size={iconSize} strokeWidth={strokeWidth} />}
+                  Thème {dark ? "clair" : "sombre"}
+                </button>
               </div>
             </div>
           </div>
