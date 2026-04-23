@@ -310,7 +310,7 @@ export default function AccueilPage() {
 
   if (loading) {
     return (
-      <div style={{ paddingTop: 16, paddingRight: 20, paddingLeft: 20, paddingBottom: 96, maxWidth: 512, margin: "0 auto" }}>
+      <div className="max-w-lg mx-auto" style={{ paddingTop: 16, paddingRight: 20, paddingLeft: 20, paddingBottom: 96 }}>
         <div style={{ height: 32, background: "var(--card-bg)", borderRadius: 12, marginBottom: 16, opacity: 0.5 }} />
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
           {[1, 2, 3].map((i) => <div key={i} style={{ flex: 1, height: 72, background: "var(--card-bg)", borderRadius: 16, opacity: 0.5 }} />)}
@@ -321,7 +321,7 @@ export default function AccueilPage() {
   }
 
   return (
-    <div style={{ paddingTop: 0, paddingRight: 20, paddingLeft: 20, paddingBottom: 96, maxWidth: 512, margin: "0 auto" }}>
+    <div className="max-w-lg mx-auto" style={{ paddingTop: 0, paddingRight: 20, paddingLeft: 20, paddingBottom: 96 }}>
 
       {/* ── Header ──────────────────────────────────────────── */}
       <div style={{ padding: "16px 0 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>

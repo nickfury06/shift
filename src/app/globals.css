@@ -300,4 +300,37 @@
       transition-duration: 0s !important;
     }
   }
+
+  /* ── Desktop ergonomics (≥ 900px) ─────────────────────────
+     The app is mobile-first — every page wraps content in
+     `.max-w-lg.mx-auto` (or an inline maxWidth:512 centered) and
+     applies tight horizontal padding meant for a 375px phone viewport.
+     On desktop that looks like a tiny column floating in whitespace.
+     Expand the outer wrapper so content breathes, but keep card/form
+     internals as designed. Modals are styled with inline maxWidth
+     inside fixed overlays and are not affected. */
+  @media (min-width: 900px) {
+    /* All page wrappers using Tailwind's max-w-lg inside the app shell */
+    main.flex-1 .max-w-lg.mx-auto,
+    main.flex-1 [style*="max-width: 512"][style*="margin:"],
+    main.flex-1 .page-shell {
+      max-width: min(1400px, 100%) !important;
+      padding-left: 32px !important;
+      padding-right: 32px !important;
+    }
+    /* Heading + reading width remains comfortable (don't blow out lines
+       of paragraph text). Constrain content-dense first-level children. */
+    main.flex-1 .max-w-lg.mx-auto > h1 {
+      font-size: 22px;
+    }
+  }
+
+  /* ── Extra-wide (≥ 1400px) ───────────────────────────────── */
+  @media (min-width: 1400px) {
+    main.flex-1 .max-w-lg.mx-auto,
+    main.flex-1 .page-shell {
+      padding-left: 48px !important;
+      padding-right: 48px !important;
+    }
+  }
 }
