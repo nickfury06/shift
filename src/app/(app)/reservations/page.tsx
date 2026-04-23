@@ -303,7 +303,7 @@ export default function ReservationsPage() {
 
       {/* Plan view */}
       {view === "plan" && (
-        <FloorPlan tables={tables} reservations={reservations} />
+        <FloorPlan tables={tables} reservations={reservations} onTablesChanged={fetchData} />
       )}
 
       {/* Reservation list — attendu */}

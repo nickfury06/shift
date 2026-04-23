@@ -23,13 +23,15 @@ import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/Confirm";
 import { createClient } from "@/lib/supabase/client";
 import type { VenueTable, VenueSpace, Reservation } from "@/lib/types";
-import { Plus, Pencil, Check, Trash2, X as XIcon, Move } from "lucide-react";
+import { Plus, Pencil, Check, Trash2, X as XIcon, Move, Table2, ChevronDown } from "lucide-react";
 import { haptic } from "@/lib/haptics";
 
 interface FloorPlanProps {
   tables: VenueTable[];
   reservations?: Reservation[];
   onTableTap?: (table: VenueTable) => void;
+  /** Called after patron mutates the venue_tables set (add/edit/delete). */
+  onTablesChanged?: () => void;
 }
 
 const VIEWBOX_W = 1000;
@@ -51,7 +53,7 @@ type Drag =
   | { kind: "table"; id: string; offsetX: number; offsetY: number }
   | null;
 
-export default function FloorPlan({ tables, reservations = [], onTableTap }: FloorPlanProps) {
+export default function FloorPlan({ tables, reservations = [], onTableTap, onTablesChanged }: FloorPlanProps) {
   const { profile } = useAuth();
   const toast = useToast();
   const { confirm } = useConfirm();
@@ -65,6 +67,15 @@ export default function FloorPlan({ tables, reservations = [], onTableTap }: Flo
   const [localTables, setLocalTables] = useState<VenueTable[]>(tables);
   const [selectedSpaceId, setSelectedSpaceId] = useState<string | null>(null);
   const [dragging, setDragging] = useState<Drag>(null);
+
+  // Table manager (patron edit mode): list + add/edit form
+  const [showTables, setShowTables] = useState(false);
+  const [newTableId, setNewTableId] = useState("");
+  const [newTableCapacity, setNewTableCapacity] = useState(4);
+  const [newTableMax, setNewTableMax] = useState(4);
+  const [newTableType, setNewTableType] = useState<"standard" | "high" | "round">("standard");
+  const [newTableSpaceId, setNewTableSpaceId] = useState<string | null>(null);
+  const [savingTable, setSavingTable] = useState(false);
 
   useEffect(() => { setLocalTables(tables); }, [tables]);
 
@@ -141,8 +152,87 @@ export default function FloorPlan({ tables, reservations = [], onTableTap }: Flo
   async function persistTablePosition(id: string, x: number, y: number) {
     const container = spaceAtPoint(x, y);
     const space_id = container?.id ?? null;
-    setLocalTables((prev) => prev.map((t) => (t.id === id ? { ...t, x, y, space_id } : t)));
-    await supabase.from("venue_tables").update({ x, y, space_id }).eq("id", id);
+    const zone = container?.zone ?? (localTables.find((t) => t.id === id)?.zone || "restaurant");
+    setLocalTables((prev) => prev.map((t) => (t.id === id ? { ...t, x, y, space_id, zone } : t)));
+    await supabase.from("venue_tables").update({ x, y, space_id, zone }).eq("id", id);
+  }
+
+  // ── Table CRUD (patron) ────────────────────────────────────
+  function resetNewTableForm() {
+    setNewTableId("");
+    setNewTableCapacity(4);
+    setNewTableMax(4);
+    setNewTableType("standard");
+    setNewTableSpaceId(null);
+  }
+
+  async function addTable() {
+    const id = newTableId.trim();
+    if (!id) { toast.error("Donne un numéro à la table"); return; }
+    if (localTables.some((t) => t.id === id)) { toast.error("Ce numéro existe déjà"); return; }
+    if (newTableCapacity < 1) { toast.error("Au moins 1 place"); return; }
+    const max = Math.max(newTableMax, newTableCapacity);
+
+    // Default position: center of chosen space, or center of canvas
+    let x = VIEWBOX_W / 2;
+    let y = VIEWBOX_H / 2;
+    let zone: VenueTable["zone"] = "restaurant";
+    if (newTableSpaceId) {
+      const sp = spaces.find((s) => s.id === newTableSpaceId);
+      if (sp) {
+        x = sp.x + sp.width / 2;
+        y = sp.y + sp.height / 2;
+        zone = sp.zone;
+      }
+    }
+
+    setSavingTable(true);
+    const { data, error } = await supabase
+      .from("venue_tables")
+      .insert({
+        id,
+        zone,
+        capacity: newTableCapacity,
+        max_capacity: max,
+        table_type: newTableType,
+        sort_order: localTables.length + 1,
+        x: Math.round(x),
+        y: Math.round(y),
+        space_id: newTableSpaceId,
+      })
+      .select()
+      .single();
+    setSavingTable(false);
+
+    if (error) { toast.error("Erreur, réessaie"); haptic("error"); return; }
+    haptic("success");
+    toast.success(`Table ${id} ajoutée`);
+    setLocalTables((prev) => [...prev, data as VenueTable]);
+    resetNewTableForm();
+    onTablesChanged?.();
+  }
+
+  async function updateTable(id: string, patch: Partial<VenueTable>) {
+    setLocalTables((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+    const { error } = await supabase.from("venue_tables").update(patch).eq("id", id);
+    if (error) { toast.error("Erreur, réessaie"); return; }
+    onTablesChanged?.();
+  }
+
+  async function deleteTable(id: string) {
+    const ok = await confirm({
+      title: `Supprimer la table ${id} ?`,
+      message: "Les réservations assignées perdront leur table.",
+      variant: "danger",
+      confirmLabel: "Supprimer",
+    });
+    if (!ok) return;
+    haptic("warning");
+    setLocalTables((prev) => prev.filter((t) => t.id !== id));
+    const { error } = await supabase.from("venue_tables").delete().eq("id", id);
+    if (error) { toast.error("Erreur, réessaie"); return; }
+    toast.success(`Table ${id} supprimée`);
+    onTablesChanged?.();
   }
 
   // ── Drag handlers (pointer events → touch + mouse) ─────────
@@ -253,6 +343,19 @@ export default function FloorPlan({ tables, reservations = [], onTableTap }: Flo
                 <Plus size={12} /> {p.label}
               </button>
             ))}
+            <button
+              onClick={() => setShowTables((v) => !v)}
+              style={{
+                display: "flex", alignItems: "center", gap: 4,
+                padding: "6px 10px", borderRadius: 8,
+                background: showTables ? "var(--terra-medium)" : "var(--secondary-bg)",
+                color: showTables ? "#fff" : "var(--text-secondary)",
+                border: "none", cursor: "pointer",
+                fontSize: 12, fontWeight: 500,
+              }}
+            >
+              <Table2 size={12} /> Tables
+            </button>
           </div>
         )}
       </div>
@@ -462,12 +565,334 @@ export default function FloorPlan({ tables, reservations = [], onTableTap }: Flo
         </div>
       )}
 
-      {editing && !selectedSpace && (
+      {editing && !selectedSpace && !showTables && (
         <p style={{ fontSize: 12, color: "var(--text-tertiary)", textAlign: "center", marginTop: 10, lineHeight: 1.5 }}>
           <Move size={11} style={{ display: "inline", marginRight: 4 }} />
           Glisse les espaces et les tables. Touche le coin d&apos;un espace pour redimensionner.
         </p>
       )}
+
+      {/* Tables manager */}
+      {editing && showTables && (
+        <div className="card-light" style={{ marginTop: 12, padding: 14, display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
+              Tables ({localTables.length})
+            </div>
+            <button
+              onClick={() => setShowTables(false)}
+              aria-label="Fermer"
+              style={{
+                width: 32, height: 32, borderRadius: 8,
+                background: "var(--secondary-bg)", border: "none", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+            >
+              <XIcon size={14} style={{ color: "var(--text-tertiary)" }} />
+            </button>
+          </div>
+
+          {/* Add form */}
+          <div style={{
+            background: "var(--secondary-bg)", borderRadius: 12, padding: 12,
+            display: "flex", flexDirection: "column", gap: 10,
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              Nouvelle table
+            </div>
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                type="text"
+                placeholder="Numéro (ex. 400)"
+                value={newTableId}
+                onChange={(e) => setNewTableId(e.target.value)}
+                style={{
+                  flex: 1, padding: "10px 12px", borderRadius: 10,
+                  border: "1px solid var(--border-color)", background: "var(--input-bg)",
+                  fontSize: 14, color: "var(--text-primary)", outline: "none",
+                }}
+              />
+              <div style={{ display: "flex", alignItems: "center", gap: 4, background: "var(--input-bg)", borderRadius: 10, padding: "0 8px", border: "1px solid var(--border-color)" }}>
+                <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Places</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={newTableCapacity}
+                  onChange={(e) => {
+                    const n = parseInt(e.target.value) || 1;
+                    setNewTableCapacity(n);
+                    if (newTableMax < n) setNewTableMax(n);
+                  }}
+                  style={{
+                    width: 48, padding: "10px 6px", borderRadius: 8,
+                    border: "none", background: "transparent",
+                    fontSize: 14, fontWeight: 600, color: "var(--text-primary)", outline: "none",
+                    textAlign: "center",
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {(["standard", "high", "round"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setNewTableType(t)}
+                  style={{
+                    padding: "6px 12px", borderRadius: 8, border: "none", cursor: "pointer",
+                    fontSize: 12, fontWeight: 500,
+                    background: newTableType === t ? "var(--terra-medium)" : "var(--card-bg)",
+                    color: newTableType === t ? "#fff" : "var(--text-secondary)",
+                  }}
+                >
+                  {t === "standard" ? "Standard" : t === "high" ? "Haute" : "Ronde"}
+                </button>
+              ))}
+            </div>
+
+            <div>
+              <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 6, fontWeight: 500 }}>
+                Espace
+              </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                <button
+                  onClick={() => setNewTableSpaceId(null)}
+                  style={{
+                    padding: "6px 10px", borderRadius: 8, border: "none", cursor: "pointer",
+                    fontSize: 12, fontWeight: 500,
+                    background: newTableSpaceId === null ? "var(--text-primary)" : "var(--card-bg)",
+                    color: newTableSpaceId === null ? "#fff" : "var(--text-tertiary)",
+                  }}
+                >
+                  Aucun
+                </button>
+                {spaces.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => setNewTableSpaceId(s.id)}
+                    style={{
+                      padding: "6px 10px", borderRadius: 8, border: "none", cursor: "pointer",
+                      fontSize: 12, fontWeight: 500,
+                      background: newTableSpaceId === s.id ? s.color : "var(--card-bg)",
+                      color: newTableSpaceId === s.id ? "#fff" : "var(--text-secondary)",
+                    }}
+                  >
+                    {s.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={addTable}
+              disabled={savingTable || !newTableId.trim()}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                padding: "10px 16px", borderRadius: 10,
+                background: "var(--gradient-primary)", color: "#fff", border: "none",
+                cursor: savingTable || !newTableId.trim() ? "default" : "pointer",
+                opacity: savingTable || !newTableId.trim() ? 0.5 : 1,
+                fontSize: 14, fontWeight: 600, minHeight: 44,
+              }}
+            >
+              <Plus size={14} /> Ajouter
+            </button>
+          </div>
+
+          {/* Grouped list */}
+          <TablesByGroup
+            tables={localTables}
+            spaces={spaces}
+            onUpdate={updateTable}
+            onDelete={deleteTable}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Sub-component: grouped editable table list ───────────────
+
+function TablesByGroup({
+  tables,
+  spaces,
+  onUpdate,
+  onDelete,
+}: {
+  tables: VenueTable[];
+  spaces: VenueSpace[];
+  onUpdate: (id: string, patch: Partial<VenueTable>) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const spaceMap = new Map(spaces.map((s) => [s.id, s]));
+  const grouped = new Map<string, VenueTable[]>();
+  const groupOrder: string[] = [];
+  for (const t of tables) {
+    const key = t.space_id && spaceMap.get(t.space_id) ? spaceMap.get(t.space_id)!.name : "Non placées";
+    if (!grouped.has(key)) { grouped.set(key, []); groupOrder.push(key); }
+    grouped.get(key)!.push(t);
+  }
+
+  if (tables.length === 0) {
+    return (
+      <div style={{ padding: 20, textAlign: "center", color: "var(--text-tertiary)", fontSize: 13 }}>
+        Aucune table. Ajoute-en avec le formulaire ci-dessus.
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {groupOrder.map((groupName) => {
+        const items = grouped.get(groupName)!;
+        const space = spaces.find((s) => s.name === groupName);
+        return (
+          <div key={groupName}>
+            <div style={{
+              fontSize: 11, fontWeight: 600, color: space?.color || "var(--text-tertiary)",
+              textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6,
+            }}>
+              {groupName} ({items.length})
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {items.map((t) => {
+                const isExpanded = expanded === t.id;
+                return (
+                  <div key={t.id} style={{
+                    background: "var(--card-bg)", borderRadius: 10,
+                    border: "1px solid var(--border-color)",
+                    overflow: "hidden",
+                  }}>
+                    <button
+                      onClick={() => setExpanded(isExpanded ? null : t.id)}
+                      style={{
+                        width: "100%", display: "flex", alignItems: "center", gap: 10,
+                        padding: "10px 12px", background: "none", border: "none", cursor: "pointer",
+                        textAlign: "left",
+                      }}
+                    >
+                      <div style={{
+                        width: 32, height: 32, borderRadius: "50%",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        background: "var(--secondary-bg)", fontSize: 12, fontWeight: 700,
+                        color: "var(--text-primary)",
+                      }}>{t.id}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, color: "var(--text-primary)", fontWeight: 500 }}>
+                          Table {t.id}
+                        </div>
+                        <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                          {t.capacity} places · {t.table_type === "standard" ? "standard" : t.table_type === "high" ? "haute" : "ronde"}
+                        </div>
+                      </div>
+                      <ChevronDown
+                        size={14}
+                        style={{
+                          color: "var(--text-tertiary)",
+                          transform: isExpanded ? "rotate(180deg)" : "rotate(0)",
+                          transition: "transform 0.2s",
+                        }}
+                      />
+                    </button>
+                    {isExpanded && (
+                      <div style={{
+                        padding: "0 12px 12px",
+                        display: "flex", flexDirection: "column", gap: 10,
+                        borderTop: "1px solid var(--border-color)",
+                        paddingTop: 12,
+                      }}>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                          <span style={{ fontSize: 12, color: "var(--text-tertiary)", minWidth: 60 }}>Places</span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={20}
+                            value={t.capacity}
+                            onChange={(e) => {
+                              const n = parseInt(e.target.value) || 1;
+                              onUpdate(t.id, { capacity: n, max_capacity: Math.max(n, t.max_capacity) });
+                            }}
+                            style={{
+                              width: 64, padding: "6px 8px", borderRadius: 8,
+                              border: "1px solid var(--border-color)", background: "var(--input-bg)",
+                              fontSize: 13, color: "var(--text-primary)", outline: "none", textAlign: "center",
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: 6 }}>Type</div>
+                          <div style={{ display: "flex", gap: 6 }}>
+                            {(["standard", "high", "round"] as const).map((typ) => (
+                              <button
+                                key={typ}
+                                onClick={() => onUpdate(t.id, { table_type: typ })}
+                                style={{
+                                  padding: "6px 12px", borderRadius: 8, border: "none", cursor: "pointer",
+                                  fontSize: 12, fontWeight: 500,
+                                  background: t.table_type === typ ? "var(--terra-medium)" : "var(--secondary-bg)",
+                                  color: t.table_type === typ ? "#fff" : "var(--text-secondary)",
+                                }}
+                              >
+                                {typ === "standard" ? "Standard" : typ === "high" ? "Haute" : "Ronde"}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: 6 }}>Espace</div>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            <button
+                              onClick={() => onUpdate(t.id, { space_id: null })}
+                              style={{
+                                padding: "6px 10px", borderRadius: 8, border: "none", cursor: "pointer",
+                                fontSize: 12, fontWeight: 500,
+                                background: t.space_id === null ? "var(--text-primary)" : "var(--secondary-bg)",
+                                color: t.space_id === null ? "#fff" : "var(--text-tertiary)",
+                              }}
+                            >
+                              Aucun
+                            </button>
+                            {spaces.map((s) => (
+                              <button
+                                key={s.id}
+                                onClick={() => onUpdate(t.id, { space_id: s.id, zone: s.zone })}
+                                style={{
+                                  padding: "6px 10px", borderRadius: 8, border: "none", cursor: "pointer",
+                                  fontSize: 12, fontWeight: 500,
+                                  background: t.space_id === s.id ? s.color : "var(--secondary-bg)",
+                                  color: t.space_id === s.id ? "#fff" : "var(--text-secondary)",
+                                }}
+                              >
+                                {s.name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => onDelete(t.id)}
+                          style={{
+                            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                            padding: "8px 14px", borderRadius: 8,
+                            background: "rgba(192,122,122,0.1)", color: "var(--danger)",
+                            border: "none", cursor: "pointer",
+                            fontSize: 13, fontWeight: 500, marginTop: 4, minHeight: 40,
+                          }}
+                        >
+                          <Trash2 size={13} /> Supprimer la table {t.id}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
