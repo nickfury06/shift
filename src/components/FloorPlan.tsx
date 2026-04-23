@@ -23,7 +23,7 @@ import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/Confirm";
 import { createClient } from "@/lib/supabase/client";
 import type { VenueTable, VenueSpace, Reservation } from "@/lib/types";
-import { Plus, Pencil, Check, Trash2, X as XIcon, Move, Table2, ChevronDown, Image as ImageIcon, Upload } from "lucide-react";
+import { Plus, Pencil, Check, Trash2, X as XIcon, Move, Table2, ChevronDown, Image as ImageIcon, Upload, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
 import { haptic } from "@/lib/haptics";
 
 interface FloorPlanProps {
@@ -84,6 +84,13 @@ export default function FloorPlan({ tables, reservations = [], onTableTap, onTab
   const [bgOpacity, setBgOpacity] = useState(0.4);
   const [uploadingBg, setUploadingBg] = useState(false);
   const bgInputRef = useRef<HTMLInputElement>(null);
+
+  // View mode: pan + zoom via viewBox manipulation
+  const [viewBox, setViewBox] = useState({ x: 0, y: 0, w: VIEWBOX_W, h: VIEWBOX_H });
+  const pointers = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const pinchRef = useRef<{ startDist: number; startZoom: number; centerX: number; centerY: number } | null>(null);
+  const panRef = useRef<{ startX: number; startY: number; vbX: number; vbY: number } | null>(null);
+  const isZoomed = viewBox.w !== VIEWBOX_W || viewBox.h !== VIEWBOX_H || viewBox.x !== 0 || viewBox.y !== 0;
 
   useEffect(() => { setLocalTables(tables); }, [tables]);
 
@@ -309,6 +316,50 @@ export default function FloorPlan({ tables, reservations = [], onTableTap, onTab
     onTablesChanged?.();
   }
 
+  // ── Zoom + pan (view mode only) ────────────────────────────
+  const MIN_ZOOM = 1;      // can't zoom out past the whole plan
+  const MAX_ZOOM = 5;
+  function currentZoom() { return VIEWBOX_W / viewBox.w; }
+
+  function zoomAt(anchorX: number, anchorY: number, targetZoom: number) {
+    const z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, targetZoom));
+    const w = VIEWBOX_W / z;
+    const h = VIEWBOX_H / z;
+    // Keep `anchor` at the same screen position before and after.
+    // Ratio of anchor within current viewBox:
+    const rx = (anchorX - viewBox.x) / viewBox.w;
+    const ry = (anchorY - viewBox.y) / viewBox.h;
+    let x = anchorX - rx * w;
+    let y = anchorY - ry * h;
+    x = Math.max(0, Math.min(VIEWBOX_W - w, x));
+    y = Math.max(0, Math.min(VIEWBOX_H - h, y));
+    setViewBox({ x, y, w, h });
+  }
+
+  function resetZoom() {
+    haptic("light");
+    setViewBox({ x: 0, y: 0, w: VIEWBOX_W, h: VIEWBOX_H });
+  }
+
+  function clampPan(x: number, y: number) {
+    return {
+      x: Math.max(0, Math.min(VIEWBOX_W - viewBox.w, x)),
+      y: Math.max(0, Math.min(VIEWBOX_H - viewBox.h, y)),
+    };
+  }
+
+  function onWheel(e: React.WheelEvent) {
+    if (editing) return;
+    e.preventDefault();
+    const p = svgPoint(e as unknown as React.PointerEvent);
+    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    zoomAt(p.x, p.y, currentZoom() * factor);
+  }
+
+  function distance(a: { x: number; y: number }, b: { x: number; y: number }) {
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  }
+
   // ── Drag handlers (pointer events → touch + mouse) ─────────
   function onSpaceDown(e: React.PointerEvent, s: VenueSpace) {
     if (!editing) return;
@@ -338,31 +389,78 @@ export default function FloorPlan({ tables, reservations = [], onTableTap, onTab
     setDragging({ kind: "table", id: t.id, offsetX: p.x - t.x, offsetY: p.y - t.y });
   }
 
-  function onPointerMove(e: React.PointerEvent) {
-    if (!dragging) return;
+  // ── Canvas-level pointer: pan + pinch when not editing ─────
+  function onCanvasPointerDown(e: React.PointerEvent) {
+    if (editing) return;
     const p = svgPoint(e);
-    if (dragging.kind === "space") {
-      const x = Math.max(0, Math.min(VIEWBOX_W - MIN_SPACE_W, p.x - dragging.offsetX));
-      const y = Math.max(0, Math.min(VIEWBOX_H - MIN_SPACE_H, p.y - dragging.offsetY));
-      setSpaces((prev) => prev.map((s) => (s.id === dragging.id ? { ...s, x, y } : s)));
-    } else if (dragging.kind === "resize") {
-      const space = spaces.find((s) => s.id === dragging.id);
-      if (!space) return;
-      const dx = p.x - dragging.startX;
-      const dy = p.y - dragging.startY;
-      const width = Math.max(MIN_SPACE_W, Math.min(VIEWBOX_W - space.x, dragging.startW + dx));
-      const height = Math.max(MIN_SPACE_H, Math.min(VIEWBOX_H - space.y, dragging.startH + dy));
-      setSpaces((prev) => prev.map((s) => (s.id === dragging.id ? { ...s, width, height } : s)));
-    } else if (dragging.kind === "table") {
-      const t = localTables.find((x) => x.id === dragging.id);
-      const r = t?.radius ?? DEFAULT_TABLE_RADIUS;
-      const x = Math.max(r, Math.min(VIEWBOX_W - r, p.x - dragging.offsetX));
-      const y = Math.max(r, Math.min(VIEWBOX_H - r, p.y - dragging.offsetY));
-      setLocalTables((prev) => prev.map((t) => (t.id === dragging.id ? { ...t, x, y } : t)));
+    pointers.current.set(e.pointerId, p);
+
+    if (pointers.current.size === 2) {
+      // Start pinch
+      const pts = Array.from(pointers.current.values());
+      pinchRef.current = {
+        startDist: distance(pts[0], pts[1]),
+        startZoom: currentZoom(),
+        centerX: (pts[0].x + pts[1].x) / 2,
+        centerY: (pts[0].y + pts[1].y) / 2,
+      };
+      panRef.current = null;
+    } else if (pointers.current.size === 1 && isZoomed) {
+      // Start pan
+      panRef.current = { startX: p.x, startY: p.y, vbX: viewBox.x, vbY: viewBox.y };
     }
   }
 
-  function onPointerUp() {
+  function onPointerMove(e: React.PointerEvent) {
+    // EDIT-mode drag (spaces/tables/resize)
+    if (dragging) {
+      const p = svgPoint(e);
+      if (dragging.kind === "space") {
+        const x = Math.max(0, Math.min(VIEWBOX_W - MIN_SPACE_W, p.x - dragging.offsetX));
+        const y = Math.max(0, Math.min(VIEWBOX_H - MIN_SPACE_H, p.y - dragging.offsetY));
+        setSpaces((prev) => prev.map((s) => (s.id === dragging.id ? { ...s, x, y } : s)));
+      } else if (dragging.kind === "resize") {
+        const space = spaces.find((s) => s.id === dragging.id);
+        if (!space) return;
+        const dx = p.x - dragging.startX;
+        const dy = p.y - dragging.startY;
+        const width = Math.max(MIN_SPACE_W, Math.min(VIEWBOX_W - space.x, dragging.startW + dx));
+        const height = Math.max(MIN_SPACE_H, Math.min(VIEWBOX_H - space.y, dragging.startH + dy));
+        setSpaces((prev) => prev.map((s) => (s.id === dragging.id ? { ...s, width, height } : s)));
+      } else if (dragging.kind === "table") {
+        const t = localTables.find((x) => x.id === dragging.id);
+        const r = t?.radius ?? DEFAULT_TABLE_RADIUS;
+        const x = Math.max(r, Math.min(VIEWBOX_W - r, p.x - dragging.offsetX));
+        const y = Math.max(r, Math.min(VIEWBOX_H - r, p.y - dragging.offsetY));
+        setLocalTables((prev) => prev.map((t) => (t.id === dragging.id ? { ...t, x, y } : t)));
+      }
+      return;
+    }
+
+    // VIEW-mode pan / pinch
+    if (editing) return;
+    if (!pointers.current.has(e.pointerId)) return;
+    const p = svgPoint(e);
+    pointers.current.set(e.pointerId, p);
+
+    if (pinchRef.current && pointers.current.size === 2) {
+      const pts = Array.from(pointers.current.values());
+      const newDist = distance(pts[0], pts[1]);
+      const ratio = newDist / pinchRef.current.startDist;
+      zoomAt(pinchRef.current.centerX, pinchRef.current.centerY, pinchRef.current.startZoom * ratio);
+    } else if (panRef.current && pointers.current.size === 1) {
+      const dx = p.x - panRef.current.startX;
+      const dy = p.y - panRef.current.startY;
+      const c = clampPan(panRef.current.vbX - dx, panRef.current.vbY - dy);
+      setViewBox((vb) => ({ ...vb, x: c.x, y: c.y }));
+    }
+  }
+
+  function onPointerUp(e?: React.PointerEvent) {
+    if (e) pointers.current.delete(e.pointerId);
+    if (pointers.current.size < 2) pinchRef.current = null;
+    if (pointers.current.size === 0) panRef.current = null;
+
     if (!dragging) return;
     const d = dragging;
     setDragging(null);
@@ -387,7 +485,13 @@ export default function FloorPlan({ tables, reservations = [], onTableTap, onTab
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
         {canEdit && (
           <button
-            onClick={() => { setEditing((v) => !v); setSelectedSpaceId(null); }}
+            onClick={() => {
+              setEditing((v) => !v);
+              setSelectedSpaceId(null);
+              setShowTables(false);
+              // Reset zoom on mode switch so each mode starts at full view
+              setViewBox({ x: 0, y: 0, w: VIEWBOX_W, h: VIEWBOX_H });
+            }}
             style={{
               display: "flex", alignItems: "center", gap: 6,
               padding: "8px 14px", borderRadius: 10,
@@ -475,15 +579,75 @@ export default function FloorPlan({ tables, reservations = [], onTableTap, onTab
           border: editing ? "2px dashed var(--terra-medium)" : "1px solid var(--border-color)",
         }}
       >
+        {/* Zoom controls (view mode only) */}
+        {!editing && (
+          <div
+            style={{
+              position: "absolute",
+              top: 10,
+              right: 10,
+              zIndex: 10,
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+              background: "rgba(255,255,255,0.92)",
+              backdropFilter: "blur(10px)",
+              WebkitBackdropFilter: "blur(10px)",
+              borderRadius: 10,
+              padding: 4,
+              boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
+            }}
+          >
+            <button
+              onClick={() => zoomAt(viewBox.x + viewBox.w / 2, viewBox.y + viewBox.h / 2, currentZoom() * 1.3)}
+              aria-label="Zoomer"
+              style={{
+                width: 36, height: 36, borderRadius: 8,
+                background: "transparent", border: "none", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+            >
+              <ZoomIn size={16} style={{ color: "var(--text-secondary)" }} />
+            </button>
+            <button
+              onClick={() => zoomAt(viewBox.x + viewBox.w / 2, viewBox.y + viewBox.h / 2, currentZoom() / 1.3)}
+              aria-label="Dézoomer"
+              style={{
+                width: 36, height: 36, borderRadius: 8,
+                background: "transparent", border: "none", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+            >
+              <ZoomOut size={16} style={{ color: "var(--text-secondary)" }} />
+            </button>
+            {isZoomed && (
+              <button
+                onClick={resetZoom}
+                aria-label="Réinitialiser"
+                style={{
+                  width: 36, height: 36, borderRadius: 8,
+                  background: "var(--terra-medium)", border: "none", cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}
+              >
+                <Maximize2 size={14} style={{ color: "#fff" }} />
+              </button>
+            )}
+          </div>
+        )}
+
         <svg
           ref={svgRef}
-          viewBox={`0 0 ${VIEWBOX_W} ${VIEWBOX_H}`}
+          viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`}
           width="100%"
           height="100%"
+          onPointerDown={onCanvasPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerLeave={onPointerUp}
-          style={{ display: "block" }}
+          onPointerCancel={onPointerUp}
+          onWheel={onWheel}
+          style={{ display: "block", touchAction: "none", cursor: !editing && isZoomed ? "grab" : "default" }}
         >
           {/* Background template image (patron-uploaded tracing guide) */}
           {bgImageUrl && (
