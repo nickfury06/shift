@@ -125,6 +125,22 @@ export interface VenueTable {
   max_capacity: number;
   table_type: string;
   sort_order: number;
+  x: number;
+  y: number;
+  space_id: string | null;
+}
+
+export interface VenueSpace {
+  id: string;
+  name: string;
+  zone: "restaurant" | "terrasse" | "terrasse_couverte" | "bar";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: string;
+  sort_order: number;
+  created_at: string;
 }
 
 // ── Manager Messages ───────────────────────────────────────
