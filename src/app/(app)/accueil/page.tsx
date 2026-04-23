@@ -95,57 +95,65 @@ export default function AccueilPage() {
   const fetchData = useCallback(async () => {
     if (!profile) return;
 
-    const [msgRes, resaRes, taskRes, oneOffRes, compRes, profRes, alertRes, prodRes, eventRes, ritualRes] =
-      await Promise.all([
-        supabase.from("messages").select("*").eq("date", shiftDate).order("created_at", { ascending: false }),
-        supabase.from("reservations").select("*").eq("date", shiftDate).order("time", { ascending: true }),
-        supabase.from("tasks").select("*").order("priority", { ascending: true }),
-        supabase.from("one_off_tasks").select("*").eq("date", shiftDate).order("priority", { ascending: true }),
-        supabase.from("task_completions").select("*").eq("date", shiftDate),
-        supabase.from("profiles").select("id, name, role"),
-        supabase.from("stock_alerts").select("*").eq("acknowledged", false).order("created_at", { ascending: false }),
-        supabase.from("stock_products").select("id, name, category").order("name"),
-        supabase.from("events").select("*").eq("date", shiftDate).limit(1).maybeSingle(),
-        supabase.from("rituals").select("*").eq("day", shiftDay).eq("active", true).order("sort_order"),
-      ]);
+    // Wrap each query in a catch so one missing table (e.g. not-yet-migrated)
+    // doesn't hang the whole page on an infinite spinner.
+    const safe = <T,>(p: PromiseLike<{ data: T | null }>): Promise<{ data: T | null }> =>
+      Promise.resolve(p).then((r) => r).catch(() => ({ data: null }));
 
-    setMessages((msgRes.data as ManagerMessage[]) || []);
-    setReservations((resaRes.data as Reservation[]) || []);
-    const profList = (profRes.data as Pick<Profile, "id" | "name" | "role">[]) || [];
-    const profMap: Record<string, string> = {};
-    profList.forEach((p) => { profMap[p.id] = p.name; });
-    setProfiles(profMap);
-    setStaffProfiles(profList.filter((p) => p.role !== "patron"));
-    setStockAlerts((alertRes.data as StockAlert[]) || []);
-    setStockProducts((prodRes.data as StockProduct[]) || []);
-    setEvent((eventRes.data as Event) || null);
-    setRituals((ritualRes.data as Ritual[]) || []);
+    try {
+      const [msgRes, resaRes, taskRes, oneOffRes, compRes, profRes, alertRes, prodRes, eventRes, ritualRes] =
+        await Promise.all([
+          safe(supabase.from("messages").select("*").eq("date", shiftDate).order("created_at", { ascending: false })),
+          safe(supabase.from("reservations").select("*").eq("date", shiftDate).order("time", { ascending: true })),
+          safe(supabase.from("tasks").select("*").order("priority", { ascending: true })),
+          safe(supabase.from("one_off_tasks").select("*").eq("date", shiftDate).order("priority", { ascending: true })),
+          safe(supabase.from("task_completions").select("*").eq("date", shiftDate)),
+          safe(supabase.from("profiles").select("id, name, role")),
+          safe(supabase.from("stock_alerts").select("*").eq("acknowledged", false).order("created_at", { ascending: false })),
+          safe(supabase.from("stock_products").select("id, name, category").order("name")),
+          safe(supabase.from("events").select("*").eq("date", shiftDate).limit(1).maybeSingle()),
+          safe(supabase.from("rituals").select("*").eq("day", shiftDay).eq("active", true).order("sort_order")),
+        ]);
 
-    const completions = (compRes.data as TaskCompletion[]) || [];
-    setRawCompletions(completions);
-    const completedIds = new Set(completions.map((c) => c.task_id));
+      setMessages((msgRes.data as ManagerMessage[]) || []);
+      setReservations((resaRes.data as Reservation[]) || []);
+      const profList = (profRes.data as Pick<Profile, "id" | "name" | "role">[]) || [];
+      const profMap: Record<string, string> = {};
+      profList.forEach((p) => { profMap[p.id] = p.name; });
+      setProfiles(profMap);
+      setStaffProfiles(profList.filter((p) => p.role !== "patron"));
+      setStockAlerts((alertRes.data as StockAlert[]) || []);
+      setStockProducts((prodRes.data as StockProduct[]) || []);
+      setEvent((eventRes.data as Event | null) || null);
+      setRituals((ritualRes.data as Ritual[]) || []);
 
-    const todayTasks = ((taskRes.data as Task[]) || []).filter((t) => t.days && t.days.includes(shiftDay));
-    setRawTasks(todayTasks);
+      const completions = (compRes.data as TaskCompletion[]) || [];
+      setRawCompletions(completions);
+      const completedIds = new Set(completions.map((c) => c.task_id));
 
-    const { ZONE_LABELS } = await import("@/lib/constants");
-    const recurring: MergedTask[] = todayTasks.map((t) => ({
-      id: t.id, title: t.title, zone: ZONE_LABELS[t.zone] || t.zone,
-      zoneKey: t.zone, description: t.note, completed: completedIds.has(t.id),
-      moment: t.moment, isOneOff: false, isLibre: t.is_libre,
-      assignedTo: t.assigned_to || [],
-    }));
+      const todayTasks = ((taskRes.data as Task[]) || []).filter((t) => t.days && t.days.includes(shiftDay));
+      setRawTasks(todayTasks);
 
-    const oneOff: MergedTask[] = ((oneOffRes.data as OneOffTask[]) || []).map((t) => ({
-      id: t.id, title: t.title, zone: ZONE_LABELS[t.zone] || t.zone,
-      zoneKey: t.zone, description: t.note, completed: completedIds.has(t.id),
-      moment: t.moment, isOneOff: true, isLibre: t.is_libre,
-      assignedTo: t.assigned_to || [],
-    }));
+      const { ZONE_LABELS } = await import("@/lib/constants");
+      const recurring: MergedTask[] = todayTasks.map((t) => ({
+        id: t.id, title: t.title, zone: ZONE_LABELS[t.zone] || t.zone,
+        zoneKey: t.zone, description: t.note, completed: completedIds.has(t.id),
+        moment: t.moment, isOneOff: false, isLibre: t.is_libre,
+        assignedTo: t.assigned_to || [],
+      }));
 
-    const allTasks = [...recurring, ...oneOff];
-    setTasks(allTasks);
-    setLoading(false);
+      const oneOff: MergedTask[] = ((oneOffRes.data as OneOffTask[]) || []).map((t) => ({
+        id: t.id, title: t.title, zone: ZONE_LABELS[t.zone] || t.zone,
+        zoneKey: t.zone, description: t.note, completed: completedIds.has(t.id),
+        moment: t.moment, isOneOff: true, isLibre: t.is_libre,
+        assignedTo: t.assigned_to || [],
+      }));
+
+      const allTasks = [...recurring, ...oneOff];
+      setTasks(allTasks);
+    } finally {
+      setLoading(false);
+    }
   }, [profile, supabase, shiftDate, shiftDay]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
