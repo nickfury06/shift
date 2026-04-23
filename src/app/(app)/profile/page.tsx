@@ -76,7 +76,7 @@ export default function ProfilePage() {
   const roleLabel = { patron: "Patron", responsable: "Responsable", staff: "Staff" }[profile?.role || "staff"];
 
   return (
-    <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+    <div style={{ paddingTop: 16, paddingRight: 20, paddingLeft: 20, paddingBottom: 96 }} className="max-w-lg mx-auto">
       <h1 style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-primary)", marginBottom: 20 }}>
         Mon profil
       </h1>

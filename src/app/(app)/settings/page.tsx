@@ -55,7 +55,7 @@ export default function SettingsPage() {
 
   if (profile && profile.role !== "patron") {
     return (
-      <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+      <div style={{ paddingTop: 16, paddingRight: 20, paddingLeft: 20, paddingBottom: 96 }} className="max-w-lg mx-auto">
         <div className="card-medium" style={{ padding: 24, textAlign: "center" }}>
           <p style={{ color: "var(--text-secondary)" }}>Accès réservé au patron</p>
         </div>
@@ -65,7 +65,7 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+      <div style={{ paddingTop: 16, paddingRight: 20, paddingLeft: 20, paddingBottom: 96 }} className="max-w-lg mx-auto">
         {[1, 2, 3].map((i) => (
           <div key={i} className="card-light pulse" style={{ height: 56, borderRadius: 16, marginBottom: 10 }} />
         ))}
@@ -74,7 +74,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+    <div style={{ paddingTop: 16, paddingRight: 20, paddingLeft: 20, paddingBottom: 96 }} className="max-w-lg mx-auto">
       <h1 style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-primary)", marginBottom: 20 }}>
         Réglages
       </h1>

@@ -78,7 +78,7 @@ export default function OnboardingPage() {
   // Reading a document
   if (activeDoc) {
     return (
-      <div className="min-h-dvh" style={{ padding: "0 20px", paddingBottom: 96 }}>
+      <div className="min-h-dvh" style={{ paddingTop: 0, paddingRight: 20, paddingLeft: 20, paddingBottom: 96 }}>
         <div className="max-w-lg mx-auto">
           <button
             onClick={() => setActiveDoc(null)}
@@ -130,7 +130,7 @@ export default function OnboardingPage() {
 
   // Document checklist
   return (
-    <div className="min-h-dvh" style={{ padding: "0 20px", paddingBottom: 96 }}>
+    <div className="min-h-dvh" style={{ paddingTop: 0, paddingRight: 20, paddingLeft: 20, paddingBottom: 96 }}>
       <div className="max-w-lg mx-auto">
         <div style={{ textAlign: "center", marginBottom: 32, marginTop: 32 }}>
           <h1 style={{ fontSize: 24, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-primary)", marginBottom: 8 }}>

@@ -74,7 +74,7 @@ export default function MessagesPage() {
 
   if (loading) {
     return (
-      <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+      <div style={{ paddingTop: 16, paddingRight: 20, paddingLeft: 20, paddingBottom: 96 }} className="max-w-lg mx-auto">
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div className="card-light pulse" style={{ height: 40, width: "50%", borderRadius: 8, opacity: 0.5 }} />
           <div className="card-light pulse" style={{ height: 128, borderRadius: 8, opacity: 0.5 }} />
@@ -86,7 +86,7 @@ export default function MessagesPage() {
   const today = getShiftDate();
 
   return (
-    <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+    <div style={{ paddingTop: 16, paddingRight: 20, paddingLeft: 20, paddingBottom: 96 }} className="max-w-lg mx-auto">
       <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
         <h1 style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-primary)" }}>Messages</h1>
 

@@ -167,7 +167,7 @@ export default function DebriefPage() {
 
   if (loading) {
     return (
-      <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+      <div style={{ paddingTop: 16, paddingRight: 20, paddingLeft: 20, paddingBottom: 96 }} className="max-w-lg mx-auto">
         {[1, 2, 3].map((i) => (
           <div key={i} className="card-light pulse" style={{ height: 56, borderRadius: 16, marginBottom: 10, opacity: 0.5 }} />
         ))}
@@ -177,7 +177,7 @@ export default function DebriefPage() {
 
   if (!user || !profile) {
     return (
-      <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+      <div style={{ paddingTop: 16, paddingRight: 20, paddingLeft: 20, paddingBottom: 96 }} className="max-w-lg mx-auto">
         <div className="card-medium" style={{ padding: 24, textAlign: "center" }}>
           <p style={{ color: "var(--text-secondary)" }}>Connecte-toi pour accéder au debrief</p>
         </div>
@@ -186,7 +186,7 @@ export default function DebriefPage() {
   }
 
   return (
-    <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+    <div style={{ paddingTop: 16, paddingRight: 20, paddingLeft: 20, paddingBottom: 96 }} className="max-w-lg mx-auto">
       <h1 style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-primary)", marginBottom: 4 }}>
         Debrief
       </h1>

@@ -77,7 +77,7 @@ export default function TasksPage() {
   // Guard: patron only
   if (profile && profile.role !== "patron") {
     return (
-      <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+      <div style={{ paddingTop: 16, paddingRight: 20, paddingLeft: 20, paddingBottom: 96 }} className="max-w-lg mx-auto">
         <div className="card-medium" style={{ padding: 24, textAlign: "center" }}>
           <p style={{ color: "var(--text-secondary)" }}>Acces reserve au patron</p>
         </div>
@@ -189,7 +189,7 @@ export default function TasksPage() {
 
   if (loading) {
     return (
-      <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+      <div style={{ paddingTop: 16, paddingRight: 20, paddingLeft: 20, paddingBottom: 96 }} className="max-w-lg mx-auto">
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div className="card-light pulse" style={{ height: 40, width: "50%", borderRadius: 8, opacity: 0.5 }} />
           {[1, 2, 3].map((i) => (
@@ -201,7 +201,7 @@ export default function TasksPage() {
   }
 
   return (
-    <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+    <div style={{ paddingTop: 16, paddingRight: 20, paddingLeft: 20, paddingBottom: 96 }} className="max-w-lg mx-auto">
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>

@@ -120,7 +120,7 @@ export default function PlanningPage() {
 
   if (loading) {
     return (
-      <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+      <div style={{ paddingTop: 16, paddingRight: 20, paddingLeft: 20, paddingBottom: 96 }} className="max-w-lg mx-auto">
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="card-light pulse" style={{ height: 48, borderRadius: 16, opacity: 0.5 }} />
@@ -131,7 +131,7 @@ export default function PlanningPage() {
   }
 
   return (
-    <div style={{ padding: "16px 20px", paddingBottom: 96 }} className="max-w-lg mx-auto">
+    <div style={{ paddingTop: 16, paddingRight: 20, paddingLeft: 20, paddingBottom: 96 }} className="max-w-lg mx-auto">
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
         <h1 style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-primary)" }}>Planning</h1>
