@@ -97,6 +97,10 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       } catch {
         // ignore
       }
+      // Hard navigate to /login so we drop all cached state
+      // (memoized clients, in-flight queries, Nav role gates, etc.)
+      // and the next session starts from a blank canvas.
+      window.location.assign("/login");
     }
   }
 
