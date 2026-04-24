@@ -33,17 +33,32 @@ export type TableZone = "restaurant" | "terrasse" | "terrasse_couverte" | "bar";
 // ── Profile ────────────────────────────────────────────────
 export type EmploymentType = "permanent" | "extra";
 
+export type Department = "bar" | "salle";
+
 export interface Profile {
   id: string;
   name: string;
   email: string;
   role: Role;
   stock_domain: StockDomain | null;
+  /**
+   * Which side of the venue this user belongs to.
+   * - patron: null (spans both)
+   * - responsable: 'bar' (Benjamin) or 'salle' (Maxime)
+   * - staff: 'bar' or 'salle'
+   */
+  department: Department | null;
   must_change_password: boolean;
   onboarding_completed: boolean;
   employment_type: EmploymentType;
   active: boolean;
   created_at: string;
+}
+
+export interface MessageRead {
+  message_id: string;
+  user_id: string;
+  read_at: string;
 }
 
 // ── Tasks ──────────────────────────────────────────────────

@@ -13,10 +13,13 @@ create table if not exists public.profiles (
   email text not null,
   role text not null check (role in ('patron', 'responsable', 'staff')),
   stock_domain text check (stock_domain in ('boissons', 'vins') or stock_domain is null),
+  department text check (department in ('bar', 'salle') or department is null),
   must_change_password boolean not null default true,
   onboarding_completed boolean not null default false,
   created_at timestamptz not null default now()
 );
+
+create index if not exists profiles_department_idx on public.profiles (department);
 
 -- Auto-create profile on signup
 create or replace function public.handle_new_user()
@@ -564,6 +567,27 @@ create policy "onboarding_completions_insert_own" on public.onboarding_completio
 alter publication supabase_realtime add table public.tasks;
 alter publication supabase_realtime add table public.one_off_tasks;
 alter publication supabase_realtime add table public.debriefs;
+
+-- ────────────────────────────────────────────────────────────
+-- Message read receipts — audit trail per user
+-- ────────────────────────────────────────────────────────────
+
+create table if not exists public.message_reads (
+  message_id uuid not null references public.messages on delete cascade,
+  user_id uuid not null references public.profiles on delete cascade,
+  read_at timestamptz not null default now(),
+  primary key (message_id, user_id)
+);
+
+create index if not exists message_reads_user_idx on public.message_reads (user_id);
+create index if not exists message_reads_message_idx on public.message_reads (message_id);
+
+alter table public.message_reads enable row level security;
+create policy "message_reads_select_all" on public.message_reads for select using (true);
+create policy "message_reads_insert_own" on public.message_reads for insert
+  with check (user_id = auth.uid());
+
+alter publication supabase_realtime add table public.message_reads;
 
 -- ────────────────────────────────────────────────────────────
 -- Rituals — recurring weekly activities shown in "Ce Soir"
