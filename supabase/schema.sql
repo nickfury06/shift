@@ -368,10 +368,11 @@ create policy "venue_tables_select_all" on public.venue_tables for select using 
 create policy "venue_tables_manage_patron" on public.venue_tables for all
   using (exists (select 1 from public.profiles where id = auth.uid() and role = 'patron'));
 
--- FK on reservations (if not already added)
+-- FK on reservations (if not already added). ON DELETE SET NULL so that
+-- deleting a table doesn't block on existing reservations referencing it.
 do $$ begin
   alter table public.reservations add constraint reservations_table_id_fkey
-    foreign key (table_id) references public.venue_tables(id);
+    foreign key (table_id) references public.venue_tables(id) on delete set null;
 exception when duplicate_object then null;
 end $$;
 
