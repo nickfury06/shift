@@ -32,6 +32,8 @@ interface FloorPlanProps {
   onTableTap?: (table: VenueTable) => void;
   /** Called after patron mutates the venue_tables set (add/edit/delete). */
   onTablesChanged?: () => void;
+  /** Hide tables — useful on the Guide page where only spaces matter. */
+  showTables?: boolean;
 }
 
 const VIEWBOX_W = 1000;
@@ -55,7 +57,7 @@ type Drag =
   | { kind: "table"; id: string; offsetX: number; offsetY: number }
   | null;
 
-export default function FloorPlan({ tables, reservations = [], onTableTap, onTablesChanged }: FloorPlanProps) {
+export default function FloorPlan({ tables, reservations = [], onTableTap, onTablesChanged, showTables = true }: FloorPlanProps) {
   const { profile } = useAuth();
   const toast = useToast();
   const { confirm } = useConfirm();
@@ -71,7 +73,7 @@ export default function FloorPlan({ tables, reservations = [], onTableTap, onTab
   const [dragging, setDragging] = useState<Drag>(null);
 
   // Table manager (patron edit mode): list + add/edit form
-  const [showTables, setShowTables] = useState(false);
+  const [showTableManager, setShowTableManager] = useState(false);
   const [newTableId, setNewTableId] = useState("");
   const [newTableCapacity, setNewTableCapacity] = useState(4);
   const [newTableMax, setNewTableMax] = useState(4);
@@ -488,7 +490,7 @@ export default function FloorPlan({ tables, reservations = [], onTableTap, onTab
             onClick={() => {
               setEditing((v) => !v);
               setSelectedSpaceId(null);
-              setShowTables(false);
+              setShowTableManager(false);
               // Reset zoom on mode switch so each mode starts at full view
               setViewBox({ x: 0, y: 0, w: VIEWBOX_W, h: VIEWBOX_H });
             }}
@@ -524,12 +526,12 @@ export default function FloorPlan({ tables, reservations = [], onTableTap, onTab
               </button>
             ))}
             <button
-              onClick={() => setShowTables((v) => !v)}
+              onClick={() => setShowTableManager((v) => !v)}
               style={{
                 display: "flex", alignItems: "center", gap: 4,
                 padding: "6px 10px", borderRadius: 8,
-                background: showTables ? "var(--terra-medium)" : "var(--secondary-bg)",
-                color: showTables ? "#fff" : "var(--text-secondary)",
+                background: showTableManager ? "var(--terra-medium)" : "var(--secondary-bg)",
+                color: showTableManager ? "#fff" : "var(--text-secondary)",
                 border: "none", cursor: "pointer",
                 fontSize: 12, fontWeight: 500,
               }}
@@ -721,7 +723,7 @@ export default function FloorPlan({ tables, reservations = [], onTableTap, onTab
           })}
 
           {/* Tables */}
-          {localTables.map((t) => {
+          {showTables && localTables.map((t) => {
             const booked = bookedTableIds.has(t.id);
             const r = t.radius || DEFAULT_TABLE_RADIUS;
             const idFontSize = Math.max(10, Math.round(r * 0.55));
@@ -849,7 +851,7 @@ export default function FloorPlan({ tables, reservations = [], onTableTap, onTab
         </div>
       )}
 
-      {editing && !selectedSpace && !showTables && (
+      {editing && !selectedSpace && !showTableManager && (
         <p style={{ fontSize: 12, color: "var(--text-tertiary)", textAlign: "center", marginTop: 10, lineHeight: 1.5 }}>
           <Move size={11} style={{ display: "inline", marginRight: 4 }} />
           Glisse les espaces et les tables. Touche le coin d&apos;un espace pour redimensionner.
@@ -900,14 +902,14 @@ export default function FloorPlan({ tables, reservations = [], onTableTap, onTab
       )}
 
       {/* Tables manager */}
-      {editing && showTables && (
+      {editing && showTableManager && (
         <div className="card-light" style={{ marginTop: 12, padding: 14, display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
               Tables ({localTables.length})
             </div>
             <button
-              onClick={() => setShowTables(false)}
+              onClick={() => setShowTableManager(false)}
               aria-label="Fermer"
               style={{
                 width: 32, height: 32, borderRadius: 8,
