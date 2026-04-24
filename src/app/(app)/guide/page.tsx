@@ -190,11 +190,17 @@ export default function GuidePage() {
 
   if (loading) {
     return (
-      <div style={{ paddingTop: 20, paddingRight: 20, paddingLeft: 20, paddingBottom: 96 }} className="max-w-lg mx-auto">
-        <div className="pulse" style={{ height: 36, borderRadius: 10, background: "var(--card-bg)", marginBottom: 20, width: "50%" }} />
+      <div
+        style={{ paddingTop: 20, paddingRight: 20, paddingLeft: 20, paddingBottom: 96, position: "relative" }}
+        className="max-w-lg mx-auto"
+      >
+        <div className="liquid-bg" aria-hidden>
+          <div className="liquid-bg-extra" />
+        </div>
+        <div className="glass pulse" style={{ height: 36, borderRadius: 10, marginBottom: 20, width: "50%" }} />
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="card-light pulse" style={{ height: 120, borderRadius: 20, opacity: 0.5 }} />
+            <div key={i} className="glass pulse" style={{ height: 120, borderRadius: 20, opacity: 0.7 }} />
           ))}
         </div>
       </div>
@@ -208,9 +214,13 @@ export default function GuidePage() {
     const section = sections.find((s) => s.key === activeSection)!;
     return (
       <div
-        style={{ paddingTop: 14, paddingRight: 20, paddingLeft: 20, paddingBottom: 96 }}
+        style={{ paddingTop: 14, paddingRight: 20, paddingLeft: 20, paddingBottom: 96, position: "relative" }}
         className="max-w-lg mx-auto animate-fade-in-up"
       >
+        <div className="liquid-bg" aria-hidden>
+          <div className="liquid-bg-extra" />
+        </div>
+
         {/* Back button (Apple-style) */}
         <button
           onClick={() => setActiveSection(null)}
@@ -228,14 +238,17 @@ export default function GuidePage() {
           Guide
         </button>
 
-        {/* Section hero */}
+        {/* Section hero — glass icon tile */}
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 22 }}>
           <div
             style={{
-              width: 52, height: 52, borderRadius: 14,
+              width: 56, height: 56, borderRadius: 16,
               background: section.tint,
               color: section.accent,
               display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: `0 1px 0 0 rgba(255,255,255,0.5) inset, 0 6px 18px ${section.accent}33`,
+              backdropFilter: "blur(10px)",
+              WebkitBackdropFilter: "blur(10px)",
             }}
           >
             {section.icon}
@@ -266,9 +279,15 @@ export default function GuidePage() {
   // ═══════════════════════════════════════════════════════════
   return (
     <div
-      style={{ paddingTop: 20, paddingRight: 20, paddingLeft: 20, paddingBottom: 96 }}
+      style={{ paddingTop: 20, paddingRight: 20, paddingLeft: 20, paddingBottom: 96, position: "relative" }}
       className="max-w-lg mx-auto"
     >
+      {/* Liquid-glass ambient background — colored blobs the glass
+          surfaces below refract. Fixed layer, doesn't scroll. */}
+      <div className="liquid-bg" aria-hidden>
+        <div className="liquid-bg-extra" />
+      </div>
+
       {/* Apple-style large title */}
       <div style={{ marginBottom: 22 }}>
         <h1 style={{ fontSize: 30, fontWeight: 700, letterSpacing: "-0.03em", color: "var(--text-primary)", margin: 0, lineHeight: 1.1 }}>
@@ -279,17 +298,16 @@ export default function GuidePage() {
         </p>
       </div>
 
-      {/* Tonight's team — hero card */}
+      {/* Tonight's team — glass hero card */}
       {responsable && (
         <button
           onClick={() => setActiveSection("shifts")}
+          className="glass-strong"
           style={{
             width: "100%",
             display: "flex", alignItems: "center", gap: 14,
             padding: "16px 18px",
-            borderRadius: 18,
-            background: "linear-gradient(135deg, rgba(196,120,90,0.12), rgba(196,120,90,0.03))",
-            border: "1px solid rgba(196,120,90,0.16)",
+            borderRadius: 20,
             cursor: "pointer",
             marginBottom: 16,
             textAlign: "left",
@@ -370,11 +388,12 @@ export default function GuidePage() {
         </div>
       )}
 
-      {/* Apple Shortcuts-style grid of section cards */}
+      {/* Apple Shortcuts-style grid of glass section cards */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         {sections.map((section) => (
           <button
             key={section.key}
+            className="glass"
             onClick={() => { haptic("light"); setActiveSection(section.key); }}
             style={{
               position: "relative",
@@ -382,21 +401,22 @@ export default function GuidePage() {
               gap: 10,
               padding: "16px 14px",
               borderRadius: 20,
-              background: "var(--card-bg)",
-              border: "1px solid var(--card-border)",
-              boxShadow: "var(--shadow-light)",
               cursor: "pointer",
               textAlign: "left",
               minHeight: 130,
-              transition: "transform 0.15s ease, box-shadow 0.15s ease",
+              transition: "transform 0.15s ease",
             }}
           >
+            {/* Glass icon tile with colored tint + inner highlight */}
             <div
               style={{
-                width: 40, height: 40, borderRadius: 12,
+                width: 44, height: 44, borderRadius: 14,
                 background: section.tint,
                 color: section.accent,
                 display: "flex", alignItems: "center", justifyContent: "center",
+                boxShadow: `0 1px 0 0 rgba(255,255,255,0.5) inset, 0 4px 12px ${section.accent}22`,
+                backdropFilter: "blur(8px)",
+                WebkitBackdropFilter: "blur(8px)",
               }}
             >
               {section.icon}
@@ -417,11 +437,11 @@ export default function GuidePage() {
       {profile?.role === "patron" && (
         <Link
           href="/settings"
+          className="glass"
           style={{
             display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-            padding: "12px 14px", marginTop: 22, borderRadius: 14,
+            padding: "12px 14px", marginTop: 22, borderRadius: 16,
             fontSize: 13, fontWeight: 500, color: "var(--text-secondary)",
-            background: "var(--secondary-bg)",
             textDecoration: "none", minHeight: 44,
           }}
         >
@@ -511,12 +531,13 @@ function SectionContent({
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <div
-          className="card-medium"
+          className="glass"
           style={{
-            padding: 14,
-            background: "rgba(192,122,122,0.06)",
-            border: "1px solid rgba(192,122,122,0.2)",
+            padding: 16, borderRadius: 18,
             display: "flex", flexDirection: "column", gap: 10,
+            // Subtle danger tint on top of the glass
+            boxShadow:
+              "0 1px 0 0 rgba(255,255,255,0.4) inset, 0 0 0 1px rgba(192,122,122,0.2), 0 8px 24px rgba(192,122,122,0.1)",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -547,8 +568,12 @@ function SectionContent({
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {hasWifi ? (
           <div
-            className="card-medium"
-            style={{ padding: 14, display: "flex", alignItems: "center", gap: 12, borderLeft: "3px solid var(--terra-medium)" }}
+            className="glass"
+            style={{
+              padding: 16, borderRadius: 18,
+              display: "flex", alignItems: "center", gap: 12,
+              borderLeft: "3px solid var(--terra-medium)",
+            }}
           >
             <Wifi size={22} style={{ color: "var(--terra-medium)", flexShrink: 0 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -590,7 +615,7 @@ function SectionContent({
               <BookOpen size={12} style={{ color: "var(--text-tertiary)" }} />
               <span className="section-label">Où trouver quoi</span>
             </div>
-            <div className="card-light" style={{ padding: 14 }}>
+            <div className="glass" style={{ padding: 16, borderRadius: 16 }}>
               <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.55, margin: 0, whiteSpace: "pre-wrap" }}>
                 {venueInfo.storage_notes}
               </p>
@@ -614,10 +639,7 @@ function SectionContent({
 
 function BodyText({ text }: { text: string }) {
   return (
-    <div
-      className="card-light"
-      style={{ padding: 18, borderRadius: 18 }}
-    >
+    <div className="glass" style={{ padding: 20, borderRadius: 20 }}>
       <p style={{ fontSize: 14, color: "var(--text-primary)", lineHeight: 1.65, margin: 0, whiteSpace: "pre-wrap" }}>
         {text}
       </p>
@@ -628,11 +650,10 @@ function BodyText({ text }: { text: string }) {
 function DetailRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <div
+      className="glass"
       style={{
         display: "flex", alignItems: "flex-start", gap: 12,
-        padding: "12px 14px", borderRadius: 14,
-        background: "var(--card-bg)",
-        border: "1px solid var(--card-border)",
+        padding: "14px 16px", borderRadius: 16,
       }}
     >
       <div style={{ color: "var(--terra-medium)", flexShrink: 0, marginTop: 2 }}>{icon}</div>
@@ -652,13 +673,12 @@ function EmergencyCard({ label, number }: { label: string; number: string }) {
   return (
     <a
       href={`tel:${number}`}
+      className="glass"
       style={{
         display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
-        padding: "14px 10px", borderRadius: 14,
-        background: "var(--card-bg)",
-        border: "1px solid var(--card-border)",
+        padding: "16px 10px", borderRadius: 16,
         textDecoration: "none",
-        minHeight: 80,
+        minHeight: 92,
         justifyContent: "center",
       }}
     >
@@ -672,10 +692,10 @@ function EmergencyCard({ label, number }: { label: string; number: string }) {
 function EmptyHint({ label, hint }: { label: string; hint: string }) {
   return (
     <div
+      className="glass"
       style={{
         padding: "14px 16px", borderRadius: 14,
-        background: "var(--secondary-bg)", color: "var(--text-tertiary)",
-        fontSize: 13, lineHeight: 1.5,
+        color: "var(--text-tertiary)", fontSize: 13, lineHeight: 1.5,
       }}
     >
       <div style={{ fontWeight: 600, color: "var(--text-secondary)", marginBottom: 2 }}>{label}</div>
@@ -688,12 +708,12 @@ function EditHint() {
   return (
     <Link
       href="/settings"
+      className="glass"
       style={{
         display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-        padding: "10px 14px", borderRadius: 12,
+        padding: "10px 14px", borderRadius: 14,
         fontSize: 12, fontWeight: 500, color: "var(--text-secondary)",
-        background: "var(--secondary-bg)",
-        textDecoration: "none", minHeight: 40,
+        textDecoration: "none", minHeight: 44,
       }}
     >
       <Pencil size={13} />

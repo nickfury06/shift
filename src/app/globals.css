@@ -301,6 +301,101 @@
     }
   }
 
+  /* ── Liquid Glass (Apple iOS 26 / macOS Tahoe) ─────────────
+     Translucent panels that refract the colored blobs behind
+     them. Two variants: `.glass` for secondary surfaces, and
+     `.glass-strong` for hero cards that need extra depth.
+     The highlight border (top inset shadow) fakes a specular
+     edge where the glass "catches" light.                       */
+
+  .glass,
+  .glass-strong {
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    box-shadow:
+      0 1px 0 0 rgba(255, 255, 255, 0.55) inset,
+      0 8px 32px rgba(0, 0, 0, 0.06),
+      0 1px 2px rgba(0, 0, 0, 0.03);
+  }
+
+  .glass-strong {
+    background: rgba(255, 255, 255, 0.7);
+    box-shadow:
+      0 1px 0 0 rgba(255, 255, 255, 0.6) inset,
+      0 16px 48px rgba(0, 0, 0, 0.08),
+      0 2px 4px rgba(0, 0, 0, 0.04);
+  }
+
+  .dark .glass,
+  .dark .glass-strong {
+    background: rgba(30, 26, 22, 0.5);
+    border: 1px solid rgba(255, 240, 220, 0.08);
+    box-shadow:
+      0 1px 0 0 rgba(255, 240, 220, 0.06) inset,
+      0 8px 32px rgba(0, 0, 0, 0.35),
+      0 1px 2px rgba(0, 0, 0, 0.2);
+  }
+
+  .dark .glass-strong {
+    background: rgba(40, 34, 28, 0.62);
+  }
+
+  /* Ambient color blobs that glass surfaces refract. Place a
+     `.liquid-bg` div as a fixed layer behind page content on
+     pages that want the effect. z-index kept below app shell. */
+  .liquid-bg {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .liquid-bg::before,
+  .liquid-bg::after {
+    content: "";
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(90px);
+    opacity: 0.55;
+  }
+
+  .liquid-bg::before {
+    top: -15%;
+    left: -10%;
+    width: 520px;
+    height: 520px;
+    background: radial-gradient(circle, #D4A04A 0%, transparent 65%);
+  }
+
+  .liquid-bg::after {
+    top: 30%;
+    right: -15%;
+    width: 620px;
+    height: 620px;
+    background: radial-gradient(circle, #C4785A 0%, transparent 65%);
+  }
+
+  .liquid-bg-extra {
+    position: absolute;
+    bottom: -10%;
+    left: 25%;
+    width: 560px;
+    height: 560px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #8B5A40 0%, transparent 65%);
+    filter: blur(110px);
+    opacity: 0.4;
+  }
+
+  .dark .liquid-bg::before,
+  .dark .liquid-bg::after,
+  .dark .liquid-bg-extra {
+    opacity: 0.35;
+  }
+
   /* ── App shell ─────────────────────────────────────────────
      The outer wrapper around DesktopNav + main content. On mobile it's
      a plain block (main fills width, bottom nav is separate position:
