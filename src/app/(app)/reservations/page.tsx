@@ -28,7 +28,8 @@ export default function ReservationsPage() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(false);
-  const [view, setView] = useState<"list" | "plan">("list");
+  const [view, setView] = useState<"list" | "plan">("plan");
+  const [peekResaId, setPeekResaId] = useState<string | null>(null);
   const [profileMap, setProfileMap] = useState<Record<string, string>>({});
   const isPatron = profile?.role === "patron";
   const canApproveFnF = profile?.role === "patron" || profile?.role === "responsable";
@@ -107,21 +108,45 @@ export default function ReservationsPage() {
 
   const bookedTableIds = new Set(formDateResas.filter((r) => r.table_id).map((r) => r.table_id));
 
-  function openForm() {
+  function openForm(preselected?: { table: VenueTable }) {
     setName("");
     setPhone("");
-    setCovers(2);
+    setCovers(preselected ? Math.min(preselected.table.capacity, 8) : 2);
     setFormDate(viewDate);
     setTime("20:00");
-    setSeating("terrasse");
+    setSeating(preselected ? zoneToSeating(preselected.table.zone) : "terrasse");
     setType("diner");
     setSource("telephone");
-    setTableId(null);
+    setTableId(preselected?.table.id ?? null);
     setNotes("");
     setIsFnF(false);
     setShowDetails(false);
     setShowForm(true);
   }
+
+  // Map a venue zone to the form's seating label.
+  function zoneToSeating(zone: string): ReservationSeating {
+    if (zone === "terrasse" || zone === "terrasse_couverte") return "terrasse";
+    if (zone === "bar") return "bar";
+    return "interieur";
+  }
+
+  /**
+   * Called when the user taps a table in the floor plan (view mode).
+   * - Free table → open new-resa form pre-filled with that table
+   * - Booked table → open peek sheet with the existing resa + quick actions
+   */
+  function handleTableTap(table: VenueTable) {
+    const existing = reservations.find((r) => r.table_id === table.id);
+    if (existing) {
+      setPeekResaId(existing.id);
+    } else {
+      openForm({ table });
+    }
+  }
+
+  const peekResa = peekResaId ? reservations.find((r) => r.id === peekResaId) : null;
+  const peekTable = peekResa?.table_id ? tables.find((t) => t.id === peekResa.table_id) : null;
 
   async function handleSave() {
     if (!name.trim() || !user || saving) return;
@@ -235,7 +260,7 @@ export default function ReservationsPage() {
           Réservations
         </h1>
         <button
-          onClick={openForm}
+          onClick={() => openForm()}
           className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-white"
           style={{ background: "var(--gradient-primary)" }}
         >
@@ -303,7 +328,12 @@ export default function ReservationsPage() {
 
       {/* Plan view */}
       {view === "plan" && (
-        <FloorPlan tables={tables} reservations={reservations} onTablesChanged={fetchData} />
+        <FloorPlan
+          tables={tables}
+          reservations={reservations}
+          onTablesChanged={fetchData}
+          onTableTap={handleTableTap}
+        />
       )}
 
       {/* Reservation list — attendu */}
@@ -474,6 +504,96 @@ export default function ReservationsPage() {
       )}
 
       {/* ── FORM MODAL ───────────────────────────────────── */}
+      {/* Booked-table peek sheet (tap a red table on the plan) */}
+      {peekResa && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+          <div onClick={() => setPeekResaId(null)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }} />
+          <div
+            className="card-medium"
+            style={{
+              position: "relative", width: "100%", maxWidth: 512,
+              padding: "20px 20px 24px",
+              borderRadius: "20px 20px 0 0",
+              animation: "fadeInUp 0.25s ease-out",
+            }}
+          >
+            <button onClick={() => setPeekResaId(null)} style={{ position: "absolute", top: 14, right: 14, background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+              <X size={20} style={{ color: "var(--text-tertiary)" }} />
+            </button>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: 12,
+                background: "rgba(192,122,122,0.15)", color: "var(--danger)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 14, fontWeight: 700,
+              }}>
+                {peekTable?.id ?? "—"}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text-primary)" }}>
+                  {peekResa.name}
+                </div>
+                <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                  {formatTime(peekResa.time)} · {peekResa.covers} pers.
+                  {peekResa.seating ? ` · ${SEATING_LABELS[peekResa.seating]}` : ""}
+                </div>
+              </div>
+            </div>
+
+            {peekResa.phone && (
+              <a
+                href={`tel:${peekResa.phone}`}
+                style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  padding: "10px 12px", borderRadius: 10, marginBottom: 8,
+                  background: "var(--secondary-bg)", color: "var(--terra-medium)",
+                  textDecoration: "none", fontSize: 13, fontWeight: 500,
+                }}
+              >
+                <Phone size={14} /> {peekResa.phone}
+              </a>
+            )}
+
+            {peekResa.notes && (
+              <div style={{
+                padding: "10px 12px", borderRadius: 10, marginBottom: 12,
+                background: "var(--secondary-bg)",
+                fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5,
+                whiteSpace: "pre-wrap",
+              }}>
+                {peekResa.notes}
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <button
+                onClick={() => { toggleArrived(peekResa); setPeekResaId(null); }}
+                style={{
+                  flex: 2, padding: "12px 0", borderRadius: 12, border: "none", cursor: "pointer",
+                  fontSize: 14, fontWeight: 600, color: "#fff",
+                  background: peekResa.status === "arrive" ? "var(--secondary-bg)" : "var(--gradient-primary)",
+                  ...(peekResa.status === "arrive" ? { color: "var(--text-secondary)" } : {}),
+                }}
+              >
+                {peekResa.status === "arrive" ? "↩ Marquer attendu" : "✓ Marquer arrivé"}
+              </button>
+              <button
+                onClick={() => { handleDelete(peekResa.id); setPeekResaId(null); }}
+                aria-label="Supprimer"
+                style={{
+                  width: 48, height: 48, borderRadius: 12,
+                  background: "rgba(192,122,122,0.1)", border: "none", cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}
+              >
+                <Trash2 size={18} style={{ color: "var(--danger)" }} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showForm && (
         <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
           <div onClick={() => setShowForm(false)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }} />
@@ -492,6 +612,43 @@ export default function ReservationsPage() {
             <p style={{ fontSize: 16, fontWeight: 600, color: "var(--text-primary)", marginBottom: 20 }}>
               Nouvelle réservation
             </p>
+
+            {/* Pre-selected table banner (when form opened from floor plan tap) */}
+            {tableId && (() => {
+              const selectedTable = tables.find((t) => t.id === tableId);
+              if (!selectedTable) return null;
+              return (
+                <div
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "10px 14px", marginBottom: 16, borderRadius: 12,
+                    background: "rgba(196,120,90,0.08)",
+                    border: "1px solid rgba(196,120,90,0.2)",
+                  }}
+                >
+                  <Armchair size={16} style={{ color: "var(--terra-medium)", flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
+                      Table {selectedTable.id}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                      {selectedTable.capacity} places · choisie depuis le plan
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setTableId(null)}
+                    aria-label="Retirer la table"
+                    style={{
+                      width: 28, height: 28, borderRadius: 8,
+                      background: "var(--secondary-bg)", border: "none", cursor: "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}
+                  >
+                    <X size={14} style={{ color: "var(--text-tertiary)" }} />
+                  </button>
+                </div>
+              );
+            })()}
 
             {/* ── Row 1: Nom + Téléphone ─────────────────── */}
             <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
