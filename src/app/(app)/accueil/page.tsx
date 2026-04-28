@@ -23,6 +23,7 @@ import MessageBanner from "@/components/MessageBanner";
 import MomentSection from "@/components/MomentSection";
 import Link from "next/link";
 import { haptic } from "@/lib/haptics";
+import { markMessageRead } from "@/lib/message-reads";
 import { Users, Bell, Search, X, ChevronDown, BookOpen, Check } from "lucide-react";
 
 interface MergedTask {
@@ -59,6 +60,9 @@ export default function AccueilPage() {
       localStorage.setItem("shift-dismissed-msgs", JSON.stringify([...next]));
       return next;
     });
+    // Audit-trail: mark this message as read for the current user.
+    // The dismiss is per-device; the read receipt is permanent.
+    if (user) markMessageRead(supabase, id, user.id);
   }
 
   const [profiles, setProfiles] = useState<Record<string, string>>({});

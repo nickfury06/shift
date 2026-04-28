@@ -33,6 +33,9 @@ export default function ReservationsPage() {
   const [profileMap, setProfileMap] = useState<Record<string, string>>({});
   const isPatron = profile?.role === "patron";
   const canApproveFnF = profile?.role === "patron" || profile?.role === "responsable";
+  // Extras are read-only on /reservations: see the book, can't add or edit
+  const isExtra = profile?.employment_type === "extra";
+  const canCreateResa = !!profile && !isExtra;
 
   // Form
   const [name, setName] = useState("");
@@ -139,10 +142,12 @@ export default function ReservationsPage() {
   function handleTableTap(table: VenueTable) {
     const existing = reservations.find((r) => r.table_id === table.id);
     if (existing) {
+      // Extras can still see who's at a booked table — useful for service
       setPeekResaId(existing.id);
-    } else {
+    } else if (canCreateResa) {
       openForm({ table });
     }
+    // free table + extra → silently ignore (no booking creation allowed)
   }
 
   const peekResa = peekResaId ? reservations.find((r) => r.id === peekResaId) : null;
@@ -259,6 +264,7 @@ export default function ReservationsPage() {
         <h1 style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-primary)" }}>
           Réservations
         </h1>
+        {canCreateResa && (
         <button
           onClick={() => openForm()}
           className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-white"
@@ -267,6 +273,7 @@ export default function ReservationsPage() {
           <Plus size={16} />
           Ajouter
         </button>
+        )}
       </div>
 
       {/* Date nav */}

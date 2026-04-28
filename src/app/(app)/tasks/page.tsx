@@ -6,11 +6,23 @@ import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/Confirm";
 import { createClient } from "@/lib/supabase/client";
 import { ZONE_LABELS, ZONE_COLORS, MOMENT_LABELS, MOMENT_ORDER } from "@/lib/constants";
-import type { Task, Zone, Moment, Day, Profile } from "@/lib/types";
+import type { Task, Zone, Moment, Day, Profile, Department } from "@/lib/types";
 import { Plus, Trash2, Edit3, Bell } from "lucide-react";
 
 // ── Work days & labels ────────────────────────────────────
 const TASK_WORK_DAYS: Day[] = ["mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+
+// Map a task zone to which department owns it.
+// Bar is bar; terrasse + restaurant are both salle service.
+function zoneToDepartment(z: Zone): Department {
+  return z === "bar" ? "bar" : "salle";
+}
+
+function zonesForDepartment(d: Department | null): Zone[] {
+  if (d === "bar") return ["bar"];
+  if (d === "salle") return ["terrasse", "restaurant"];
+  return ["bar", "terrasse", "restaurant"];
+}
 
 const SHORT_DAY_LABELS: Record<Day, string> = {
   lundi: "Lun",
@@ -31,9 +43,15 @@ export default function TasksPage() {
   const supabase = useRef(createClient()).current;
 
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [staff, setStaff] = useState<Pick<Profile, "id" | "name">[]>([]);
+  const [staff, setStaff] = useState<Pick<Profile, "id" | "name" | "department">[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterCategory>("all");
+
+  // Department-scoped permissions for responsables
+  const isPatron = profile?.role === "patron";
+  const isResponsable = profile?.role === "responsable";
+  const allowedZones = zonesForDepartment(isPatron ? null : profile?.department ?? null);
+  const myDepartment = profile?.department ?? null;
 
   // Form state
   const [showForm, setShowForm] = useState(false);
@@ -64,9 +82,9 @@ export default function TasksPage() {
   const fetchStaff = useCallback(async () => {
     const { data } = await supabase
       .from("profiles")
-      .select("id, name")
+      .select("id, name, department")
       .order("name");
-    setStaff(data || []);
+    setStaff((data as Pick<Profile, "id" | "name" | "department">[]) || []);
   }, [supabase]);
 
   useEffect(() => {
@@ -74,12 +92,12 @@ export default function TasksPage() {
     fetchStaff();
   }, [fetchTasks, fetchStaff]);
 
-  // Guard: patron only
-  if (profile && profile.role !== "patron") {
+  // Guard: patron + responsable only
+  if (profile && profile.role !== "patron" && profile.role !== "responsable") {
     return (
       <div style={{ paddingTop: 16, paddingRight: 20, paddingLeft: 20, paddingBottom: 96 }} className="max-w-lg mx-auto">
         <div className="card-medium" style={{ padding: 24, textAlign: "center" }}>
-          <p style={{ color: "var(--text-secondary)" }}>Acces reserve au patron</p>
+          <p style={{ color: "var(--text-secondary)" }}>Accès réservé aux managers</p>
         </div>
       </div>
     );
@@ -88,7 +106,8 @@ export default function TasksPage() {
   function resetForm() {
     setTitle("");
     setNote("");
-    setZone("restaurant");
+    // Default zone: responsable → first zone of their department; patron → restaurant
+    setZone(allowedZones[0] ?? "restaurant");
     setMoment("ouverture");
     setSelectedDays([...TASK_WORK_DAYS]);
     setPriority(1);
@@ -182,10 +201,26 @@ export default function TasksPage() {
     fetchTasks();
   }
 
-  const filtered =
-    filter === "all" ? tasks : tasks.filter((t) => t.zone === filter);
+  // Responsables only see tasks in their department's zones; patron sees all
+  const visibleTasks = isPatron
+    ? tasks
+    : tasks.filter((t) => allowedZones.includes(t.zone));
 
-  const zones: FilterCategory[] = ["all", "bar", "terrasse", "restaurant"];
+  const filtered =
+    filter === "all" ? visibleTasks : visibleTasks.filter((t) => t.zone === filter);
+
+  // Filter pills exclude zones outside the user's department (responsable scope)
+  const zones: FilterCategory[] = isPatron
+    ? ["all", "bar", "terrasse", "restaurant"]
+    : ["all", ...allowedZones];
+
+  // Staff candidates for assignment: patron sees all non-patron, responsable
+  // sees only their department's staff
+  const assignableStaff = staff.filter((s) => {
+    if (s.id === profile?.id) return false; // don't self-assign noise
+    if (isPatron) return true;
+    return s.department === myDepartment;
+  });
 
   if (loading) {
     return (
@@ -280,11 +315,11 @@ export default function TasksPage() {
                 rows={2}
               />
 
-              {/* Zone */}
+              {/* Zone — responsables only see their department's zones */}
               <div>
                 <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 8 }}>Zone</p>
                 <div style={{ display: "flex", gap: 8 }}>
-                  {(Object.keys(ZONE_LABELS) as Zone[]).map((z) => (
+                  {allowedZones.map((z) => (
                     <button
                       key={z}
                       onClick={() => setZone(z)}
@@ -458,7 +493,7 @@ export default function TasksPage() {
                     Assigne a (optionnel)
                   </p>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {staff.map((s) => (
+                    {assignableStaff.map((s) => (
                       <button
                         key={s.id}
                         onClick={() => toggleStaffMember(s.id)}
@@ -472,6 +507,11 @@ export default function TasksPage() {
                         {s.name}
                       </button>
                     ))}
+                    {assignableStaff.length === 0 && (
+                      <p style={{ fontSize: 12, color: "var(--text-tertiary)", padding: "6px 0" }}>
+                        Aucun staff disponible. Le patron doit assigner un département à tes équipiers.
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
