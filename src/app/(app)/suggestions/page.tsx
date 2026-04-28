@@ -1,12 +1,10 @@
 "use client";
 
 /**
- * Suggestions — staff idea box.
- *
- * Anyone authenticated can drop a quick idea (categorized + free text).
- * Patron reviews and resolves on /admin (and here, with extra controls).
- * Read-open: full transparency on what's been suggested + the patron's
- * decisions, so the team learns from each call.
+ * Boîte à idées — simple board where anyone can drop an idea for the
+ * team. Categories double as filter tags. No status workflow, no
+ * patron resolution actions — just a public lightweight wall of
+ * suggestions, kept honest by author attribution + delete-own.
  */
 
 import { useEffect, useState, useRef, useCallback } from "react";
@@ -15,8 +13,8 @@ import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/Confirm";
 import { createClient } from "@/lib/supabase/client";
 import { haptic } from "@/lib/haptics";
-import type { Suggestion, SuggestionCategory, SuggestionStatus, Profile } from "@/lib/types";
-import { Lightbulb, Send, Trash2, Check, X as XIcon, Sparkles } from "lucide-react";
+import type { Suggestion, SuggestionCategory, Profile } from "@/lib/types";
+import { Lightbulb, Send, Trash2, Sparkles } from "lucide-react";
 import EmptyState from "@/components/EmptyState";
 
 const CATEGORY_LABELS: Record<SuggestionCategory, string> = {
@@ -26,18 +24,12 @@ const CATEGORY_LABELS: Record<SuggestionCategory, string> = {
   autre: "Autre",
 };
 
-const STATUS_LABELS: Record<SuggestionStatus, string> = {
-  pending: "En attente",
-  accepted: "Acceptée",
-  rejected: "Refusée",
-  implemented: "Mise en place",
-};
-
-const STATUS_COLOR: Record<SuggestionStatus, string> = {
-  pending: "var(--text-tertiary)",
-  accepted: "#8B5A40",
-  rejected: "var(--danger)",
-  implemented: "#6B4A30",
+// Color tag per category — visual differentiation for the wall view
+const CATEGORY_COLOR: Record<SuggestionCategory, string> = {
+  service: "#C4785A",
+  menu: "#D4A04A",
+  organisation: "#8B5A40",
+  autre: "#8A857E",
 };
 
 export default function SuggestionsPage() {
@@ -55,8 +47,8 @@ export default function SuggestionsPage() {
   const [category, setCategory] = useState<SuggestionCategory>("service");
   const [submitting, setSubmitting] = useState(false);
 
-  // Filter
-  const [filter, setFilter] = useState<"all" | SuggestionStatus>("all");
+  // Filter — by category only (no status workflow anymore)
+  const [filter, setFilter] = useState<"all" | SuggestionCategory>("all");
 
   const isPatron = profile?.role === "patron";
 
@@ -96,18 +88,6 @@ export default function SuggestionsPage() {
     setContent("");
   }
 
-  async function setStatus(id: string, status: SuggestionStatus) {
-    if (!user) return;
-    haptic(status === "accepted" || status === "implemented" ? "success" : "medium");
-    const { error } = await supabase.from("suggestions").update({
-      status,
-      resolved_by: user.id,
-      resolved_at: new Date().toISOString(),
-    }).eq("id", id);
-    if (error) { toast.error("Erreur, réessaie"); return; }
-    toast.success(STATUS_LABELS[status]);
-  }
-
   async function handleDelete(id: string) {
     const ok = await confirm({
       title: "Supprimer cette idée ?",
@@ -130,14 +110,7 @@ export default function SuggestionsPage() {
     );
   }
 
-  const filtered = filter === "all" ? suggestions : suggestions.filter((s) => s.status === filter);
-  const counts = {
-    all: suggestions.length,
-    pending: suggestions.filter((s) => s.status === "pending").length,
-    accepted: suggestions.filter((s) => s.status === "accepted").length,
-    implemented: suggestions.filter((s) => s.status === "implemented").length,
-    rejected: suggestions.filter((s) => s.status === "rejected").length,
-  };
+  const filtered = filter === "all" ? suggestions : suggestions.filter((s) => s.category === filter);
 
   return (
     <div style={{ paddingTop: 16, paddingRight: 20, paddingLeft: 20, paddingBottom: 96 }} className="max-w-lg mx-auto">
@@ -147,7 +120,7 @@ export default function SuggestionsPage() {
             Boîte à idées
           </h1>
           <p style={{ fontSize: 13, color: "var(--text-tertiary)", marginTop: 4 }}>
-            Partage ce qu&apos;on pourrait améliorer. Le patron lit tout.
+            Partage ce qu&apos;on pourrait améliorer.
           </p>
         </div>
 
@@ -184,7 +157,7 @@ export default function SuggestionsPage() {
                 style={{
                   padding: "6px 12px", borderRadius: 8, border: "none", cursor: "pointer",
                   fontSize: 12, fontWeight: 500,
-                  background: category === c ? "var(--gradient-primary)" : "var(--secondary-bg)",
+                  background: category === c ? CATEGORY_COLOR[c] : "var(--secondary-bg)",
                   color: category === c ? "#fff" : "var(--text-secondary)",
                 }}
               >
@@ -204,66 +177,78 @@ export default function SuggestionsPage() {
               fontSize: 14, fontWeight: 600, minHeight: 44,
             }}
           >
-            <Send size={14} /> Envoyer l&apos;idée
+            <Send size={14} /> Envoyer
           </button>
         </div>
 
-        {/* Filter pills */}
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {([
-            { key: "all" as const, label: `Tout (${counts.all})` },
-            { key: "pending" as const, label: `En attente (${counts.pending})` },
-            { key: "accepted" as const, label: `Acceptées (${counts.accepted})` },
-            { key: "implemented" as const, label: `En place (${counts.implemented})` },
-            { key: "rejected" as const, label: `Refusées (${counts.rejected})` },
-          ]).map((f) => (
+        {/* Filter pills — only categories now */}
+        {suggestions.length > 0 && (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             <button
-              key={f.key}
-              onClick={() => setFilter(f.key)}
+              onClick={() => setFilter("all")}
               style={{
                 padding: "6px 12px", borderRadius: 8, border: "none", cursor: "pointer",
                 fontSize: 12, fontWeight: 500,
-                background: filter === f.key ? "var(--text-primary)" : "var(--secondary-bg)",
-                color: filter === f.key ? "var(--bg)" : "var(--text-secondary)",
+                background: filter === "all" ? "var(--text-primary)" : "var(--secondary-bg)",
+                color: filter === "all" ? "var(--bg)" : "var(--text-secondary)",
               }}
             >
-              {f.label}
+              Tout ({suggestions.length})
             </button>
-          ))}
-        </div>
+            {(Object.keys(CATEGORY_LABELS) as SuggestionCategory[]).map((c) => {
+              const count = suggestions.filter((s) => s.category === c).length;
+              if (count === 0) return null;
+              return (
+                <button
+                  key={c}
+                  onClick={() => setFilter(c)}
+                  style={{
+                    padding: "6px 12px", borderRadius: 8, border: "none", cursor: "pointer",
+                    fontSize: 12, fontWeight: 500,
+                    background: filter === c ? CATEGORY_COLOR[c] : "var(--secondary-bg)",
+                    color: filter === c ? "#fff" : "var(--text-secondary)",
+                  }}
+                >
+                  {CATEGORY_LABELS[c]} ({count})
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* List */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {filtered.length === 0 ? (
             <EmptyState
               icon={<Lightbulb size={24} />}
-              title={filter === "all" ? "Aucune idée pour l'instant" : `Aucune idée ${STATUS_LABELS[filter as SuggestionStatus].toLowerCase()}`}
+              title="Aucune idée pour l'instant"
               message="Sois le premier·e à en partager une."
             />
           ) : filtered.map((s) => {
             const canDelete = s.created_by === user?.id || isPatron;
             const time = new Date(s.created_at);
             const dateStr = time.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+            const color = CATEGORY_COLOR[s.category];
             return (
               <div
                 key={s.id}
                 className="card-light"
                 style={{
                   padding: 14,
-                  borderLeft: `3px solid ${STATUS_COLOR[s.status]}`,
+                  borderLeft: `3px solid ${color}`,
                   display: "flex", flexDirection: "column", gap: 8,
                 }}
               >
-                <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{
-                    fontSize: 10, fontWeight: 600, color: STATUS_COLOR[s.status],
-                    textTransform: "uppercase", letterSpacing: "0.04em",
+                    fontSize: 10, fontWeight: 600, color, textTransform: "uppercase",
+                    letterSpacing: "0.04em",
                     background: "var(--secondary-bg)", padding: "3px 8px", borderRadius: 6,
                   }}>
-                    {STATUS_LABELS[s.status]}
+                    {CATEGORY_LABELS[s.category]}
                   </span>
                   <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-                    {CATEGORY_LABELS[s.category]}
+                    {profiles[s.created_by] || "?"} · {dateStr}
                   </span>
                   {canDelete && (
                     <button
@@ -282,65 +267,6 @@ export default function SuggestionsPage() {
                 <p style={{ fontSize: 14, color: "var(--text-primary)", lineHeight: 1.5, whiteSpace: "pre-wrap", margin: 0 }}>
                   {s.content}
                 </p>
-                <p style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-                  — {profiles[s.created_by] || "?"} · {dateStr}
-                  {s.resolved_by && (
-                    <> · résolu par {profiles[s.resolved_by] || "?"}</>
-                  )}
-                </p>
-
-                {/* Patron actions on pending */}
-                {isPatron && s.status === "pending" && (
-                  <div style={{ display: "flex", gap: 6, paddingTop: 4, borderTop: "1px dashed var(--border-color)" }}>
-                    <button
-                      onClick={() => setStatus(s.id, "accepted")}
-                      style={{
-                        flex: 1, padding: "8px 0", borderRadius: 8, border: "none", cursor: "pointer",
-                        fontSize: 12, fontWeight: 600,
-                        background: "rgba(139,90,64,0.12)", color: "#8B5A40",
-                      }}
-                    >
-                      <Check size={12} style={{ display: "inline", marginRight: 4 }} />
-                      Accepter
-                    </button>
-                    <button
-                      onClick={() => setStatus(s.id, "implemented")}
-                      style={{
-                        flex: 1, padding: "8px 0", borderRadius: 8, border: "none", cursor: "pointer",
-                        fontSize: 12, fontWeight: 600,
-                        background: "rgba(107,74,48,0.12)", color: "#6B4A30",
-                      }}
-                    >
-                      Mettre en place
-                    </button>
-                    <button
-                      onClick={() => setStatus(s.id, "rejected")}
-                      style={{
-                        flex: 1, padding: "8px 0", borderRadius: 8, border: "none", cursor: "pointer",
-                        fontSize: 12, fontWeight: 600,
-                        background: "rgba(192,122,122,0.1)", color: "var(--danger)",
-                      }}
-                    >
-                      <XIcon size={12} style={{ display: "inline", marginRight: 4 }} />
-                      Refuser
-                    </button>
-                  </div>
-                )}
-
-                {/* Patron can re-open from any non-pending state */}
-                {isPatron && s.status !== "pending" && (
-                  <button
-                    onClick={() => setStatus(s.id, "pending")}
-                    style={{
-                      alignSelf: "flex-start", padding: "4px 10px", borderRadius: 6,
-                      border: "none", cursor: "pointer",
-                      fontSize: 11, fontWeight: 500,
-                      background: "var(--secondary-bg)", color: "var(--text-tertiary)",
-                    }}
-                  >
-                    Repasser en attente
-                  </button>
-                )}
               </div>
             );
           })}

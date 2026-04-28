@@ -194,7 +194,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ═══ Suggestions en attente — link to /suggestions ═══ */}
+      {/* ═══ Idées récentes — link to /suggestions ═════════ */}
       {pendingSuggestions.length > 0 && (
         <Link
           href="/suggestions"
@@ -209,7 +209,7 @@ export default function AdminPage() {
           <Lightbulb size={18} style={{ color: "var(--warning)", flexShrink: 0 }} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
-              {pendingSuggestions.length} idée{pendingSuggestions.length > 1 ? "s" : ""} de l&apos;équipe en attente
+              {pendingSuggestions.length} idée{pendingSuggestions.length > 1 ? "s" : ""} récente{pendingSuggestions.length > 1 ? "s" : ""} de l&apos;équipe
             </div>
             <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>
               {pendingSuggestions.slice(0, 1).map((s) => `« ${s.content.slice(0, 60)}${s.content.length > 60 ? "…" : ""} »`).join("")}
