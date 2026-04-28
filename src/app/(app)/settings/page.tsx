@@ -21,6 +21,8 @@ export default function SettingsPage() {
   const [shiftEndHour, setShiftEndHour] = useState(1);
   const [wifiName, setWifiName] = useState("");
   const [wifiPassword, setWifiPassword] = useState("");
+  const [wifiCustomerName, setWifiCustomerName] = useState("");
+  const [wifiCustomerPassword, setWifiCustomerPassword] = useState("");
   const [storageNotes, setStorageNotes] = useState("");
   const [vestiaireNotes, setVestiaireNotes] = useState("");
   const [firstAidNotes, setFirstAidNotes] = useState("");
@@ -32,6 +34,7 @@ export default function SettingsPage() {
   const [guideService, setGuideService] = useState("");
   const [guideUniform, setGuideUniform] = useState("");
   const [guideBarTech, setGuideBarTech] = useState("");
+  const [guideGaming, setGuideGaming] = useState("");
 
   const fetchSettings = useCallback(async () => {
     const { data } = await supabase.from("settings").select("*");
@@ -43,6 +46,8 @@ export default function SettingsPage() {
     if (map.shift_end_hour) setShiftEndHour(parseInt(map.shift_end_hour));
     if (map.wifi_name) setWifiName(map.wifi_name);
     if (map.wifi_password) setWifiPassword(map.wifi_password);
+    if (map.wifi_customer_name) setWifiCustomerName(map.wifi_customer_name);
+    if (map.wifi_customer_password) setWifiCustomerPassword(map.wifi_customer_password);
     if (map.storage_notes) setStorageNotes(map.storage_notes);
     if (map.vestiaire_notes) setVestiaireNotes(map.vestiaire_notes);
     if (map.first_aid_notes) setFirstAidNotes(map.first_aid_notes);
@@ -52,6 +57,7 @@ export default function SettingsPage() {
     if (map.guide_service) setGuideService(map.guide_service);
     if (map.guide_uniform) setGuideUniform(map.guide_uniform);
     if (map.guide_bar_tech) setGuideBarTech(map.guide_bar_tech);
+    if (map.guide_gaming) setGuideGaming(map.guide_gaming);
     setLoading(false);
   }, [supabase]);
 
@@ -205,11 +211,25 @@ export default function SettingsPage() {
             placeholder="ex. LeHive-Staff"
           />
           <VenueField
-            label="Mot de passe WiFi"
+            label="Mot de passe WiFi staff"
             value={wifiPassword}
             onChange={setWifiPassword}
             onBlur={() => updateSetting("wifi_password", wifiPassword)}
             placeholder="ex. abeille2024"
+          />
+          <VenueField
+            label="Nom du WiFi clients"
+            value={wifiCustomerName}
+            onChange={setWifiCustomerName}
+            onBlur={() => updateSetting("wifi_customer_name", wifiCustomerName)}
+            placeholder="ex. Hive Customers"
+          />
+          <VenueField
+            label="Mot de passe WiFi clients"
+            value={wifiCustomerPassword}
+            onChange={setWifiCustomerPassword}
+            onBlur={() => updateSetting("wifi_customer_password", wifiCustomerPassword)}
+            placeholder="utilisé par les extras + clients"
           />
           <VenueField
             label="Vestiaire"
@@ -292,6 +312,14 @@ export default function SettingsPage() {
             onChange={setGuideBarTech}
             onBlur={() => updateSetting("guide_bar_tech", guideBarTech)}
             placeholder="Recettes cocktails, dosages, matos…"
+            multiline
+          />
+          <VenueField
+            label="Gaming PC"
+            value={guideGaming}
+            onChange={setGuideGaming}
+            onBlur={() => updateSetting("guide_gaming", guideGaming)}
+            placeholder="Allumer / éteindre les PC, prêt du matos…"
             multiline
           />
         </div>

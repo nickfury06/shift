@@ -23,12 +23,12 @@ import { haptic } from "@/lib/haptics";
 import {
   MapPin, Wifi, Users, AlertTriangle, Shirt, ShieldCheck, Copy,
   Clock, BookOpen, Phone, ChevronLeft, ChevronRight, Pencil,
-  Coffee, Utensils, Martini,
+  Coffee, Utensils, Martini, Gamepad2,
 } from "lucide-react";
 
 interface Setting { key: string; value: string; }
 
-type SectionKey = "plan" | "shifts" | "rules" | "uniform" | "emergency" | "infos" | "service" | "bar_tech";
+type SectionKey = "plan" | "shifts" | "rules" | "uniform" | "emergency" | "infos" | "service" | "bar_tech" | "gaming";
 
 interface Section {
   key: SectionKey;
@@ -85,6 +85,21 @@ Pause : 15 min par shift de 6h, à coordonner avec le responsable.
 Prise de service 10 min avant l'ouverture (en tenue, tablier prêt).
 
 Fin de service : nettoyage de ta zone, caisse comptée et signée, check-out avec le responsable.`;
+
+const DEFAULT_GAMING = `Allumer un PC :
+• Le mot de passe suit le numéro du poste : PC Le Hive 1 → "lehive1", PC Le Hive 2 → "lehive2", etc.
+• 10 PCs disponibles (lehive1 → lehive10)
+
+Éteindre un PC :
+• PRENDS UNE SOURIS — ne jamais éteindre par le bouton physique
+• Menu démarrer (icône Windows en bas à gauche) → Éteindre
+
+Prêt du matériel (clavier / souris / casque) :
+• Demander une pièce d'identité au joueur en garantie
+• La rendre uniquement quand le matériel est restitué en bon état
+• Vérifier les câbles et les boutons rapidement avant la pose en caisse
+
+En cas de souci technique : préviens le responsable, ne tente pas de débrancher / rebrancher seul·e.`;
 
 const DEFAULT_BAR_TECH = `Cocktails maison — dosages standard :
 • Spritz : 9 cl prosecco · 6 cl Aperol · trait soda
@@ -224,6 +239,14 @@ export default function GuidePage() {
       tint: "rgba(168,93,63,0.14)",
       accent: "#A85D3F",
     }] : []),
+    {
+      key: "gaming",
+      title: "Gaming PC",
+      subtitle: "Allumer, éteindre, prêter le matos",
+      icon: <Gamepad2 size={22} strokeWidth={1.8} />,
+      tint: "rgba(107,74,48,0.14)",
+      accent: "#6B4A30",
+    },
   ];
 
   if (loading) {
@@ -307,6 +330,7 @@ export default function GuidePage() {
           tables={tables}
           onCopy={copyValue}
           isPatron={profile?.role === "patron"}
+          isExtra={profile?.employment_type === "extra"}
         />
       </div>
     );
@@ -501,12 +525,14 @@ function SectionContent({
   tables,
   onCopy,
   isPatron,
+  isExtra,
 }: {
   sectionKey: SectionKey;
   venueInfo: Record<string, string>;
   tables: VenueTable[];
   onCopy: (text: string, label: string) => void;
   isPatron: boolean;
+  isExtra: boolean;
 }) {
   if (sectionKey === "plan") {
     return (
@@ -554,6 +580,16 @@ function SectionContent({
 
   if (sectionKey === "bar_tech") {
     const body = venueInfo.guide_bar_tech || DEFAULT_BAR_TECH;
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <BodyText text={body} />
+        {isPatron && <EditHint />}
+      </div>
+    );
+  }
+
+  if (sectionKey === "gaming") {
+    const body = venueInfo.guide_gaming || DEFAULT_GAMING;
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <BodyText text={body} />
@@ -611,7 +647,12 @@ function SectionContent({
   }
 
   if (sectionKey === "infos") {
-    const hasWifi = venueInfo.wifi_name || venueInfo.wifi_password;
+    // Extras use the customer wifi; permanent staff + responsables +
+    // patron use the staff wifi. Patron sees both for reference.
+    const wifiToShow = isExtra
+      ? { name: venueInfo.wifi_customer_name, password: venueInfo.wifi_customer_password, label: "WiFi clients" }
+      : { name: venueInfo.wifi_name, password: venueInfo.wifi_password, label: "WiFi staff" };
+    const hasWifi = wifiToShow.name || wifiToShow.password;
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {hasWifi ? (
@@ -626,20 +667,20 @@ function SectionContent({
             <Wifi size={22} style={{ color: "var(--terra-medium)", flexShrink: 0 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                WiFi staff
+                {wifiToShow.label}
               </div>
-              {venueInfo.wifi_name && (
+              {wifiToShow.name && (
                 <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2 }}>
-                  Réseau : <span style={{ color: "var(--text-primary)", fontWeight: 500 }}>{venueInfo.wifi_name}</span>
+                  Réseau : <span style={{ color: "var(--text-primary)", fontWeight: 500 }}>{wifiToShow.name}</span>
                 </div>
               )}
-              {venueInfo.wifi_password && (
+              {wifiToShow.password && (
                 <div style={{ fontSize: 13, color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
                   <code style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", fontFamily: "ui-monospace, SFMono-Regular, monospace" }}>
-                    {venueInfo.wifi_password}
+                    {wifiToShow.password}
                   </code>
                   <button
-                    onClick={() => onCopy(venueInfo.wifi_password, "Mot de passe")}
+                    onClick={() => onCopy(wifiToShow.password!, "Mot de passe")}
                     style={{
                       marginLeft: "auto", display: "flex", alignItems: "center", gap: 4,
                       fontSize: 11, fontWeight: 500, color: "var(--terra-medium)",
@@ -655,6 +696,24 @@ function SectionContent({
           </div>
         ) : (
           <EmptyHint label="WiFi à configurer" hint="Le patron peut l'ajouter dans Réglages → Infos du lieu." />
+        )}
+
+        {/* Patron sees the OTHER wifi too as a reminder */}
+        {isPatron && venueInfo.wifi_customer_name && (
+          <div className="glass" style={{
+            padding: 14, borderRadius: 16,
+            display: "flex", alignItems: "center", gap: 10,
+            borderLeft: "3px solid var(--text-tertiary)",
+          }}>
+            <Wifi size={16} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text-tertiary)" }}>
+              <span style={{ fontWeight: 600 }}>WiFi clients</span> · {venueInfo.wifi_customer_name}
+              {venueInfo.wifi_customer_password && (
+                <> · <code style={{ fontFamily: "ui-monospace, SFMono-Regular, monospace" }}>{venueInfo.wifi_customer_password}</code></>
+              )}
+              <span style={{ marginLeft: 6, fontStyle: "italic" }}>(visible par les extras)</span>
+            </div>
+          </div>
         )}
 
         {venueInfo.storage_notes ? (
