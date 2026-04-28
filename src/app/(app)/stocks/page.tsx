@@ -222,8 +222,11 @@ export default function StocksPage() {
   }
 
   // ── Derived ─────────────────────────────────────────────
+  // Responsables only see their domain — EXCEPT for `consommables`,
+  // which both responsables (and patron) can manage. Whoever is on
+  // site signals the need; Benjamin then passes the Metro order.
   const visibleProducts = profile?.role === "responsable" && profile.stock_domain
-    ? products.filter((p) => p.domain === profile.stock_domain)
+    ? products.filter((p) => p.domain === profile.stock_domain || p.category === "consommables")
     : products;
 
   const searchResults = search.length >= 2

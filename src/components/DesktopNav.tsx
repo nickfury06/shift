@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home, BookOpen, Package, User, LogOut, Shield, Calendar, PenLine,
-  HelpCircle, Settings as SettingsIcon, MessageCircle, Sun, Moon, ListChecks,
+  HelpCircle, Settings as SettingsIcon, MessageCircle, Sun, Moon, ListChecks, Lightbulb,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
@@ -106,6 +106,7 @@ export default function DesktopNav() {
   const isPermanentStaff = role === "staff" && profile?.employment_type !== "extra";
   const secondaryItems: NavItem[] = [
     { href: "/messages", label: "Messages équipe", icon: <MessageCircle size={ICON} /> },
+    { href: "/suggestions", label: "Boîte à idées", icon: <Lightbulb size={ICON} /> },
     ...(role === "responsable" ? [{ href: "/tasks", label: "Tâches équipe", icon: <ListChecks size={ICON} /> }] : []),
     ...(isPermanentStaff ? [{ href: "/stocks", label: "Stocks (consulter)", icon: <Package size={ICON} /> }] : []),
     { href: "/guide", label: "Guide du lieu", icon: <HelpCircle size={ICON} /> },

@@ -69,6 +69,21 @@ export interface DebriefReply {
   created_at: string;
 }
 
+export type SuggestionCategory = "service" | "menu" | "organisation" | "autre";
+export type SuggestionStatus = "pending" | "accepted" | "rejected" | "implemented";
+
+export interface Suggestion {
+  id: string;
+  content: string;
+  category: SuggestionCategory;
+  status: SuggestionStatus;
+  created_by: string;
+  created_at: string;
+  resolved_by: string | null;
+  resolved_at: string | null;
+  resolution_notes: string | null;
+}
+
 // ── Tasks ──────────────────────────────────────────────────
 export interface Task {
   id: string;

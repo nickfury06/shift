@@ -20,6 +20,7 @@ import {
   Sun,
   Moon,
   ListChecks,
+  Lightbulb,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase/client";
@@ -121,6 +122,7 @@ export default function Nav() {
   const isPermanentStaff = role === "staff" && profile?.employment_type !== "extra";
   const moreItems: NavItem[] = [
     { href: "/messages", label: "Messages équipe", icon: <MessageCircle size={iconSize} strokeWidth={strokeWidth} /> },
+    { href: "/suggestions", label: "Boîte à idées", icon: <Lightbulb size={iconSize} strokeWidth={strokeWidth} /> },
     ...(role === "responsable"
       ? [{ href: "/tasks", label: "Tâches équipe", icon: <ListChecks size={iconSize} strokeWidth={strokeWidth} /> }]
       : []),

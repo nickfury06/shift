@@ -14,6 +14,8 @@ import {
   Send, Check, ChevronDown, AlertTriangle, Lightbulb,
 } from "lucide-react";
 
+import type { Suggestion } from "@/lib/types";
+
 const RATING_COLORS = ["", "#D44", "#D88", "#B89070", "#8B6A50", "#6B4A30"];
 
 export default function AdminPage() {
@@ -30,6 +32,7 @@ export default function AdminPage() {
   const [expandedDebrief, setExpandedDebrief] = useState<string | null>(null);
   const [replyDraft, setReplyDraft] = useState<Record<string, string>>({});
   const [replySending, setReplySending] = useState<string | null>(null);
+  const [pendingSuggestions, setPendingSuggestions] = useState<Suggestion[]>([]);
 
   // Inline message compose
   const [msgContent, setMsgContent] = useState("");
@@ -45,12 +48,13 @@ export default function AdminPage() {
       d.setDate(d.getDate() - 6);
       return d.toISOString().slice(0, 10);
     })();
-    const [absRes, profRes, debRes, weekRes, replyRes] = await Promise.all([
+    const [absRes, profRes, debRes, weekRes, replyRes, sgsRes] = await Promise.all([
       supabase.from("availability_requests").select("*").eq("status", "pending").order("date"),
       supabase.from("profiles").select("id, name, role"),
       supabase.from("debriefs").select("*").eq("date", shiftDate).order("created_at"),
       supabase.from("debriefs").select("*").gte("date", weekAgo).lte("date", shiftDate),
       supabase.from("debrief_replies").select("*").order("created_at"),
+      supabase.from("suggestions").select("*").eq("status", "pending").order("created_at", { ascending: false }),
     ]);
     setAbsenceRequests((absRes.data as AvailabilityRequest[]) || []);
     const map: Record<string, string> = {};
@@ -59,6 +63,7 @@ export default function AdminPage() {
     setDebriefs((debRes.data as Debrief[]) || []);
     setWeekDebriefs((weekRes.data as Debrief[]) || []);
     setDebriefReplies((replyRes.data as DebriefReply[]) || []);
+    setPendingSuggestions((sgsRes.data as Suggestion[]) || []);
     setLoading(false);
   }, [supabase, shiftDate]);
 
@@ -69,6 +74,7 @@ export default function AdminPage() {
       .on("postgres_changes", { event: "*", schema: "public", table: "availability_requests" }, () => fetchData())
       .on("postgres_changes", { event: "*", schema: "public", table: "debriefs" }, () => fetchData())
       .on("postgres_changes", { event: "*", schema: "public", table: "debrief_replies" }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "suggestions" }, () => fetchData())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [supabase, fetchData]);
@@ -169,7 +175,7 @@ export default function AdminPage() {
       </h1>
 
       {/* ═══ Zero-state summary when nothing is pending ══════ */}
-      {absenceRequests.length === 0 && debriefs.length === 0 && (
+      {absenceRequests.length === 0 && debriefs.length === 0 && pendingSuggestions.length === 0 && (
         <div className="card-light" style={{
           padding: "14px 16px",
           marginBottom: 24,
@@ -182,10 +188,35 @@ export default function AdminPage() {
           <div>
             <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>Rien n&apos;attend ta décision</div>
             <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>
-              Les demandes d&apos;absence et debriefs du soir apparaîtront ici.
+              Les demandes d&apos;absence, debriefs et idées apparaîtront ici.
             </div>
           </div>
         </div>
+      )}
+
+      {/* ═══ Suggestions en attente — link to /suggestions ═══ */}
+      {pendingSuggestions.length > 0 && (
+        <Link
+          href="/suggestions"
+          style={{
+            display: "flex", alignItems: "center", gap: 12,
+            padding: "12px 14px", marginBottom: 24, borderRadius: 14,
+            background: "rgba(212,160,74,0.08)",
+            border: "1px solid rgba(212,160,74,0.2)",
+            textDecoration: "none",
+          }}
+        >
+          <Lightbulb size={18} style={{ color: "var(--warning)", flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
+              {pendingSuggestions.length} idée{pendingSuggestions.length > 1 ? "s" : ""} de l&apos;équipe en attente
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>
+              {pendingSuggestions.slice(0, 1).map((s) => `« ${s.content.slice(0, 60)}${s.content.length > 60 ? "…" : ""} »`).join("")}
+            </div>
+          </div>
+          <ArrowRight size={14} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
+        </Link>
       )}
 
       {/* ═══ 1. ABSENCES EN ATTENTE ═══════════════════════ */}

@@ -448,11 +448,16 @@ create policy "stock_products_update_patron" on public.stock_products for update
   using (exists (select 1 from public.profiles where id = auth.uid() and role = 'patron'));
 create policy "stock_products_delete_patron" on public.stock_products for delete
   using (exists (select 1 from public.profiles where id = auth.uid() and role = 'patron'));
+-- Responsables can update their domain's products + the shared
+-- `consommables` category (both responsables coordinate on Metro orders).
 create policy "stock_products_update_responsable" on public.stock_products for update
   using (exists (
-    select 1 from public.profiles
-    where id = auth.uid() and role = 'responsable'
-    and stock_domain = (select domain from public.stock_products sp where sp.id = stock_products.id)
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role = 'responsable'
+    and (
+      p.stock_domain = (select sp.domain from public.stock_products sp where sp.id = stock_products.id)
+      or (select sp.category from public.stock_products sp where sp.id = stock_products.id) = 'consommables'
+    )
   ));
 
 
@@ -567,6 +572,41 @@ create policy "onboarding_completions_insert_own" on public.onboarding_completio
 alter publication supabase_realtime add table public.tasks;
 alter publication supabase_realtime add table public.one_off_tasks;
 alter publication supabase_realtime add table public.debriefs;
+
+-- ────────────────────────────────────────────────────────────
+-- Suggestions — staff idea box
+-- ────────────────────────────────────────────────────────────
+
+create table if not exists public.suggestions (
+  id uuid primary key default gen_random_uuid(),
+  content text not null,
+  category text not null check (category in ('service', 'menu', 'organisation', 'autre')),
+  status text not null default 'pending' check (status in ('pending', 'accepted', 'rejected', 'implemented')),
+  created_by uuid not null references public.profiles on delete cascade,
+  created_at timestamptz not null default now(),
+  resolved_by uuid references public.profiles on delete set null,
+  resolved_at timestamptz,
+  resolution_notes text
+);
+
+create index if not exists suggestions_status_idx on public.suggestions (status);
+create index if not exists suggestions_created_at_idx on public.suggestions (created_at desc);
+
+alter table public.suggestions enable row level security;
+
+create policy "suggestions_select_all" on public.suggestions for select
+  using (auth.uid() is not null);
+create policy "suggestions_insert_own" on public.suggestions for insert
+  with check (created_by = auth.uid());
+create policy "suggestions_update_patron" on public.suggestions for update
+  using (exists (select 1 from public.profiles where id = auth.uid() and role = 'patron'));
+create policy "suggestions_delete_own_or_patron" on public.suggestions for delete
+  using (
+    created_by = auth.uid()
+    or exists (select 1 from public.profiles where id = auth.uid() and role = 'patron')
+  );
+
+alter publication supabase_realtime add table public.suggestions;
 
 -- ────────────────────────────────────────────────────────────
 -- Debrief replies — patron coaches each debrief
