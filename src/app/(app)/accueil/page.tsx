@@ -46,6 +46,7 @@ export default function AccueilPage() {
 
   const [loading, setLoading] = useState(true);
   const [messages, setMessages] = useState<ManagerMessage[]>([]);
+  const [myReadMessageIds, setMyReadMessageIds] = useState<Set<string>>(new Set());
   const [dismissedMsgIds, setDismissedMsgIds] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set();
     try {
@@ -113,9 +114,10 @@ export default function AccueilPage() {
       ]);
 
     try {
-      const [msgRes, resaRes, taskRes, oneOffRes, compRes, profRes, alertRes, prodRes, eventRes, ritualRes] =
+      const [msgRes, resaRes, taskRes, oneOffRes, compRes, profRes, alertRes, prodRes, eventRes, ritualRes, readsRes] =
         await Promise.all([
-          safe(supabase.from("messages").select("*").eq("date", shiftDate).order("created_at", { ascending: false })),
+          // Messages are no longer scoped to today — chat-like, recent first
+          safe(supabase.from("messages").select("*").order("created_at", { ascending: false }).limit(20)),
           safe(supabase.from("reservations").select("*").eq("date", shiftDate).order("time", { ascending: true })),
           safe(supabase.from("tasks").select("*").order("priority", { ascending: true })),
           safe(supabase.from("one_off_tasks").select("*").eq("date", shiftDate).order("priority", { ascending: true })),
@@ -125,9 +127,13 @@ export default function AccueilPage() {
           safe(supabase.from("stock_products").select("id, name, category").order("name")),
           safe(supabase.from("events").select("*").eq("date", shiftDate).limit(1).maybeSingle()),
           safe(supabase.from("rituals").select("*").eq("day", shiftDay).eq("active", true).order("sort_order")),
+          safe(supabase.from("message_reads").select("message_id, user_id")),
         ]);
 
       setMessages((msgRes.data as ManagerMessage[]) || []);
+      const readRows = (readsRes.data as { message_id: string; user_id: string }[]) || [];
+      const mine = new Set(readRows.filter((r) => r.user_id === user?.id).map((r) => r.message_id));
+      setMyReadMessageIds(mine);
       setReservations((resaRes.data as Reservation[]) || []);
       const profList = (profRes.data as Pick<Profile, "id" | "name" | "role">[]) || [];
       const profMap: Record<string, string> = {};
@@ -221,7 +227,8 @@ export default function AccueilPage() {
       .on("postgres_changes", { event: "*", schema: "public", table: "task_completions", filter: `date=eq.${shiftDate}` }, () => fetchData())
       .on("postgres_changes", { event: "*", schema: "public", table: "one_off_tasks", filter: `date=eq.${shiftDate}` }, () => fetchData())
       .on("postgres_changes", { event: "*", schema: "public", table: "reservations", filter: `date=eq.${shiftDate}` }, () => fetchData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "messages", filter: `date=eq.${shiftDate}` }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "message_reads" }, () => fetchData())
       .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, () => fetchData())
       .on("postgres_changes", { event: "*", schema: "public", table: "stock_alerts" }, () => fetchData())
       .subscribe();
@@ -302,7 +309,12 @@ export default function AccueilPage() {
   const taskPct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
   const totalCovers = reservations.reduce((sum, r) => sum + r.covers, 0);
   const pendingResas = reservations.filter((r) => r.status === "attendu").length;
-  const activeMessages = messages.filter((m) => !dismissedMsgIds.has(m.id));
+  // 3 most recent messages I haven't read yet — replaces the
+  // old "today's messages" filter so the banner becomes a true
+  // unread inbox (chat-like behavior).
+  const activeMessages = messages
+    .filter((m) => !myReadMessageIds.has(m.id) && m.created_by !== user?.id)
+    .slice(0, 3);
 
   // Imminent reservations (pending, within 45 min window or overdue)
   const nowMins = (() => {
