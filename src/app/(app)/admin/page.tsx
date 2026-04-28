@@ -6,7 +6,7 @@ import { useToast } from "@/components/Toast";
 import { createClient } from "@/lib/supabase/client";
 import { haptic } from "@/lib/haptics";
 import { getShiftDate, formatDateFr } from "@/lib/shift-utils";
-import type { AvailabilityRequest, Profile, Debrief } from "@/lib/types";
+import type { AvailabilityRequest, Profile, Debrief, DebriefReply } from "@/lib/types";
 import Link from "next/link";
 import {
   ThumbsUp, ThumbsDown, Calendar, MessageCircle, ListChecks,
@@ -26,7 +26,10 @@ export default function AdminPage() {
   const [staffMap, setStaffMap] = useState<Record<string, string>>({});
   const [debriefs, setDebriefs] = useState<Debrief[]>([]);
   const [weekDebriefs, setWeekDebriefs] = useState<Debrief[]>([]);
+  const [debriefReplies, setDebriefReplies] = useState<DebriefReply[]>([]);
   const [expandedDebrief, setExpandedDebrief] = useState<string | null>(null);
+  const [replyDraft, setReplyDraft] = useState<Record<string, string>>({});
+  const [replySending, setReplySending] = useState<string | null>(null);
 
   // Inline message compose
   const [msgContent, setMsgContent] = useState("");
@@ -42,11 +45,12 @@ export default function AdminPage() {
       d.setDate(d.getDate() - 6);
       return d.toISOString().slice(0, 10);
     })();
-    const [absRes, profRes, debRes, weekRes] = await Promise.all([
+    const [absRes, profRes, debRes, weekRes, replyRes] = await Promise.all([
       supabase.from("availability_requests").select("*").eq("status", "pending").order("date"),
       supabase.from("profiles").select("id, name, role"),
       supabase.from("debriefs").select("*").eq("date", shiftDate).order("created_at"),
       supabase.from("debriefs").select("*").gte("date", weekAgo).lte("date", shiftDate),
+      supabase.from("debrief_replies").select("*").order("created_at"),
     ]);
     setAbsenceRequests((absRes.data as AvailabilityRequest[]) || []);
     const map: Record<string, string> = {};
@@ -54,6 +58,7 @@ export default function AdminPage() {
     setStaffMap(map);
     setDebriefs((debRes.data as Debrief[]) || []);
     setWeekDebriefs((weekRes.data as Debrief[]) || []);
+    setDebriefReplies((replyRes.data as DebriefReply[]) || []);
     setLoading(false);
   }, [supabase, shiftDate]);
 
@@ -63,6 +68,7 @@ export default function AdminPage() {
     const ch = supabase.channel("admin-rt")
       .on("postgres_changes", { event: "*", schema: "public", table: "availability_requests" }, () => fetchData())
       .on("postgres_changes", { event: "*", schema: "public", table: "debriefs" }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "debrief_replies" }, () => fetchData())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [supabase, fetchData]);
@@ -88,6 +94,22 @@ export default function AdminPage() {
       }
     }
     toast.success(status === "accepted" ? "Absence acceptée" : "Absence refusée");
+    fetchData();
+  }
+
+  async function postDebriefReply(debriefId: string) {
+    const text = (replyDraft[debriefId] || "").trim();
+    if (!text || !user || replySending) return;
+    setReplySending(debriefId);
+    const { error } = await supabase.from("debrief_replies").insert({
+      debrief_id: debriefId,
+      user_id: user.id,
+      content: text,
+    });
+    setReplySending(null);
+    if (error) { toast.error("Erreur, réessaie"); haptic("error"); return; }
+    haptic("success");
+    setReplyDraft((d) => ({ ...d, [debriefId]: "" }));
     fetchData();
   }
 
@@ -325,7 +347,8 @@ export default function AdminPage() {
             {debriefs.map((d) => {
               const name = staffMap[d.user_id] || "Staff";
               const isExpanded = expandedDebrief === d.id;
-              const hasText = d.incidents || d.client_feedback || d.suggestions;
+              const replies = debriefReplies.filter((r) => r.debrief_id === d.id);
+              const hasText = d.incidents || d.client_feedback || d.suggestions || replies.length > 0;
               return (
                 <div key={d.id} className="card-light" style={{ overflow: "hidden" }}>
                   <button
@@ -365,6 +388,62 @@ export default function AdminPage() {
                           {d.suggestions}
                         </div>
                       )}
+
+                      {/* Replies thread */}
+                      {replies.length > 0 && (
+                        <div style={{
+                          marginTop: 6, paddingTop: 8,
+                          borderTop: "1px dashed var(--border-color)",
+                          display: "flex", flexDirection: "column", gap: 6,
+                        }}>
+                          {replies.map((r) => (
+                            <div key={r.id} style={{
+                              padding: "8px 10px", borderRadius: 10,
+                              background: "var(--secondary-bg)",
+                              fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5,
+                            }}>
+                              <span style={{ fontWeight: 600, color: "var(--terra-medium)" }}>
+                                {staffMap[r.user_id] || "?"}
+                              </span>{" — "}
+                              <span style={{ whiteSpace: "pre-wrap" }}>{r.content}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Reply composer (patron only on /admin) */}
+                      <div style={{
+                        marginTop: 4, paddingTop: 8,
+                        borderTop: "1px solid var(--border-color)",
+                        display: "flex", gap: 6, alignItems: "flex-end",
+                      }}>
+                        <textarea
+                          placeholder="Répondre…"
+                          value={replyDraft[d.id] || ""}
+                          onChange={(e) => setReplyDraft((prev) => ({ ...prev, [d.id]: e.target.value }))}
+                          rows={1}
+                          style={{
+                            flex: 1, borderRadius: 10,
+                            border: "1px solid var(--border-color)",
+                            background: "var(--input-bg)", padding: "8px 10px",
+                            fontSize: 12, color: "var(--text-primary)", outline: "none",
+                            resize: "none", minHeight: 36,
+                          }}
+                        />
+                        <button
+                          onClick={() => postDebriefReply(d.id)}
+                          disabled={!replyDraft[d.id]?.trim() || replySending === d.id}
+                          aria-label="Envoyer"
+                          style={{
+                            width: 36, height: 36, borderRadius: 10, border: "none", cursor: "pointer",
+                            background: "var(--gradient-primary)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            opacity: !replyDraft[d.id]?.trim() ? 0.4 : 1,
+                          }}
+                        >
+                          <Send size={14} style={{ color: "#fff" }} />
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>

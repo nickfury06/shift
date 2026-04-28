@@ -5,7 +5,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { createClient } from "@/lib/supabase/client";
 import { getShiftDate, formatDateFr } from "@/lib/shift-utils";
-import type { Debrief, Affluence, ClosingState, Profile } from "@/lib/types";
+import type { Debrief, Affluence, ClosingState, Profile, DebriefReply } from "@/lib/types";
 import { ChevronLeft, ChevronRight, ChevronDown, Send, AlertTriangle, MessageSquare, Lightbulb } from "lucide-react";
 
 // ── Quick-tap configs ──────────────────────────────────────
@@ -29,7 +29,11 @@ export default function DebriefPage() {
   const { profile, user, loading: authLoading } = useAuth();
   const toast = useToast();
   const supabase = useRef(createClient()).current;
-  const isPatron = profile?.role === "patron" || profile?.role === "responsable";
+  // Patron never fills a debrief — they only review the team's. Responsables
+  // do fill their own (like staff), AND get to see the team list at the bottom.
+  const isPatron = profile?.role === "patron";
+  const isResponsable = profile?.role === "responsable";
+  const seesTeamList = isPatron || isResponsable;
 
   const [dataLoading, setDataLoading] = useState(true);
   const [submitted, setSubmitted] = useState(false);
@@ -41,6 +45,7 @@ export default function DebriefPage() {
   const [staffMap, setStaffMap] = useState<Record<string, string>>({});
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [dateOffset, setDateOffset] = useState(0);
+  const [replies, setReplies] = useState<DebriefReply[]>([]);
 
   // Form
   const [globalRating, setGlobalRating] = useState(0);
@@ -66,17 +71,21 @@ export default function DebriefPage() {
       return;
     }
 
-    const isP = profile.role === "patron" || profile.role === "responsable";
+    const isP = profile.role === "patron";
+    const seesList = isP || profile.role === "responsable";
 
-    if (isP) {
-      const [{ data: debriefs }, { data: profiles }] = await Promise.all([
-        supabase.from("debriefs").select("*").eq("date", viewDate).order("created_at"),
-        supabase.from("profiles").select("id, name").order("name"),
-      ]);
+    // Always fetch profiles — staff also needs the staffMap to render
+    // reply author names in their own thread.
+    const { data: profiles } = await supabase
+      .from("profiles").select("id, name").order("name");
+    const map: Record<string, string> = {};
+    ((profiles as Pick<Profile, "id" | "name">[]) || []).forEach((p) => { map[p.id] = p.name; });
+    setStaffMap(map);
+
+    if (seesList) {
+      const { data: debriefs } = await supabase
+        .from("debriefs").select("*").eq("date", viewDate).order("created_at");
       setAllDebriefs((debriefs as Debrief[]) || []);
-      const map: Record<string, string> = {};
-      ((profiles as Pick<Profile, "id" | "name">[]) || []).forEach((p) => { map[p.id] = p.name; });
-      setStaffMap(map);
     }
 
     const { data: mine } = await supabase
@@ -88,10 +97,28 @@ export default function DebriefPage() {
       setMyDebrief(mine as Debrief);
       setSubmitted(true);
     }
+
+    // Pull replies for the debriefs we're displaying (staff only need
+    // their own thread; patron + responsable see the whole list)
+    const { data: replyRows } = await supabase
+      .from("debrief_replies")
+      .select("*")
+      .order("created_at");
+    setReplies((replyRows as DebriefReply[]) || []);
+
     setDataLoading(false);
   }, [user, profile, authLoading, supabase, shiftDate, viewDate]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Realtime: replies tick in live so staff sees patron's response
+  // without needing to refresh
+  useEffect(() => {
+    const ch = supabase.channel("debrief-rt")
+      .on("postgres_changes", { event: "*", schema: "public", table: "debrief_replies" }, () => fetchData())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [supabase, fetchData]);
 
   const canSubmit = globalRating > 0 && serviceRating > 0 && teamRating > 0 && affluence && closingState;
 
@@ -192,9 +219,10 @@ export default function DebriefPage() {
       </h1>
 
       {/* ════════════════════════════════════════════════════ */}
-      {/* DEBRIEF FORM (everyone fills their own)             */}
+      {/* DEBRIEF FORM — staff + responsables fill their own. */}
+      {/* Patron never fills (vision: patron lit, ne remplit pas). */}
       {/* ════════════════════════════════════════════════════ */}
-      {!submitted && (
+      {!submitted && !isPatron && (
         <div style={{ display: "flex", flexDirection: "column", gap: 20, marginTop: 16 }}>
           <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
             30 secondes pour résumer ton shift.
@@ -360,7 +388,8 @@ export default function DebriefPage() {
       {/* ════════════════════════════════════════════════════ */}
       {/* ALREADY SUBMITTED                                   */}
       {/* ════════════════════════════════════════════════════ */}
-      {submitted && myDebrief && (
+      {/* "Mon debrief" recap — staff + responsable after submit */}
+      {submitted && myDebrief && !isPatron && (
         <div style={{ marginTop: 16 }}>
           <div className="card-medium" style={{ padding: 20 }}>
             <p style={{ fontSize: 14, fontWeight: 500, color: "#8B5A40", marginBottom: 16 }}>
@@ -410,15 +439,44 @@ export default function DebriefPage() {
                 )}
               </div>
             )}
+
+            {/* Replies from patron / responsable on this debrief */}
+            {(() => {
+              const myReplies = replies.filter((r) => r.debrief_id === myDebrief.id);
+              if (myReplies.length === 0) return null;
+              return (
+                <div style={{
+                  borderTop: "1px solid var(--border-color)",
+                  marginTop: 12, paddingTop: 12,
+                  display: "flex", flexDirection: "column", gap: 6,
+                }}>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: "var(--terra-medium)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                    Réponses
+                  </p>
+                  {myReplies.map((r) => (
+                    <div key={r.id} style={{
+                      padding: "8px 10px", borderRadius: 10,
+                      background: "var(--secondary-bg)",
+                      fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5,
+                    }}>
+                      <span style={{ fontWeight: 600, color: "var(--terra-medium)" }}>
+                        {staffMap[r.user_id] || "?"}
+                      </span>{" — "}
+                      <span style={{ whiteSpace: "pre-wrap" }}>{r.content}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
 
       {/* ════════════════════════════════════════════════════ */}
-      {/* PATRON/RESPONSABLE: team debriefs (after own submit)*/}
+      {/* TEAM DEBRIEFS LIST — patron always; responsable after own submit */}
       {/* ════════════════════════════════════════════════════ */}
-      {isPatron && submitted && (
-        <div style={{ marginTop: 24 }}>
+      {seesTeamList && (isPatron || submitted) && (
+        <div style={{ marginTop: isPatron ? 16 : 24 }}>
           <p className="section-label" style={{ marginBottom: 12 }}>Debriefs de l&apos;équipe</p>
           {/* Date nav */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
@@ -568,6 +626,34 @@ export default function DebriefPage() {
                             )}
                           </div>
                         )}
+
+                        {/* Replies on this debrief (read-only here; patron composes on /admin) */}
+                        {(() => {
+                          const dr = replies.filter((r) => r.debrief_id === d.id);
+                          if (dr.length === 0) return null;
+                          return (
+                            <div style={{
+                              borderTop: "1px dashed var(--border-color)",
+                              paddingTop: 10, display: "flex", flexDirection: "column", gap: 6,
+                            }}>
+                              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--terra-medium)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                                Réponses
+                              </div>
+                              {dr.map((r) => (
+                                <div key={r.id} style={{
+                                  padding: "8px 10px", borderRadius: 10,
+                                  background: "var(--secondary-bg)",
+                                  fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5,
+                                }}>
+                                  <span style={{ fontWeight: 600, color: "var(--terra-medium)" }}>
+                                    {staffMap[r.user_id] || "?"}
+                                  </span>{" — "}
+                                  <span style={{ whiteSpace: "pre-wrap" }}>{r.content}</span>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>

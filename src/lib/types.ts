@@ -61,6 +61,14 @@ export interface MessageRead {
   read_at: string;
 }
 
+export interface DebriefReply {
+  id: string;
+  debrief_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+}
+
 // ── Tasks ──────────────────────────────────────────────────
 export interface Task {
   id: string;
