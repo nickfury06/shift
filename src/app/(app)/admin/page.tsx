@@ -25,6 +25,7 @@ export default function AdminPage() {
   const [absenceRequests, setAbsenceRequests] = useState<AvailabilityRequest[]>([]);
   const [staffMap, setStaffMap] = useState<Record<string, string>>({});
   const [debriefs, setDebriefs] = useState<Debrief[]>([]);
+  const [weekDebriefs, setWeekDebriefs] = useState<Debrief[]>([]);
   const [expandedDebrief, setExpandedDebrief] = useState<string | null>(null);
 
   // Inline message compose
@@ -35,16 +36,24 @@ export default function AdminPage() {
   const shiftDate = getShiftDate();
 
   const fetchData = useCallback(async () => {
-    const [absRes, profRes, debRes] = await Promise.all([
+    // 7-day window for stats
+    const weekAgo = (() => {
+      const d = new Date(shiftDate);
+      d.setDate(d.getDate() - 6);
+      return d.toISOString().slice(0, 10);
+    })();
+    const [absRes, profRes, debRes, weekRes] = await Promise.all([
       supabase.from("availability_requests").select("*").eq("status", "pending").order("date"),
       supabase.from("profiles").select("id, name, role"),
       supabase.from("debriefs").select("*").eq("date", shiftDate).order("created_at"),
+      supabase.from("debriefs").select("*").gte("date", weekAgo).lte("date", shiftDate),
     ]);
     setAbsenceRequests((absRes.data as AvailabilityRequest[]) || []);
     const map: Record<string, string> = {};
     ((profRes.data as Pick<Profile, "id" | "name" | "role">[]) || []).forEach((p) => { map[p.id] = p.name; });
     setStaffMap(map);
     setDebriefs((debRes.data as Debrief[]) || []);
+    setWeekDebriefs((weekRes.data as Debrief[]) || []);
     setLoading(false);
   }, [supabase, shiftDate]);
 
@@ -228,6 +237,85 @@ export default function AdminPage() {
           </button>
         </div>
       </div>
+
+      {/* ═══ 3a. STATS DEBRIEFS — 7 derniers jours ════════ */}
+      {weekDebriefs.length > 0 && (() => {
+        const ratings = weekDebriefs.map((d) => d.global_rating).filter((r): r is number => typeof r === "number" && r > 0);
+        const avg = ratings.length > 0 ? ratings.reduce((s, r) => s + r, 0) / ratings.length : 0;
+        const incidentCount = weekDebriefs.filter((d) => d.incidents && d.incidents.trim().length > 0).length;
+
+        // Best / worst shift = avg of debriefs grouped by date
+        const byDate = new Map<string, number[]>();
+        weekDebriefs.forEach((d) => {
+          if (typeof d.global_rating === "number" && d.global_rating > 0) {
+            if (!byDate.has(d.date)) byDate.set(d.date, []);
+            byDate.get(d.date)!.push(d.global_rating);
+          }
+        });
+        const dateAverages = Array.from(byDate.entries())
+          .map(([date, rs]) => ({ date, avg: rs.reduce((s, r) => s + r, 0) / rs.length }))
+          .sort((a, b) => b.avg - a.avg);
+        const best = dateAverages[0];
+        const worst = dateAverages.length > 1 ? dateAverages[dateAverages.length - 1] : null;
+
+        function formatShortDate(d: string) {
+          const date = new Date(d);
+          return date.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
+        }
+
+        return (
+          <div style={{ marginBottom: 24 }}>
+            <p className="section-label" style={{ marginBottom: 10 }}>
+              Stats debriefs — 7 derniers jours
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <div className="card-light" style={{ padding: "12px 14px" }}>
+                <div style={{ fontSize: 11, color: "var(--text-tertiary)", fontWeight: 500 }}>Note moyenne</div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginTop: 2 }}>
+                  <span style={{ fontSize: 22, fontWeight: 700, color: avg >= 3.5 ? "var(--terra-deep)" : avg >= 2.5 ? "var(--text-primary)" : "var(--danger)" }}>
+                    {avg.toFixed(1)}
+                  </span>
+                  <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>/5</span>
+                </div>
+                <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginTop: 1 }}>
+                  sur {ratings.length} debrief{ratings.length > 1 ? "s" : ""}
+                </div>
+              </div>
+              <div className="card-light" style={{ padding: "12px 14px" }}>
+                <div style={{ fontSize: 11, color: "var(--text-tertiary)", fontWeight: 500 }}>Incidents</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: incidentCount > 0 ? "var(--warning)" : "var(--text-primary)", marginTop: 2 }}>
+                  {incidentCount}
+                </div>
+                <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginTop: 1 }}>
+                  signalé{incidentCount > 1 ? "s" : ""} cette semaine
+                </div>
+              </div>
+            </div>
+            {best && (
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                <div className="card-light" style={{ flex: 1, padding: "10px 12px" }}>
+                  <div style={{ fontSize: 10, color: "var(--text-tertiary)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                    Meilleur shift
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", marginTop: 2 }}>
+                    {formatShortDate(best.date)} · <span style={{ color: "var(--terra-deep)" }}>{best.avg.toFixed(1)}/5</span>
+                  </div>
+                </div>
+                {worst && worst.date !== best.date && (
+                  <div className="card-light" style={{ flex: 1, padding: "10px 12px" }}>
+                    <div style={{ fontSize: 10, color: "var(--text-tertiary)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                      Pire shift
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", marginTop: 2 }}>
+                      {formatShortDate(worst.date)} · <span style={{ color: worst.avg < 2.5 ? "var(--danger)" : "var(--text-secondary)" }}>{worst.avg.toFixed(1)}/5</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ═══ 3. DEBRIEFS DU SOIR ═════════════════════════ */}
       {debriefs.length > 0 && (

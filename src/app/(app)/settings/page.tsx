@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { createClient } from "@/lib/supabase/client";
-import { Heart, Clock, Info, MapPin } from "lucide-react";
+import { Heart, Clock, Info, MapPin, BookOpen } from "lucide-react";
 
 interface Setting { key: string; value: string; }
 
@@ -26,6 +26,13 @@ export default function SettingsPage() {
   const [firstAidNotes, setFirstAidNotes] = useState("");
   const [emergencyContacts, setEmergencyContacts] = useState("");
 
+  // Guide content (overrides defaults shown in /guide)
+  const [guideRules, setGuideRules] = useState("");
+  const [guideShifts, setGuideShifts] = useState("");
+  const [guideService, setGuideService] = useState("");
+  const [guideUniform, setGuideUniform] = useState("");
+  const [guideBarTech, setGuideBarTech] = useState("");
+
   const fetchSettings = useCallback(async () => {
     const { data } = await supabase.from("settings").select("*");
     const map: Record<string, string> = {};
@@ -40,6 +47,11 @@ export default function SettingsPage() {
     if (map.vestiaire_notes) setVestiaireNotes(map.vestiaire_notes);
     if (map.first_aid_notes) setFirstAidNotes(map.first_aid_notes);
     if (map.emergency_contacts) setEmergencyContacts(map.emergency_contacts);
+    if (map.guide_rules) setGuideRules(map.guide_rules);
+    if (map.guide_shifts) setGuideShifts(map.guide_shifts);
+    if (map.guide_service) setGuideService(map.guide_service);
+    if (map.guide_uniform) setGuideUniform(map.guide_uniform);
+    if (map.guide_bar_tech) setGuideBarTech(map.guide_bar_tech);
     setLoading(false);
   }, [supabase]);
 
@@ -227,6 +239,59 @@ export default function SettingsPage() {
             onChange={setEmergencyContacts}
             onBlur={() => updateSetting("emergency_contacts", emergencyContacts)}
             placeholder="Nicolas 06.XX.XX.XX.XX · Sophie 06.XX.XX.XX.XX"
+            multiline
+          />
+        </div>
+      </div>
+
+      {/* Contenus du Guide — affichés dans /guide pour toute l'équipe */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+          <BookOpen size={12} style={{ color: "var(--terra-medium)" }} />
+          <span className="section-label">Guide — contenus éditables</span>
+        </div>
+        <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: 10, lineHeight: 1.4 }}>
+          Vide = on garde les textes par défaut intégrés. Remplis pour personnaliser ce que ton équipe lit.
+        </p>
+        <div className="card-light" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 14 }}>
+          <VenueField
+            label="Règles de base"
+            value={guideRules}
+            onChange={setGuideRules}
+            onBlur={() => updateSetting("guide_rules", guideRules)}
+            placeholder="Téléphone dans la poche, pas d'alcool avant le shift…"
+            multiline
+          />
+          <VenueField
+            label="Horaires & shifts"
+            value={guideShifts}
+            onChange={setGuideShifts}
+            onBlur={() => updateSetting("guide_shifts", guideShifts)}
+            placeholder="Ouverture, fermeture, pauses, prise de service…"
+            multiline
+          />
+          <VenueField
+            label="Service client"
+            value={guideService}
+            onChange={setGuideService}
+            onBlur={() => updateSetting("guide_service", guideService)}
+            placeholder="Accueil, pendant le service, départ, dosages salle…"
+            multiline
+          />
+          <VenueField
+            label="Tenue & vestiaire"
+            value={guideUniform}
+            onChange={setGuideUniform}
+            onBlur={() => updateSetting("guide_uniform", guideUniform)}
+            placeholder="Dress code, vestiaire, tablier…"
+            multiline
+          />
+          <VenueField
+            label="Fiche technique bar"
+            value={guideBarTech}
+            onChange={setGuideBarTech}
+            onBlur={() => updateSetting("guide_bar_tech", guideBarTech)}
+            placeholder="Recettes cocktails, dosages, matos…"
             multiline
           />
         </div>

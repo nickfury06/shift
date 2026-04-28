@@ -23,12 +23,12 @@ import { haptic } from "@/lib/haptics";
 import {
   MapPin, Wifi, Users, AlertTriangle, Shirt, ShieldCheck, Copy,
   Clock, BookOpen, Phone, ChevronLeft, ChevronRight, Pencil,
-  Coffee, Utensils,
+  Coffee, Utensils, Martini,
 } from "lucide-react";
 
 interface Setting { key: string; value: string; }
 
-type SectionKey = "plan" | "shifts" | "rules" | "uniform" | "emergency" | "infos" | "service";
+type SectionKey = "plan" | "shifts" | "rules" | "uniform" | "emergency" | "infos" | "service" | "bar_tech";
 
 interface Section {
   key: SectionKey;
@@ -70,7 +70,12 @@ Pendant le service :
 
 Départ :
 • Addition présentée rapidement (sans insister)
-• Remercier nommément si tu connais leur prénom`;
+• Remercier nommément si tu connais leur prénom
+
+Rappels dosages salle :
+• Verre de vin = 15 cl
+• Demi (bière) = 25 cl · pinte = 50 cl
+• Café = 7 g de mouture, 25 ml en sortie`;
 
 const DEFAULT_SHIFTS = `Ouverture standard : 16h
 Fermeture : 1h (2h le week-end)
@@ -80,6 +85,25 @@ Pause : 15 min par shift de 6h, à coordonner avec le responsable.
 Prise de service 10 min avant l'ouverture (en tenue, tablier prêt).
 
 Fin de service : nettoyage de ta zone, caisse comptée et signée, check-out avec le responsable.`;
+
+const DEFAULT_BAR_TECH = `Cocktails maison — dosages standard :
+• Spritz : 9 cl prosecco · 6 cl Aperol · trait soda
+• Negroni : 3 cl gin · 3 cl Campari · 3 cl vermouth rouge
+• Old Fashioned : 5 cl bourbon · 1 sucre · 2 dash angostura
+• Margarita : 5 cl tequila · 2 cl Cointreau · 2 cl jus de citron vert
+
+Shots : 3 cl
+Verre à long drink : 4 cl spiritueux + 12-15 cl mixer
+
+Bières pression :
+• Demi : 25 cl · pinte : 50 cl
+• Inclinaison du verre 45°, redresser à mi-remplissage
+
+Vins au verre :
+• Verre standard = 15 cl
+• Champagne flûte = 12 cl
+
+Pour toute question stocks ou recette inhabituelle : référer à Benjamin.`;
 
 export default function GuidePage() {
   const { profile } = useAuth();
@@ -128,6 +152,12 @@ export default function GuidePage() {
   }
 
   const responsable = tonightStaff.find((s) => s.profile.role === "patron" || s.profile.role === "responsable");
+
+  // Bar-tech tile is shown to bar staff, the bar responsable, and patron
+  const seesBarTech =
+    profile?.role === "patron"
+    || profile?.department === "bar"
+    || (profile?.role === "responsable" && profile?.stock_domain === "boissons");
 
   const sections: Section[] = [
     {
@@ -186,6 +216,14 @@ export default function GuidePage() {
       tint: "rgba(107,74,48,0.14)",
       accent: "#6B4A30",
     },
+    ...(seesBarTech ? [{
+      key: "bar_tech" as const,
+      title: "Fiche technique bar",
+      subtitle: "Recettes, dosages, matos",
+      icon: <Martini size={22} strokeWidth={1.8} />,
+      tint: "rgba(168,93,63,0.14)",
+      accent: "#A85D3F",
+    }] : []),
   ];
 
   if (loading) {
@@ -506,6 +544,16 @@ function SectionContent({
 
   if (sectionKey === "service") {
     const body = venueInfo.guide_service || DEFAULT_SERVICE;
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <BodyText text={body} />
+        {isPatron && <EditHint />}
+      </div>
+    );
+  }
+
+  if (sectionKey === "bar_tech") {
+    const body = venueInfo.guide_bar_tech || DEFAULT_BAR_TECH;
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <BodyText text={body} />
