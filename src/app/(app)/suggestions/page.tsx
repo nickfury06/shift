@@ -82,7 +82,13 @@ export default function SuggestionsPage() {
       created_by: user.id,
     });
     setSubmitting(false);
-    if (error) { toast.error("Erreur, réessaie"); haptic("error"); return; }
+    if (error) {
+      // Surface the real reason so we can see RLS / constraint issues
+      console.error("suggestions insert failed:", error);
+      toast.error(`Erreur : ${error.message}`);
+      haptic("error");
+      return;
+    }
     haptic("success");
     toast.success("Idée envoyée — merci !");
     setContent("");
