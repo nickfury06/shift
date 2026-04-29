@@ -18,7 +18,7 @@ import { useConfirm } from "@/components/Confirm";
 import { createClient } from "@/lib/supabase/client";
 import { haptic } from "@/lib/haptics";
 import type { Schedule, Profile, AvailabilityRequest } from "@/lib/types";
-import { ChevronLeft, ChevronRight, Plus, Trash2, X, CalendarOff, Check } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Trash2, X, CalendarOff, Check, Repeat } from "lucide-react";
 
 // ── Date helpers ──────────────────────────────────────────────
 
@@ -84,6 +84,10 @@ export default function PlanningPage() {
   // Absence request form (staff)
   const [showAvailFormForDay, setShowAvailFormForDay] = useState<string | null>(null);
   const [availReason, setAvailReason] = useState("");
+
+  // Patron tools: recurring schedule + absence range
+  const [showRecurring, setShowRecurring] = useState(false);
+  const [showAbsenceRange, setShowAbsenceRange] = useState(false);
 
   // Initialize active user once profile loads
   useEffect(() => {
@@ -309,6 +313,36 @@ export default function PlanningPage() {
               </button>
             );
           })}
+        </div>
+      )}
+
+      {/* Patron tools: bulk-add weekly + bulk-mark absent */}
+      {isPatron && activeProfile && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+          <button
+            onClick={() => setShowRecurring(true)}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "8px 14px", borderRadius: 10,
+              background: "var(--secondary-bg)", color: "var(--terra-medium)",
+              border: "none", cursor: "pointer",
+              fontSize: 12, fontWeight: 600, minHeight: 36,
+            }}
+          >
+            <Repeat size={13} /> Plan récurrent
+          </button>
+          <button
+            onClick={() => setShowAbsenceRange(true)}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "8px 14px", borderRadius: 10,
+              background: "var(--secondary-bg)", color: "var(--text-secondary)",
+              border: "none", cursor: "pointer",
+              fontSize: 12, fontWeight: 600, minHeight: 36,
+            }}
+          >
+            <CalendarOff size={13} /> Marquer absent (durée)
+          </button>
         </div>
       )}
 
@@ -663,6 +697,442 @@ export default function PlanningPage() {
           </div>
         </div>
       )}
+
+      {/* ── RECURRING SCHEDULE SHEET (patron) ─────────────────────── */}
+      {showRecurring && activeProfile && isPatron && (
+        <RecurringScheduleSheet
+          activeUserName={activeProfile.name}
+          activeUserId={activeUserId!}
+          patronId={user!.id}
+          supabase={supabase}
+          existingSchedules={schedules.filter((s) => s.user_id === activeUserId)}
+          onClose={() => setShowRecurring(false)}
+          onApplied={(count) => {
+            haptic("success");
+            toast.success(`${count} shift${count > 1 ? "s" : ""} ajouté${count > 1 ? "s" : ""}`);
+            setShowRecurring(false);
+            fetchData();
+          }}
+          onError={(msg) => { haptic("error"); toast.error(msg); }}
+        />
+      )}
+
+      {/* ── ABSENCE RANGE SHEET (patron) ──────────────────────────── */}
+      {showAbsenceRange && activeProfile && isPatron && (
+        <AbsenceRangeSheet
+          activeUserName={activeProfile.name}
+          activeUserId={activeUserId!}
+          existingSchedules={schedules.filter((s) => s.user_id === activeUserId)}
+          supabase={supabase}
+          onClose={() => setShowAbsenceRange(false)}
+          onApplied={(count) => {
+            haptic("success");
+            toast.success(`Absence enregistrée (${count} jour${count > 1 ? "s" : ""})`);
+            setShowAbsenceRange(false);
+            fetchData();
+          }}
+          onError={(msg) => { haptic("error"); toast.error(msg); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// SUB-COMPONENT: Recurring schedule sheet
+// Patron defines weekday × time pattern + a date range. We insert
+// one schedule row for each matching day in the range, skipping
+// days that already have a shift for this user (avoid duplicates).
+// ─────────────────────────────────────────────────────────────
+
+type WeekdayKey = "lundi" | "mardi" | "mercredi" | "jeudi" | "vendredi" | "samedi" | "dimanche";
+const WEEKDAYS: { key: WeekdayKey; label: string; jsDow: number }[] = [
+  { key: "lundi", label: "Lun", jsDow: 1 },
+  { key: "mardi", label: "Mar", jsDow: 2 },
+  { key: "mercredi", label: "Mer", jsDow: 3 },
+  { key: "jeudi", label: "Jeu", jsDow: 4 },
+  { key: "vendredi", label: "Ven", jsDow: 5 },
+  { key: "samedi", label: "Sam", jsDow: 6 },
+  { key: "dimanche", label: "Dim", jsDow: 0 },
+];
+
+interface DayPattern { enabled: boolean; start: string; end: string; }
+
+function defaultPattern(): Record<WeekdayKey, DayPattern> {
+  return {
+    lundi: { enabled: false, start: "16:00", end: "01:00" },
+    mardi: { enabled: false, start: "16:00", end: "01:00" },
+    mercredi: { enabled: false, start: "16:00", end: "01:00" },
+    jeudi: { enabled: false, start: "16:00", end: "01:00" },
+    vendredi: { enabled: false, start: "16:00", end: "01:30" },
+    samedi: { enabled: false, start: "16:00", end: "01:30" },
+    dimanche: { enabled: false, start: "16:00", end: "01:00" },
+  };
+}
+
+function isoDate2(d: Date): string { return d.toISOString().slice(0, 10); }
+
+function RecurringScheduleSheet({
+  activeUserName, activeUserId, patronId, supabase, existingSchedules,
+  onClose, onApplied, onError,
+}: {
+  activeUserName: string;
+  activeUserId: string;
+  patronId: string;
+  supabase: ReturnType<typeof createClient>;
+  existingSchedules: Schedule[];
+  onClose: () => void;
+  onApplied: (count: number) => void;
+  onError: (msg: string) => void;
+}) {
+  const [pattern, setPattern] = useState<Record<WeekdayKey, DayPattern>>(defaultPattern());
+  const [fromDate, setFromDate] = useState<string>(() => isoDate2(new Date()));
+  const [toDate, setToDate] = useState<string>(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 1);
+    return isoDate2(d);
+  });
+  const [saving, setSaving] = useState(false);
+
+  function togglePatternDay(k: WeekdayKey) {
+    setPattern((p) => ({ ...p, [k]: { ...p[k], enabled: !p[k].enabled } }));
+  }
+  function setStart(k: WeekdayKey, v: string) {
+    setPattern((p) => ({ ...p, [k]: { ...p[k], start: v } }));
+  }
+  function setEnd(k: WeekdayKey, v: string) {
+    setPattern((p) => ({ ...p, [k]: { ...p[k], end: v } }));
+  }
+
+  // Compute target shifts to insert
+  const targetShifts: { date: string; start_time: string; end_time: string }[] = (() => {
+    const out: { date: string; start_time: string; end_time: string }[] = [];
+    if (!fromDate || !toDate) return out;
+    const start = new Date(fromDate + "T12:00:00");
+    const end = new Date(toDate + "T12:00:00");
+    if (end < start) return out;
+    const existingDates = new Set(existingSchedules.map((s) => s.date));
+    const cursor = new Date(start);
+    while (cursor <= end) {
+      const dow = cursor.getDay();
+      const wd = WEEKDAYS.find((w) => w.jsDow === dow)!;
+      const p = pattern[wd.key];
+      if (p.enabled) {
+        const iso = isoDate2(cursor);
+        if (!existingDates.has(iso)) {
+          out.push({ date: iso, start_time: p.start, end_time: p.end });
+        }
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return out;
+  })();
+
+  async function apply() {
+    if (targetShifts.length === 0) { onError("Aucun shift à créer (vérifie les jours et la plage)"); return; }
+    setSaving(true);
+    const rows = targetShifts.map((t) => ({
+      user_id: activeUserId, date: t.date, start_time: t.start_time, end_time: t.end_time, created_by: patronId,
+    }));
+    const { error } = await supabase.from("schedules").insert(rows);
+    setSaving(false);
+    if (error) { onError(`Erreur : ${error.message}`); return; }
+    onApplied(targetShifts.length);
+  }
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 100,
+      display: "flex", alignItems: "flex-end", justifyContent: "center",
+    }} onClick={onClose}>
+      <div style={{
+        position: "absolute", inset: 0,
+        background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)",
+      }} />
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="card-medium"
+        style={{
+          position: "relative", width: "100%", maxWidth: 512,
+          maxHeight: "90vh", overflowY: "auto",
+          padding: "20px 20px 24px",
+          borderRadius: "20px 20px 0 0",
+          animation: "fadeInUp 0.25s ease-out",
+        }}
+      >
+        <button onClick={onClose} style={{
+          position: "absolute", top: 14, right: 14,
+          background: "none", border: "none", cursor: "pointer", padding: 4,
+        }}>
+          <X size={20} style={{ color: "var(--text-tertiary)" }} />
+        </button>
+
+        <h2 style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--text-primary)", margin: 0, marginBottom: 4 }}>
+          Plan récurrent
+        </h2>
+        <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: 16 }}>
+          Pour <b style={{ color: "var(--terra-medium)" }}>{activeUserName}</b>. Coche les jours, règle les heures, choisis la plage de dates → on remplit le calendrier.
+        </p>
+
+        {/* Date range */}
+        <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: 11, color: "var(--text-tertiary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Du</p>
+            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} style={{
+              width: "100%", borderRadius: 10, border: "1px solid var(--border-color)",
+              background: "var(--input-bg)", padding: "10px 12px",
+              fontSize: 13, color: "var(--text-primary)", outline: "none",
+            }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: 11, color: "var(--text-tertiary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Au</p>
+            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} style={{
+              width: "100%", borderRadius: 10, border: "1px solid var(--border-color)",
+              background: "var(--input-bg)", padding: "10px 12px",
+              fontSize: 13, color: "var(--text-primary)", outline: "none",
+            }} />
+          </div>
+        </div>
+
+        {/* Day rows */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {WEEKDAYS.map((wd) => {
+            const p = pattern[wd.key];
+            return (
+              <div key={wd.key} className="card-light" style={{
+                padding: "10px 12px",
+                display: "flex", alignItems: "center", gap: 10,
+                opacity: p.enabled ? 1 : 0.6,
+              }}>
+                <button
+                  onClick={() => togglePatternDay(wd.key)}
+                  style={{
+                    width: 38, height: 32, borderRadius: 8,
+                    background: p.enabled ? "var(--gradient-primary)" : "var(--secondary-bg)",
+                    color: p.enabled ? "#fff" : "var(--text-tertiary)",
+                    border: "none", cursor: "pointer",
+                    fontSize: 12, fontWeight: 700,
+                  }}
+                >
+                  {wd.label}
+                </button>
+                <input
+                  type="time"
+                  value={p.start}
+                  onChange={(e) => setStart(wd.key, e.target.value)}
+                  disabled={!p.enabled}
+                  style={{
+                    flex: 1, borderRadius: 8, border: "1px solid var(--border-color)",
+                    background: "var(--input-bg)", padding: "6px 8px",
+                    fontSize: 13, color: "var(--text-primary)", outline: "none",
+                  }}
+                />
+                <span style={{ color: "var(--text-tertiary)", fontSize: 12 }}>→</span>
+                <input
+                  type="time"
+                  value={p.end}
+                  onChange={(e) => setEnd(wd.key, e.target.value)}
+                  disabled={!p.enabled}
+                  style={{
+                    flex: 1, borderRadius: 8, border: "1px solid var(--border-color)",
+                    background: "var(--input-bg)", padding: "6px 8px",
+                    fontSize: 13, color: "var(--text-primary)", outline: "none",
+                  }}
+                />
+              </div>
+            );
+          })}
+        </div>
+
+        <p style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 12, lineHeight: 1.5 }}>
+          {targetShifts.length === 0
+            ? "Aucun shift ne sera créé. Coche au moins un jour ou ajuste la plage."
+            : `${targetShifts.length} shift${targetShifts.length > 1 ? "s" : ""} seront créés. Les jours qui ont déjà un shift pour ${activeUserName} sont sautés automatiquement.`}
+        </p>
+
+        <button
+          onClick={apply}
+          disabled={saving || targetShifts.length === 0}
+          style={{
+            width: "100%", padding: "12px 0", borderRadius: 12, marginTop: 14,
+            background: "var(--gradient-primary)", color: "#fff",
+            border: "none", cursor: saving || targetShifts.length === 0 ? "default" : "pointer",
+            opacity: saving || targetShifts.length === 0 ? 0.5 : 1,
+            fontSize: 14, fontWeight: 600, minHeight: 48,
+          }}
+        >
+          {saving ? "..." : `Appliquer (${targetShifts.length})`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// SUB-COMPONENT: Absence range sheet
+// Patron marks a user as absent over a date range — bulk-creates
+// availability_requests with status='accepted' and removes any
+// schedules in the range so the calendar reflects the absence.
+// ─────────────────────────────────────────────────────────────
+
+function AbsenceRangeSheet({
+  activeUserName, activeUserId, existingSchedules, supabase, onClose, onApplied, onError,
+}: {
+  activeUserName: string;
+  activeUserId: string;
+  existingSchedules: Schedule[];
+  supabase: ReturnType<typeof createClient>;
+  onClose: () => void;
+  onApplied: (count: number) => void;
+  onError: (msg: string) => void;
+}) {
+  const [fromDate, setFromDate] = useState<string>(() => isoDate2(new Date()));
+  const [toDate, setToDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return isoDate2(d);
+  });
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  // Compute affected days
+  const affectedDays: string[] = (() => {
+    if (!fromDate || !toDate) return [];
+    const start = new Date(fromDate + "T12:00:00");
+    const end = new Date(toDate + "T12:00:00");
+    if (end < start) return [];
+    const out: string[] = [];
+    const cursor = new Date(start);
+    while (cursor <= end) {
+      out.push(isoDate2(cursor));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return out;
+  })();
+
+  const conflictShiftIds = existingSchedules.filter((s) => affectedDays.includes(s.date)).map((s) => s.id);
+
+  async function apply() {
+    if (affectedDays.length === 0) { onError("Plage vide"); return; }
+    setSaving(true);
+
+    // 1. Insert availability_requests with status='accepted' for each day
+    const requestRows = affectedDays.map((d) => ({
+      user_id: activeUserId,
+      date: d,
+      reason: reason.trim() || null,
+      status: "accepted" as const,
+    }));
+    const { error: reqErr } = await supabase.from("availability_requests").insert(requestRows);
+    if (reqErr) {
+      setSaving(false);
+      onError(`Erreur absence : ${reqErr.message}`);
+      return;
+    }
+
+    // 2. Delete conflicting schedules (the user won't work those days)
+    if (conflictShiftIds.length > 0) {
+      const { error: delErr } = await supabase.from("schedules").delete().in("id", conflictShiftIds);
+      if (delErr) {
+        setSaving(false);
+        onError(`Erreur suppression shifts : ${delErr.message}`);
+        return;
+      }
+    }
+
+    setSaving(false);
+    onApplied(affectedDays.length);
+  }
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 100,
+      display: "flex", alignItems: "flex-end", justifyContent: "center",
+    }} onClick={onClose}>
+      <div style={{
+        position: "absolute", inset: 0,
+        background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)",
+      }} />
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="card-medium"
+        style={{
+          position: "relative", width: "100%", maxWidth: 512,
+          maxHeight: "85vh", overflowY: "auto",
+          padding: "20px 20px 24px",
+          borderRadius: "20px 20px 0 0",
+          animation: "fadeInUp 0.25s ease-out",
+        }}
+      >
+        <button onClick={onClose} style={{
+          position: "absolute", top: 14, right: 14,
+          background: "none", border: "none", cursor: "pointer", padding: 4,
+        }}>
+          <X size={20} style={{ color: "var(--text-tertiary)" }} />
+        </button>
+
+        <h2 style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--text-primary)", margin: 0, marginBottom: 4 }}>
+          Marquer absent (durée)
+        </h2>
+        <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: 16 }}>
+          <b style={{ color: "var(--terra-medium)" }}>{activeUserName}</b> ne sera pas présent·e sur la plage choisie. Les shifts existants seront supprimés automatiquement.
+        </p>
+
+        <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: 11, color: "var(--text-tertiary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Du</p>
+            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} style={{
+              width: "100%", borderRadius: 10, border: "1px solid var(--border-color)",
+              background: "var(--input-bg)", padding: "10px 12px",
+              fontSize: 13, color: "var(--text-primary)", outline: "none",
+            }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: 11, color: "var(--text-tertiary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Au (inclus)</p>
+            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} style={{
+              width: "100%", borderRadius: 10, border: "1px solid var(--border-color)",
+              background: "var(--input-bg)", padding: "10px 12px",
+              fontSize: 13, color: "var(--text-primary)", outline: "none",
+            }} />
+          </div>
+        </div>
+
+        <div>
+          <p style={{ fontSize: 11, color: "var(--text-tertiary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Raison (optionnel)</p>
+          <textarea
+            placeholder="Ex: arrêt maladie, congés payés, formation…"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={2}
+            style={{
+              width: "100%", borderRadius: 10, border: "1px solid var(--border-color)",
+              background: "var(--input-bg)", padding: "10px 12px",
+              fontSize: 13, color: "var(--text-primary)",
+              outline: "none", resize: "none",
+              fontFamily: "inherit",
+            }}
+          />
+        </div>
+
+        <p style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 12, lineHeight: 1.5 }}>
+          {affectedDays.length} jour{affectedDays.length > 1 ? "s" : ""} d&apos;absence
+          {conflictShiftIds.length > 0 ? ` · ${conflictShiftIds.length} shift${conflictShiftIds.length > 1 ? "s" : ""} sera${conflictShiftIds.length > 1 ? "ont" : ""} supprimé${conflictShiftIds.length > 1 ? "s" : ""}` : ""}.
+        </p>
+
+        <button
+          onClick={apply}
+          disabled={saving || affectedDays.length === 0}
+          style={{
+            width: "100%", padding: "12px 0", borderRadius: 12, marginTop: 14,
+            background: "var(--danger)", color: "#fff",
+            border: "none", cursor: saving || affectedDays.length === 0 ? "default" : "pointer",
+            opacity: saving || affectedDays.length === 0 ? 0.5 : 1,
+            fontSize: 14, fontWeight: 600, minHeight: 48,
+          }}
+        >
+          {saving ? "..." : "Confirmer l'absence"}
+        </button>
+      </div>
     </div>
   );
 }
