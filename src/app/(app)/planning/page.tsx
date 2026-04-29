@@ -19,13 +19,14 @@ import { createClient } from "@/lib/supabase/client";
 import { haptic } from "@/lib/haptics";
 import type { Schedule, Profile, AvailabilityRequest } from "@/lib/types";
 import { ChevronLeft, ChevronRight, Plus, Trash2, X, CalendarOff, Check, Repeat } from "lucide-react";
+import { localISODate } from "@/lib/shift-utils";
 
 // ── Date helpers ──────────────────────────────────────────────
 
 const FR_MONTHS = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
 const FR_DAYS_SHORT = ["L", "M", "M", "J", "V", "S", "D"]; // Monday-first
 
-function isoDate(d: Date): string { return d.toISOString().slice(0, 10); }
+const isoDate = localISODate;
 function startOfMonth(y: number, m: number): Date { return new Date(y, m, 1); }
 function endOfMonth(y: number, m: number): Date { return new Date(y, m + 1, 0); }
 
@@ -809,7 +810,7 @@ function defaultPattern(): Record<WeekdayKey, DayPattern> {
   };
 }
 
-function isoDate2(d: Date): string { return d.toISOString().slice(0, 10); }
+const isoDate2 = localISODate;
 
 function RecurringScheduleSheet({
   activeUserName, activeUserId, patronId, supabase, existingSchedules,

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { createClient } from "@/lib/supabase/client";
-import { getShiftDate, formatDateFr } from "@/lib/shift-utils";
+import { getShiftDate, formatDateFr, localISODate } from "@/lib/shift-utils";
 import type { Debrief, Affluence, ClosingState, Profile, DebriefReply } from "@/lib/types";
 import { ChevronLeft, ChevronRight, ChevronDown, Send, AlertTriangle, MessageSquare, Lightbulb } from "lucide-react";
 
@@ -60,9 +60,9 @@ export default function DebriefPage() {
 
   const shiftDate = getShiftDate();
   const viewDate = (() => {
-    const d = new Date(shiftDate);
+    const d = new Date(shiftDate + "T12:00:00");
     d.setDate(d.getDate() + dateOffset);
-    return d.toISOString().split("T")[0];
+    return localISODate(d);
   })();
 
   const fetchData = useCallback(async () => {

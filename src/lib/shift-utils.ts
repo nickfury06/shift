@@ -1,5 +1,21 @@
 import type { Day } from "./types";
 
+/**
+ * Local-timezone-safe ISO date (YYYY-MM-DD).
+ *
+ * NEVER use `d.toISOString().slice(0, 10)` for date strings — it
+ * converts to UTC, which silently shifts the date by ±1 day depending
+ * on the local timezone (Paris UTC+2 in summer turns local midnight
+ * into 22h UTC the previous day → April 27 local renders as
+ * 2026-04-26 UTC).
+ */
+export function localISODate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 // ── SIMULATION MODE ───────────────────────────────────────
 // Only active in development if NEXT_PUBLIC_SIMULATE_DATE is set.
 // In production, always uses real time.

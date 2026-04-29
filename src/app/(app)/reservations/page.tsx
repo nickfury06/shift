@@ -6,7 +6,7 @@ import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/Confirm";
 import { createClient } from "@/lib/supabase/client";
 import { haptic } from "@/lib/haptics";
-import { getShiftDate, formatDateFr, formatTime, getNow } from "@/lib/shift-utils";
+import { getShiftDate, formatDateFr, formatTime, getNow, localISODate } from "@/lib/shift-utils";
 import { SEATING_LABELS, SEATING_ICONS, TYPE_LABELS, SOURCE_LABELS, SOURCE_ICONS } from "@/lib/constants";
 import type { Reservation, VenueTable, ReservationSeating, ReservationType, ReservationSource } from "@/lib/types";
 import type { Profile } from "@/lib/types";
@@ -52,9 +52,9 @@ export default function ReservationsPage() {
 
   const shiftDate = getShiftDate();
   const viewDate = (() => {
-    const d = new Date(shiftDate);
+    const d = new Date(shiftDate + "T12:00:00");
     d.setDate(d.getDate() + dateOffset);
-    return d.toISOString().split("T")[0];
+    return localISODate(d);
   })();
   const viewDateLabel = formatDateFr(viewDate);
   const isToday = dateOffset === 0;

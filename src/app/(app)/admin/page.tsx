@@ -5,7 +5,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { createClient } from "@/lib/supabase/client";
 import { haptic } from "@/lib/haptics";
-import { getShiftDate, formatDateFr } from "@/lib/shift-utils";
+import { getShiftDate, formatDateFr, localISODate } from "@/lib/shift-utils";
 import type { AvailabilityRequest, Profile, Debrief, DebriefReply } from "@/lib/types";
 import Link from "next/link";
 import {
@@ -44,9 +44,9 @@ export default function AdminPage() {
   const fetchData = useCallback(async () => {
     // 7-day window for stats
     const weekAgo = (() => {
-      const d = new Date(shiftDate);
+      const d = new Date(shiftDate + "T12:00:00");
       d.setDate(d.getDate() - 6);
-      return d.toISOString().slice(0, 10);
+      return localISODate(d);
     })();
     const [absRes, profRes, debRes, weekRes, replyRes, sgsRes] = await Promise.all([
       supabase.from("availability_requests").select("*").eq("status", "pending").order("date"),
