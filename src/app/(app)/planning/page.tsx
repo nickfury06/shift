@@ -415,6 +415,32 @@ export default function PlanningPage() {
           const hasShift = dayShifts.length > 0;
           const avail = availOn(iso);
 
+          // Day status drives the cell's color theme:
+          //   absent (accepted)  → red tint, struck date
+          //   pending request    → yellow tint
+          //   working            → terra dot(s)
+          //   off                → nothing
+          const isAbsent = avail?.status === "accepted";
+          const isPending = avail?.status === "pending";
+
+          // Background tint for absent / pending (subtle wash on the cell)
+          const cellBg = isSelected
+            ? "var(--gradient-primary)"
+            : isAbsent
+              ? "rgba(192,122,122,0.10)"
+              : isPending
+                ? "rgba(212,160,74,0.10)"
+                : "transparent";
+
+          // Date number color (red strike-through for absent days)
+          const dateColor = isSelected
+            ? "#fff"
+            : isAbsent
+              ? "var(--danger)"
+              : isToday
+                ? "var(--terra-medium)"
+                : "var(--text-primary)";
+
           return (
             <button
               key={iso}
@@ -423,7 +449,7 @@ export default function PlanningPage() {
                 aspectRatio: "1",
                 display: "flex", flexDirection: "column",
                 alignItems: "center", justifyContent: "center", gap: 2,
-                background: isSelected ? "var(--gradient-primary)" : "transparent",
+                background: cellBg,
                 border: "none", cursor: "pointer",
                 borderRadius: 10,
                 padding: "4px 2px",
@@ -434,29 +460,38 @@ export default function PlanningPage() {
               <div style={{
                 fontSize: 14,
                 fontWeight: isToday ? 700 : 500,
-                color: isSelected ? "#fff"
-                  : isToday ? "var(--terra-medium)"
-                  : "var(--text-primary)",
+                color: dateColor,
+                textDecoration: isAbsent && !isSelected ? "line-through" : "none",
                 width: 26, height: 26,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 borderRadius: "50%",
-                background: isToday && !isSelected ? "rgba(196,120,90,0.12)" : "transparent",
+                background: isToday && !isSelected && !isAbsent ? "rgba(196,120,90,0.12)" : "transparent",
               }}>
                 {d.getDate()}
               </div>
-              {/* Indicator: dot per shift (max 3 shown) */}
+              {/* Status dots */}
               <div style={{ display: "flex", gap: 2, height: 5 }}>
-                {hasShift && dayShifts.slice(0, 3).map((s, i) => (
-                  <div key={s.id || i} style={{
-                    width: 5, height: 5, borderRadius: "50%",
-                    background: isSelected ? "rgba(255,255,255,0.85)" : "var(--terra-medium)",
-                  }} />
-                ))}
-                {avail && avail.status === "pending" && (
+                {/* Accepted absence trumps shifts visually */}
+                {isAbsent ? (
                   <div style={{
                     width: 5, height: 5, borderRadius: "50%",
-                    background: isSelected ? "rgba(255,255,255,0.85)" : "var(--warning)",
+                    background: isSelected ? "rgba(255,255,255,0.85)" : "var(--danger)",
                   }} />
+                ) : (
+                  <>
+                    {hasShift && dayShifts.slice(0, 3).map((s, i) => (
+                      <div key={s.id || i} style={{
+                        width: 5, height: 5, borderRadius: "50%",
+                        background: isSelected ? "rgba(255,255,255,0.85)" : "var(--terra-medium)",
+                      }} />
+                    ))}
+                    {isPending && (
+                      <div style={{
+                        width: 5, height: 5, borderRadius: "50%",
+                        background: isSelected ? "rgba(255,255,255,0.85)" : "var(--warning)",
+                      }} />
+                    )}
+                  </>
                 )}
               </div>
             </button>
@@ -467,15 +502,19 @@ export default function PlanningPage() {
       {/* Legend */}
       <div style={{
         display: "flex", gap: 12, justifyContent: "center", marginTop: 10,
-        fontSize: 11, color: "var(--text-tertiary)",
+        fontSize: 11, color: "var(--text-tertiary)", flexWrap: "wrap",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <div style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--terra-medium)" }} />
-          shift
+          <div style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--terra-medium)" }} />
+          shift travaillé
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <div style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--warning)" }} />
-          absence demandée
+          <div style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--warning)" }} />
+          demande en attente
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <div style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--danger)" }} />
+          absence confirmée
         </div>
       </div>
 
